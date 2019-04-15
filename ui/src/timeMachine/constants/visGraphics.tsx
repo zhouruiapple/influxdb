@@ -608,4 +608,9 @@ export const VIS_GRAPHICS = [
     name: 'Table',
     graphic: GRAPHIC_SVGS[ViewType.Table],
   },
+  {
+    type: ViewType.Vis,
+    name: 'Custom',
+    graphic: GRAPHIC_SVGS[ViewType.XY],
+  },
 ]

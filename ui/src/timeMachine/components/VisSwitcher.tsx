@@ -2,6 +2,7 @@
 import React, {FunctionComponent} from 'react'
 import {connect} from 'react-redux'
 import {AutoSizer} from 'react-virtualized'
+import {Plot} from '@influxdata/vis'
 
 // Components
 import RawFluxDataTable from 'src/timeMachine/components/RawFluxDataTable'
@@ -12,6 +13,7 @@ import TableGraphs from 'src/shared/components/tables/TableGraphs'
 import DygraphContainer from 'src/shared/components/DygraphContainer'
 import Histogram from 'src/shared/components/Histogram'
 import HistogramTransform from 'src/timeMachine/components/HistogramTransform'
+import VisTransform from 'src/timeMachine/components/VisTransform'
 
 // Utils
 import {getActiveTimeMachine, getTables} from 'src/timeMachine/selectors'
@@ -119,6 +121,12 @@ const VisSwitcher: FunctionComponent<StateProps> = ({
             />
           )}
         </HistogramTransform>
+      )
+    case ViewType.Vis:
+      return (
+        <VisTransform config={properties.config}>
+          {modifiedConfig => <Plot config={modifiedConfig} />}
+        </VisTransform>
       )
     default:
       return null

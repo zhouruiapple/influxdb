@@ -383,6 +383,12 @@ func UnmarshalViewPropertiesJSON(b []byte) (ViewProperties, error) {
 				return nil, err
 			}
 			vis = hv
+		case "vis":
+			var vv VisViewProperties
+			if err := json.Unmarshal(v.B, &vv); err != nil {
+				return nil, err
+			}
+			vis = vv
 		}
 	case "empty":
 		var ev EmptyViewProperties
@@ -471,6 +477,14 @@ func MarshalViewPropertiesJSON(v ViewProperties) ([]byte, error) {
 		}{
 			Shape:             "chronograf-v2",
 			LogViewProperties: vis,
+		}
+	case VisViewProperties:
+		s = struct {
+			Shape string `json:"shape"`
+			VisViewProperties
+		}{
+			Shape:             "chronograf-v2",
+			VisViewProperties: vis,
 		}
 	default:
 		s = struct {
@@ -647,6 +661,14 @@ type LogColumnSetting struct {
 	Name  string `json:"name,omitempty"`
 }
 
+type VisViewProperties struct {
+	Type              string           `json:"type"`
+	Config            interface{}      `json:"config"`
+	Queries           []DashboardQuery `json:"queries"`
+	Note              string           `json:"note"`
+	ShowNoteWhenEmpty bool             `json:"showNoteWhenEmpty"`
+}
+
 func (XYViewProperties) viewProperties()             {}
 func (LinePlusSingleStatProperties) viewProperties() {}
 func (SingleStatViewProperties) viewProperties()     {}
@@ -655,6 +677,7 @@ func (GaugeViewProperties) viewProperties()          {}
 func (TableViewProperties) viewProperties()          {}
 func (MarkdownViewProperties) viewProperties()       {}
 func (LogViewProperties) viewProperties()            {}
+func (VisViewProperties) viewProperties()            {}
 
 func (v XYViewProperties) GetType() string             { return v.Type }
 func (v LinePlusSingleStatProperties) GetType() string { return v.Type }
@@ -664,6 +687,7 @@ func (v GaugeViewProperties) GetType() string          { return v.Type }
 func (v TableViewProperties) GetType() string          { return v.Type }
 func (v MarkdownViewProperties) GetType() string       { return v.Type }
 func (v LogViewProperties) GetType() string            { return v.Type }
+func (v VisViewProperties) GetType() string            { return v.Type }
 
 /////////////////////////////
 // Old Chronograf Types

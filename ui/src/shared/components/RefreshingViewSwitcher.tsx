@@ -1,5 +1,6 @@
 // Libraries
 import React, {FunctionComponent} from 'react'
+import {Plot} from '@influxdata/vis'
 
 // Components
 import GaugeChart from 'src/shared/components/GaugeChart'
@@ -8,7 +9,10 @@ import SingleStatTransform from 'src/shared/components/SingleStatTransform'
 import TableGraphs from 'src/shared/components/tables/TableGraphs'
 import DygraphContainer from 'src/shared/components/DygraphContainer'
 import Histogram from 'src/shared/components/Histogram'
-import VisTableTransform from 'src/shared/components/VisTableTransform'
+import TableTransform from 'src/shared/components/TableTransform'
+
+// Constants
+import {VIS_DEFAULTS} from 'src/shared/constants'
 
 // Types
 import {
@@ -91,9 +95,17 @@ const RefreshingViewSwitcher: FunctionComponent<Props> = ({
       )
     case ViewType.Histogram:
       return (
-        <VisTableTransform tables={tables}>
+        <TableTransform tables={tables}>
           {table => <Histogram table={table} properties={properties} />}
-        </VisTableTransform>
+        </TableTransform>
+      )
+    case ViewType.Vis:
+      return (
+        <TableTransform tables={tables}>
+          {table => (
+            <Plot config={{...VIS_DEFAULTS, ...properties.config, table}} />
+          )}
+        </TableTransform>
       )
     default:
       return <div />

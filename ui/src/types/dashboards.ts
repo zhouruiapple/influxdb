@@ -126,6 +126,7 @@ export type ViewProperties =
   | MarkdownView
   | EmptyView
   | HistogramView
+  | VisView
 
 export type QueryViewProperties = Extract<
   ViewProperties,
@@ -237,6 +238,14 @@ export interface HistogramView {
   showNoteWhenEmpty: boolean
 }
 
+export interface VisView {
+  type: ViewType.Vis
+  config: any
+  queries: DashboardQuery[]
+  note: string
+  showNoteWhenEmpty: boolean
+}
+
 export interface MarkdownView {
   type: ViewType.Markdown
   shape: ViewShape.ChronografV2
@@ -257,6 +266,7 @@ export enum ViewType {
   Markdown = 'markdown',
   LogViewer = 'log-viewer',
   Histogram = 'histogram',
+  Vis = 'vis',
 }
 
 export interface DashboardFile {

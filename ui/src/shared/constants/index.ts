@@ -444,3 +444,17 @@ export const GIT_SHA = process.env.GIT_SHA
 export const CLOUD = process.env.CLOUD && process.env.CLOUD === 'true'
 export const CLOUD_SIGNIN_PATHNAME = '/api/v2/signin'
 export const CLOUD_SIGNOUT_URL = process.env.CLOUD_LOGOUT_URL
+
+export const VIS_DEFAULTS = {
+  axisColor: '#31313d',
+  gridColor: '#31313d',
+  gridOpacity: 1,
+  tickFont: '12px RobotoMono',
+  tickFontColor: '#c6cad3',
+  legendFont: '12px RobotoMono',
+  legendFontColor: '#8e91a1',
+  legendFontBrightColor: '#c6cad3',
+  legendBackgroundColor: '#1c1c21',
+  legendBorder: '1px solid #202028',
+  legendCrosshairColor: '#31313d',
+}

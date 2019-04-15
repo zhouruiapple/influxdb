@@ -14,6 +14,7 @@ import {
   HistogramView,
   LinePlusSingleStatView,
   SingleStatView,
+  VisView,
   TableView,
   GaugeView,
   MarkdownView,
@@ -125,6 +126,27 @@ const NEW_VIEW_CREATORS = {
       position: 'stacked',
       binCount: 30,
       colors: DEFAULT_LINE_COLORS,
+      note: '',
+      showNoteWhenEmpty: false,
+    },
+  }),
+  [ViewType.Vis]: (): NewView<VisView> => ({
+    ...defaultView(),
+    properties: {
+      type: ViewType.Vis,
+      config: {
+        layers: [
+          {
+            type: 'line',
+            x: null,
+            y: null,
+            fill: [],
+            colors: DEFAULT_LINE_COLORS.map(c => c.hex),
+            interpolation: 'linear',
+          },
+        ],
+      },
+      queries: [],
       note: '',
       showNoteWhenEmpty: false,
     },
