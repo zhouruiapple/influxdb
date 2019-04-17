@@ -6,6 +6,7 @@ export const GROUP_KEY_COL_NAME = 'group_key'
 export interface ToMinardTableResult {
   table: Table
   schemaConflicts: string[]
+  defaultGroupColumns: string[]
 }
 
 /*
@@ -55,6 +56,7 @@ export interface ToMinardTableResult {
 export const toMinardTable = (tables: FluxTable[]): ToMinardTableResult => {
   const outColumns = {}
   const schemaConflicts = []
+  const defaultGroupColumns = new Set()
 
   let k = 0
 
@@ -102,11 +104,16 @@ export const toMinardTable = (tables: FluxTable[]): ToMinardTableResult => {
     }
 
     k += table.data.length - 1
+
+    for (const columnKey of Object.keys(table.groupKey)) {
+      defaultGroupColumns.add(columnKey)
+    }
   }
 
   const result: ToMinardTableResult = {
     table: {columns: outColumns, length: k},
     schemaConflicts,
+    defaultGroupColumns: [...defaultGroupColumns],
   }
 
   return result

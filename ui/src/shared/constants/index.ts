@@ -449,7 +449,7 @@ export const VIS_DEFAULTS = {
   axisColor: '#31313d',
   gridColor: '#31313d',
   gridOpacity: 1,
-  tickFont: '12px RobotoMono',
+  tickFont: '10px RobotoMono',
   tickFontColor: '#c6cad3',
   legendFont: '12px RobotoMono',
   legendFontColor: '#8e91a1',

@@ -194,3 +194,7 @@ $cell--header-size: 36px;
     display: none;
   }
 }
+
+.vis-tooltip-container {
+  z-index: $z--dygraph-legend;
+}

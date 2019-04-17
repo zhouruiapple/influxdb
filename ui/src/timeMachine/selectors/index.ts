@@ -1,11 +1,20 @@
 // Libraries
 import memoizeOne from 'memoize-one'
 import {get, flatMap} from 'lodash'
-import {Table, isNumeric} from '@influxdata/vis'
 
 // Utils
 import {parseResponse} from 'src/shared/parsing/flux/response'
-import {toMinardTable} from 'src/shared/utils/toMinardTable'
+import {
+  toMinardTable,
+  ToMinardTableResult,
+} from 'src/shared/utils/toMinardTable'
+import {
+  getNumericColumns as getNumericColumnsFn,
+  getGroupableColumns as getGroupableColumnsFn,
+  resolveMappings,
+  resolveNumericMapping,
+  resolveGroupMapping,
+} from 'src/shared/utils/vis'
 
 // Types
 import {
@@ -38,63 +47,30 @@ export const getTables = (state: AppState): FluxTable[] =>
 
 const getVisTableMemoized = memoizeOne(toMinardTable)
 
-export const getVisTable = (state: AppState): Table => {
+export const getVisTable = (state: AppState): ToMinardTableResult => {
   const fluxTables = getTables(state)
-  const {table} = getVisTableMemoized(fluxTables)
+  const result = getVisTableMemoized(fluxTables)
 
-  return table
+  return result
 }
 
-const getNumericColumnsMemoized = memoizeOne(
-  (table: Table): string[] => {
-    const numericColumns = Object.entries(table.columns)
-      .filter(([__, {type}]) => isNumeric(type))
-      .map(([name]) => name)
-
-    return numericColumns
-  }
-)
+const getNumericColumnsMemoized = memoizeOne(getNumericColumnsFn)
 
 export const getNumericColumns = (state: AppState): string[] => {
-  const table = getVisTable(state)
+  const table = getVisTable(state).table
 
   return getNumericColumnsMemoized(table)
 }
 
-const getGroupableColumnsMemoized = memoizeOne(
-  (table: Table): string[] => {
-    const invalidGroupColumns = new Set(['_value', '_start', '_stop', '_time'])
-    const groupableColumns = Object.keys(table.columns).filter(
-      name => !invalidGroupColumns.has(name)
-    )
-
-    return groupableColumns
-  }
-)
+const getGroupableColumnsMemoized = memoizeOne(getGroupableColumnsFn)
 
 export const getGroupableColumns = (state: AppState): string[] => {
-  const table = getVisTable(state)
+  const table = getVisTable(state).table
 
   return getGroupableColumnsMemoized(table)
 }
 
-const getXColumnSelectionMemoized = memoizeOne(
-  (validXColumns: string[], preference: string): string => {
-    if (preference && validXColumns.includes(preference)) {
-      return preference
-    }
-
-    if (validXColumns.includes('_value')) {
-      return '_value'
-    }
-
-    if (validXColumns.length) {
-      return validXColumns[0]
-    }
-
-    return null
-  }
-)
+const getXColumnSelectionMemoized = memoizeOne(resolveNumericMapping)
 
 export const getXColumnSelection = (state: AppState): string => {
   const validXColumns = getNumericColumns(state)
@@ -103,15 +79,7 @@ export const getXColumnSelection = (state: AppState): string => {
   return getXColumnSelectionMemoized(validXColumns, preference)
 }
 
-const getFillColumnsSelectionMemoized = memoizeOne(
-  (validFillColumns: string[], preference: string[]): string[] => {
-    if (preference && preference.every(col => validFillColumns.includes(col))) {
-      return preference
-    }
-
-    return []
-  }
-)
+const getFillColumnsSelectionMemoized = memoizeOne(resolveGroupMapping)
 
 export const getFillColumnsSelection = (state: AppState): string[] => {
   const validFillColumns = getGroupableColumns(state)
@@ -141,6 +109,17 @@ export const getSaveableView = (state: AppState): QueryView & {id?: string} => {
         ...saveableView.properties,
         xColumn: getXColumnSelection(state),
         fillColumns: getFillColumnsSelection(state),
+      },
+    }
+  } else if (saveableView.properties.type === ViewType.Vis) {
+    saveableView = {
+      ...saveableView,
+      properties: {
+        ...saveableView.properties,
+        config: resolveMappings(
+          saveableView.properties.config,
+          getVisTable(state)
+        ),
       },
     }
   }

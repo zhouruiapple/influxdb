@@ -1,0 +1,21 @@
+@import "src/style/modules";
+
+.vis-layer-options {
+  margin: $ix-marg-c 0;
+}
+
+.vis-layer-options--header {
+  cursor: pointer;
+}
+
+.vis-layer-options.active .vis-layer-options--header {
+  color: $c-pool;
+}
+
+.vis-layer-options--header .icon {
+  padding-right: $ix-marg-b;
+}
+
+.vis-layer-options--children {
+  padding-top: $ix-marg-c;
+}

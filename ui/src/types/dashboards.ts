@@ -240,6 +240,7 @@ export interface HistogramView {
 
 export interface VisView {
   type: ViewType.Vis
+  shape: ViewShape.ChronografV2
   config: any
   queries: DashboardQuery[]
   note: string

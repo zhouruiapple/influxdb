@@ -334,6 +334,12 @@ export const timeMachineReducer = (
       return setViewProperties(state, {xDomain})
     }
 
+    case 'SET_VIS_CONFIG': {
+      const {config} = action.payload
+
+      return setViewProperties(state, {config})
+    }
+
     case 'SET_PREFIX': {
       const {prefix} = action.payload
 

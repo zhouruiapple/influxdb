@@ -39,7 +39,7 @@ const HistogramTransform: FunctionComponent<Props> = ({
 }
 
 const mstp = (state: AppState) => {
-  const table = getVisTable(state)
+  const table = getVisTable(state).table
   const xColumn = getXColumnSelection(state)
   const fillColumns = getFillColumnsSelection(state)
 

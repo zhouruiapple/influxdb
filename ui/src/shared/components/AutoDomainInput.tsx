@@ -87,8 +87,8 @@ const MinMaxInputs: SFC<MinMaxInputsProps> = ({
 }
 
 interface AutoDomainInputProps {
-  domain: [number, number]
-  onSetDomain: (domain: [number, number]) => void
+  domain: number[]
+  onSetDomain: (domain: number[]) => void
   label?: string
 }
 

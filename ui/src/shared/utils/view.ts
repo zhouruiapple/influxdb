@@ -134,13 +134,14 @@ const NEW_VIEW_CREATORS = {
     ...defaultView(),
     properties: {
       type: ViewType.Vis,
+      shape: ViewShape.ChronografV2,
       config: {
         layers: [
           {
             type: 'line',
             x: null,
             y: null,
-            fill: [],
+            fill: null,
             colors: DEFAULT_LINE_COLORS.map(c => c.hex),
             interpolation: 'linear',
           },

@@ -22,7 +22,7 @@ import {
   AutoRefresh,
 } from 'src/types'
 import {Color} from 'src/types/colors'
-import {HistogramPosition} from '@influxdata/vis'
+import {HistogramPosition, Config} from '@influxdata/vis'
 
 export type Action =
   | QueryBuilderAction
@@ -67,6 +67,7 @@ export type Action =
   | SetHistogramPositionAction
   | SetXDomainAction
   | SetXAxisLabelAction
+  | SetConfigAction
 
 interface SetActiveTimeMachineAction {
   type: 'SET_ACTIVE_TIME_MACHINE'
@@ -526,4 +527,14 @@ interface SetXAxisLabelAction {
 export const setXAxisLabel = (xAxisLabel: string): SetXAxisLabelAction => ({
   type: 'SET_X_AXIS_LABEL',
   payload: {xAxisLabel},
+})
+
+interface SetConfigAction {
+  type: 'SET_VIS_CONFIG'
+  payload: {config: Partial<Config>}
+}
+
+export const setConfig = (config: Partial<Config>): SetConfigAction => ({
+  type: 'SET_VIS_CONFIG',
+  payload: {config},
 })
