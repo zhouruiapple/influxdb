@@ -5,7 +5,7 @@ import {LineLayerConfig} from '@influxdata/vis'
 import {
   Form,
   Dropdown,
-  MultiSelectDropdown,
+  // MultiSelectDropdown,
   ComponentStatus,
 } from '@influxdata/clockface'
 
@@ -31,17 +31,15 @@ const VisLineLayerOptions: FunctionComponent<Props> = ({
   layer,
   onSetLayer,
   numericColumns,
-  groupColumns,
+  // groupColumns,
 }) => {
   const numericDropdownStatus = numericColumns.length
     ? ComponentStatus.Default
     : ComponentStatus.Disabled
 
-  const groupDropdownStatus = groupColumns.length
-    ? ComponentStatus.Default
-    : ComponentStatus.Disabled
-
-  console.log(layer.fill)
+  // const groupDropdownStatus = groupColumns.length
+  //   ? ComponentStatus.Default
+  //   : ComponentStatus.Disabled
 
   return (
     <>
@@ -73,6 +71,32 @@ const VisLineLayerOptions: FunctionComponent<Props> = ({
           ))}
         </Dropdown>
       </Form.Element>
+      <Form.Element label="Interpolation">
+        <Dropdown
+          selectedID={layer.interpolation}
+          onChange={interpolation => onSetLayer({...layer, interpolation})}
+        >
+          <Dropdown.Item id="linear" key="linear" value="linear">
+            Linear
+          </Dropdown.Item>
+          <Dropdown.Item id="monotoneX" key="monotoneX" value="monotoneX">
+            Smooth (X-Monotonic)
+          </Dropdown.Item>
+          <Dropdown.Item id="monotoneY" key="monotoneY" value="monotoneY">
+            Smooth (Y-Monotonic)
+          </Dropdown.Item>
+          <Dropdown.Item id="step" key="step" value="step">
+            Step
+          </Dropdown.Item>
+          <Dropdown.Item id="stepBefore" key="stepBefore" value="stepBefore">
+            Step Before
+          </Dropdown.Item>
+          <Dropdown.Item id="stepAfter" key="stepAfter" value="stepAfter">
+            Step After
+          </Dropdown.Item>
+        </Dropdown>
+      </Form.Element>
+      {/*
       <Form.Element label="Group By">
         <MultiSelectDropdown
           selectedIDs={layer.fill}
@@ -90,6 +114,7 @@ const VisLineLayerOptions: FunctionComponent<Props> = ({
           ))}
         </MultiSelectDropdown>
       </Form.Element>
+      */}
     </>
   )
 }

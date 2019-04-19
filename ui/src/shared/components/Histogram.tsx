@@ -11,6 +11,7 @@ import {useOneWayState} from 'src/shared/utils/useOneWayState'
 
 // Constants
 import {INVALID_DATA_COPY} from 'src/shared/copy/cell'
+import {VIS_DEFAULTS} from 'src/shared/constants'
 
 // Types
 import {HistogramView} from 'src/types/dashboards'
@@ -46,6 +47,7 @@ const Histogram: FunctionComponent<Props> = ({
 
   const config: Config = useMemo(
     () => ({
+      ...VIS_DEFAULTS,
       table,
       xDomain,
       onSetXDomain,

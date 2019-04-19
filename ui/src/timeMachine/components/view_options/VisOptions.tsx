@@ -59,25 +59,11 @@ const VisOptions: FunctionComponent<Props> = ({
 
   return (
     <Grid.Column>
-      <h5 className="view-options--header">Layers</h5>
-      <Button
-        text="Add Layer"
-        color={ComponentColor.Primary}
-        icon={IconFont.Plus}
-        size={ComponentSize.ExtraSmall}
+      <h4 className="view-options--header">Visualization Options</h4>
+      <VisLineLayerOptions
+        layer={resolvedConfig.layers[0] as any}
+        onSetLayer={onSetLayer(0)}
       />
-      {resolvedConfig.layers.map((layer, i) => {
-        if (layer.type === 'line') {
-          return (
-            <VisLayerOptions layer={layer} key={`${i}-${layer.type}`}>
-              <VisLineLayerOptions layer={layer} onSetLayer={onSetLayer(i)} />
-            </VisLayerOptions>
-          )
-        }
-
-        return null
-      })}
-      <h5 className="view-options--header">Base Options</h5>
       <VisBaseOptions config={resolvedConfig} onSetConfig={onSetConfig} />
     </Grid.Column>
   )

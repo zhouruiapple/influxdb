@@ -1,4 +1,5 @@
 import _ from 'lodash'
+import {format} from 'd3-format'
 import {AutoRefreshStatus} from 'src/types'
 
 export const DEFAULT_TIME_FORMAT = 'YYYY-MM-DD HH:mm:ss'
@@ -445,16 +446,19 @@ export const CLOUD = process.env.CLOUD && process.env.CLOUD === 'true'
 export const CLOUD_SIGNIN_PATHNAME = '/api/v2/signin'
 export const CLOUD_SIGNOUT_URL = process.env.CLOUD_LOGOUT_URL
 
+const format2s = format('.2s')
+
 export const VIS_DEFAULTS = {
+  yTickFormatter: t => `${format2s(t)}`,
   axisColor: '#31313d',
   gridColor: '#31313d',
   gridOpacity: 1,
-  tickFont: '10px RobotoMono',
+  tickFont: 'bold 12px Roboto',
   tickFontColor: '#c6cad3',
   legendFont: '12px RobotoMono',
   legendFontColor: '#8e91a1',
   legendFontBrightColor: '#c6cad3',
   legendBackgroundColor: '#1c1c21',
   legendBorder: '1px solid #202028',
-  legendCrosshairColor: '#31313d',
+  legendCrosshairColor: '#676978',
 }
