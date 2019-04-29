@@ -851,7 +851,7 @@ func (c *Compactor) WriteSnapshot(ctx context.Context, cache *Cache) ([]string, 
 	resC := make(chan res, concurrency)
 	for i := 0; i < concurrency; i++ {
 		go func(sp *Cache) {
-			iter := NewCacheKeyIterator(sp, MaxPointsPerBlock, intC)
+			iter := newCacheKeyIterator(sp, MaxPointsPerBlock, intC)
 			files, err := c.writeNewFiles(c.FileStore.NextGeneration(), 0, nil, iter, throttle)
 			resC <- res{files: files, err: err}
 
@@ -940,7 +940,7 @@ func (c *Compactor) compact(fast bool, tsmFiles []string) ([]string, error) {
 		return nil, nil
 	}
 
-	tsm, err := NewTSMBatchKeyIterator(size, fast, intC, trs...)
+	tsm, err := newTSMBatchKeyIterator(size, fast, intC, trs...)
 	if err != nil {
 		return nil, err
 	}
@@ -1228,9 +1228,6 @@ type KeyIterator interface {
 	// or any error that occurred.
 	Read() (key []byte, minTime int64, maxTime int64, data []byte, err error)
 
-	// Close closes the iterator.
-	Close() error
-
 	// Err returns any errors encountered during iteration.
 	Err() error
 
@@ -1393,9 +1390,9 @@ type tsmBatchKeyIterator struct {
 	interrupt chan struct{}
 }
 
-// NewTSMBatchKeyIterator returns a new TSM key iterator from readers.
+// newTSMBatchKeyIterator returns a new TSM key iterator from readers.
 // size indicates the maximum number of values to encode in a single block.
-func NewTSMBatchKeyIterator(size int, fast bool, interrupt chan struct{}, readers ...*TSMReader) (KeyIterator, error) {
+func newTSMBatchKeyIterator(size int, fast bool, interrupt chan struct{}, readers ...*TSMReader) (*tsmBatchKeyIterator, error) {
 	var iter []*BlockIterator
 	for _, r := range readers {
 		iter = append(iter, r.BlockIterator())
@@ -1613,7 +1610,7 @@ func (k *tsmBatchKeyIterator) Read() ([]byte, int64, int64, []byte, error) {
 	return block.key, block.minTime, block.maxTime, block.b, k.err
 }
 
-func (k *tsmBatchKeyIterator) Close() error {
+func (k *tsmBatchKeyIterator) KClose() error {
 	k.values = nil
 	k.pos = nil
 	k.iterators = nil
@@ -1649,8 +1646,8 @@ type cacheBlock struct {
 	err              error
 }
 
-// NewCacheKeyIterator returns a new KeyIterator from a Cache.
-func NewCacheKeyIterator(cache *Cache, size int, interrupt chan struct{}) KeyIterator {
+// newCacheKeyIterator returns a new KeyIterator from a Cache.
+func newCacheKeyIterator(cache *Cache, size int, interrupt chan struct{}) *cacheKeyIterator {
 	keys := cache.Keys()
 
 	chans := make([]chan struct{}, len(keys))
