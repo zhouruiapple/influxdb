@@ -1159,7 +1159,7 @@ func (s *compactionStrategy) compactGroup(ctx context.Context) {
 		return
 	}
 
-	if err := s.fileStore.ReplaceWithCallback(group, files, nil); err != nil {
+	if err := s.fileStore.Replace(group, files); err != nil {
 		tracing.LogError(span, err)
 		log.Info("Error replacing new TSM files", zap.Error(err))
 		s.tracker.Attempted(s.level, false, "", 0)

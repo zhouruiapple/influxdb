@@ -795,17 +795,8 @@ func (f *FileStore) Stats() []FileStat {
 	return f.lastFileStats
 }
 
-// ReplaceWithCallback replaces oldFiles with newFiles and calls updatedFn with the files to be added the FileStore.
-func (f *FileStore) ReplaceWithCallback(oldFiles, newFiles []string, updatedFn func(r []TSMFile)) error {
-	return f.replace(oldFiles, newFiles, updatedFn)
-}
-
 // Replace replaces oldFiles with newFiles.
 func (f *FileStore) Replace(oldFiles, newFiles []string) error {
-	return f.replace(oldFiles, newFiles, nil)
-}
-
-func (f *FileStore) replace(oldFiles, newFiles []string, updatedFn func(r []TSMFile)) error {
 	if len(oldFiles) == 0 && len(newFiles) == 0 {
 		return nil
 	}
@@ -867,10 +858,6 @@ func (f *FileStore) replace(oldFiles, newFiles []string, updatedFn func(r []TSMF
 		tsm.WithObserver(f.obs)
 
 		updated = append(updated, tsm)
-	}
-
-	if updatedFn != nil {
-		updatedFn(updated)
 	}
 
 	f.mu.Lock()
