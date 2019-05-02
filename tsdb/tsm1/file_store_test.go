@@ -2357,7 +2357,7 @@ func TestFileStore_Open(t *testing.T) {
 		keyValues{"mem", []tsm1.Value{tsm1.NewValue(0, 1.0)}},
 	}
 
-	_, err := newFileDir(dir, data...)
+	_, err := newFiles(dir, data...)
 	if err != nil {
 		fatal(t, "creating test files", err)
 	}
@@ -2388,7 +2388,7 @@ func TestFileStore_Remove(t *testing.T) {
 		keyValues{"mem", []tsm1.Value{tsm1.NewValue(0, 1.0)}},
 	}
 
-	files, err := newFileDir(dir, data...)
+	files, err := newFiles(dir, data...)
 	if err != nil {
 		fatal(t, "creating test files", err)
 	}
@@ -2433,7 +2433,7 @@ func TestFileStore_Replace(t *testing.T) {
 		keyValues{"cpu", []tsm1.Value{tsm1.NewValue(2, 3.0)}},
 	}
 
-	files, err := newFileDir(dir, data...)
+	files, err := newFiles(dir, data...)
 	if err != nil {
 		fatal(t, "creating test files", err)
 	}
@@ -2523,7 +2523,7 @@ func TestFileStore_Open_Deleted(t *testing.T) {
 		keyValues{"mem,host=server1!~#!value", []tsm1.Value{tsm1.NewValue(0, 1.0)}},
 	}
 
-	_, err := newFileDir(dir, data...)
+	_, err := newFiles(dir, data...)
 	if err != nil {
 		fatal(t, "creating test files", err)
 	}
@@ -2635,7 +2635,7 @@ func TestFileStore_Stats(t *testing.T) {
 		keyValues{"mem", []tsm1.Value{tsm1.NewValue(0, 1.0)}},
 	}
 
-	files, err := newFileDir(dir, data...)
+	files, err := newFiles(dir, data...)
 	if err != nil {
 		fatal(t, "creating test files", err)
 	}
@@ -2857,40 +2857,6 @@ func TestFileStore_Observer(t *testing.T) {
 	unlinks, finishes = nil, nil
 }
 
-func newFileDir(dir string, values ...keyValues) ([]string, error) {
-	var files []string
-
-	id := 1
-	for _, v := range values {
-		f := MustTempFile(dir)
-		w, err := tsm1.NewTSMWriter(f)
-		if err != nil {
-			return nil, err
-		}
-
-		if err := w.Write([]byte(v.key), v.values); err != nil {
-			return nil, err
-		}
-
-		if err := w.WriteIndex(); err != nil {
-			return nil, err
-		}
-
-		if err := w.Close(); err != nil {
-			return nil, err
-		}
-		newName := filepath.Join(filepath.Dir(f.Name()), tsm1.DefaultFormatFileName(id, 1)+".tsm")
-		if err := os.Rename(f.Name(), newName); err != nil {
-			return nil, err
-		}
-		id++
-
-		files = append(files, newName)
-	}
-	return files, nil
-
-}
-
 func newFiles(dir string, values ...keyValues) ([]string, error) {
 	var files []string
 
@@ -2962,7 +2928,7 @@ func BenchmarkFileStore_Stats(b *testing.B) {
 		data = append(data, keyValues{"cpu", []tsm1.Value{tsm1.NewValue(0, 1.0)}})
 	}
 
-	_, err := newFileDir(dir, data...)
+	_, err := newFiles(dir, data...)
 	if err != nil {
 		b.Fatalf("creating benchmark files %v", err)
 	}
