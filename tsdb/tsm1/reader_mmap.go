@@ -4,8 +4,10 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
+	"reflect"
 	"sync"
 	"sync/atomic"
+	"unsafe"
 
 	"github.com/influxdata/influxdb/pkg/file"
 	"go.uber.org/zap"
@@ -119,10 +121,16 @@ func (m *mmapAccessor) rename(path string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	hdrp := (*reflect.SliceHeader)(unsafe.Pointer(&m.b))
+	fmt.Printf("%p %v %v %v\n", m.b, hdrp.Data, hdrp.Len, hdrp.Cap)
+
 	err := munmap(m.b)
 	if err != nil {
 		return err
 	}
+
+	hdrp = (*reflect.SliceHeader)(unsafe.Pointer(&m.b))
+	fmt.Printf("%p %v %v %v\n", m.b, hdrp.Data, hdrp.Len, hdrp.Cap)
 
 	if err := m.f.Close(); err != nil {
 		return err
@@ -151,8 +159,14 @@ func (m *mmapAccessor) rename(path string) error {
 		return err
 	}
 
+	hdrp = (*reflect.SliceHeader)(unsafe.Pointer(&m.b))
+	fmt.Printf("%p %v %v %v\n", m.b, hdrp.Data, hdrp.Len, hdrp.Cap)
+
 	if m.mmapWillNeed {
 		return madviseWillNeed(m.b)
+	}
+	if err := madviseDontNeed(m.b); err != nil {
+		return err
 	}
 	return nil
 }

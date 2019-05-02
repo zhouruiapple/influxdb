@@ -34,7 +34,7 @@ func madviseWillNeed(b []byte) error {
 }
 
 func madviseDontNeed(b []byte) error {
-	return madvise(b, syscall.MADV_DONTNEED)
+	return madvise(b, syscall.MADV_REMOVE)
 }
 
 // From: github.com/boltdb/bolt/bolt_unix.go

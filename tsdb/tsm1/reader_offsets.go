@@ -116,6 +116,11 @@ func (ri *readerOffsetsIterator) Length(b *faultBuffer) uint16 {
 		buf := b.access(ri.Offset(), 2)
 		ri.ks.length = uint16(buf[0])<<8 | uint16(buf[1])
 	}
+
+	buf := make([]byte, 0, len(b.b))
+	for i := 0; i < len(b.b); i++ {
+		buf = append(buf, b.b[i])
+	}
 	return ri.ks.length
 }
 

@@ -1,12 +1,15 @@
 package tsm1
 
 import (
+	"fmt"
 	"io/ioutil"
 	"math"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"testing"
+	"time"
 )
 
 func fatal(t testing.TB, msg string, err error) {
@@ -1070,6 +1073,143 @@ func TestTSMReader_MMAP_Stats(t *testing.T) {
 
 	if got, exp := r.KeyCount(), 2; got != exp {
 		t.Fatalf("key length mismatch: got %v, exp %v", got, exp)
+	}
+}
+
+// See https://github.com/influxdata/idpe/issues/3048
+func TestTSMReader_MMAP_TombstoneRange_Rename(t *testing.T) {
+	dir := mustTempDir()
+	defer os.RemoveAll(dir)
+	f := mustTempFile(dir)
+	defer f.Close()
+
+	// Write a TSM file with 100K series in the index
+	w, err := NewTSMWriter(f)
+	if err != nil {
+		t.Fatalf("unexpected error creating writer: %v", err)
+	}
+
+	// Add 10,000 values for each series key spread across [0,999900] ns.
+	expValues := make([]Value, 0, 10000)
+	for i := 0; i < 10000; i++ {
+		expValues = append(expValues, NewValue(int64(i*100), 1.0))
+	}
+
+	for i := 0; i < 10000; i++ {
+		next := fmt.Sprintf("cpu-%07x", i)
+		if err := w.Write([]byte(next), expValues); err != nil {
+			t.Fatalf("unexpected error writing: %v", err)
+		}
+	}
+
+	if err := w.WriteIndex(); err != nil {
+		t.Fatalf("unexpected error writing index: %v", err)
+	}
+
+	if err := w.Close(); err != nil {
+		t.Fatalf("unexpected error closing: %v", err)
+	}
+
+	f, err = os.Open(f.Name())
+	if err != nil {
+		t.Fatalf("unexpected error open file: %v", err)
+	}
+
+	// Create a reader for the file
+	r, err := NewTSMReader(f)
+	if err != nil {
+		t.Fatalf("unexpected error created reader: %v", err)
+	}
+	defer r.Close()
+
+	// Delete some bits of time for a few series keys.
+	if err := r.DeleteRange([][]byte{[]byte("cpu-00026f9")}, 1000, 350000); err != nil {
+		t.Fatalf("unexpected error deleting: %v", err)
+	}
+
+	if err := r.DeleteRange([][]byte{[]byte("cpu-0000a09")}, 1000, 600000); err != nil {
+		t.Fatalf("unexpected error deleting: %v", err)
+	}
+
+	if err := r.DeleteRange([][]byte{[]byte("cpu-0000003")}, 500000, 700000); err != nil {
+		t.Fatalf("unexpected error deleting: %v", err)
+	}
+
+	if err := r.DeleteRange([][]byte{[]byte("cpu-0000003")}, 1, 198776); err != nil {
+		t.Fatalf("unexpected error deleting: %v", err)
+	}
+
+	if err := r.DeleteRange([][]byte{[]byte("cpu-0000003")}, 1, 298776); err != nil {
+		t.Fatalf("unexpected error deleting: %v", err)
+	}
+
+	// Rename the TSM file...
+	newPath := fmt.Sprintf("%s.tmp", f.Name())
+	if err := r.Rename(newPath); err != nil {
+		t.Fatal(err)
+	}
+
+	checkTombstones := func() error {
+		// Get some tombstone time ranges.
+		var buf []TimeRange
+		buf = r.TombstoneRange([]byte("cpu-0000003"), buf)
+
+		expRanges := []TimeRange{{1, 198776}, {1, 298776}, {500000, 700000}}
+		if got, exp := buf, expRanges; !reflect.DeepEqual(got, exp) {
+			return fmt.Errorf("got %v, expected %v", got, exp)
+		}
+
+		buf = r.TombstoneRange([]byte("cpu-0000a09"), buf[:0])
+		expRanges = []TimeRange{{1000, 600000}}
+		if got, exp := buf, expRanges; !reflect.DeepEqual(got, exp) {
+			return fmt.Errorf("got %v, expected %v", got, exp)
+		}
+
+		buf = r.TombstoneRange([]byte("cpu-00026f9"), buf[:0])
+		expRanges = []TimeRange{{1000, 350000}}
+		if got, exp := buf, expRanges; !reflect.DeepEqual(got, exp) {
+			return fmt.Errorf("got %v, expected %v", got, exp)
+		}
+		return nil
+	}
+
+	done := make(chan struct{})
+	go func() { time.Sleep(10 * time.Second); close(done) }()
+
+	// var bbuf []byte
+	// go func() {
+	// 	for {
+	// 		select {
+	// 		case <-done:
+	// 			return
+	// 		default:
+	// 			b := r.accessor.(*mmapAccessor).b
+	// 			bbuf = bbuf[:0]
+	// 			for i := 0; i < len(b); i++ {
+	// 				bbuf = append(bbuf, b[i])
+	// 			}
+	// 		}
+	// 	}
+	// }()
+
+	// Check tombstones until the timeout period closes everything down
+	errC := make(chan error)
+	go func() {
+		for {
+			select {
+			case <-done:
+				close(errC)
+				return
+			default:
+				if err := checkTombstones(); err != nil {
+					errC <- err
+				}
+			}
+		}
+	}()
+
+	for err := range errC {
+		t.Fatal(err)
 	}
 }
 
