@@ -130,6 +130,8 @@ export const executeQuery = (
 
   xhr.onerror = reject
 
+  console.log(`executing Flux query \n\n${query}\n\nwith extern \n\n${extern}`)
+
   const dialect = {annotations: ['group', 'datatype', 'default']}
   const body = extern ? {query, dialect, extern} : {query, dialect}
 
