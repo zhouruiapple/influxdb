@@ -22,13 +22,14 @@ export default class BuilderCardBody extends PureComponent<Props> {
 
     if (scrollable) {
       return (
-        <DapperScrollbars
-          className="builder-card--body"
-          style={{maxWidth: '100%', maxHeight: '100%'}}
-          testID={testID}
-        >
-          {this.children}
-        </DapperScrollbars>
+        <div className="builder-card--body" data-testid={testID}>
+          <DapperScrollbars
+            autoSize={true}
+            style={{maxWidth: '100%', maxHeight: '100%'}}
+          >
+            {this.children}
+          </DapperScrollbars>
+        </div>
       )
     }
 

@@ -8,18 +8,8 @@ $builder-card--header-margin: $ix-marg-b + $ix-border;
   flex: 1 1 0;
   flex-wrap: nowrap;
   height: 100%;
-
-  > * {
-    margin-left: $builder-card--margin / 2;
-    margin-right: $builder-card--margin / 2;
-
-    &:first-child {
-      margin-left: 0;
-    }
-
-    &:last-child {
-      margin-right: 0;
-    }
+  > *:first-child {
+    margin-right: $builder-card--margin;
   }
 }
 
@@ -149,6 +139,7 @@ $builder-card--header-margin: $ix-marg-b + $ix-border;
 .builder-card--body {
   flex: 1 1 0;
   overflow: hidden;
+  position: relative;
 }
 
 .builder-card--empty {
@@ -167,4 +158,14 @@ $builder-card--header-margin: $ix-marg-b + $ix-border;
 
 .builder-card--contents {
   padding: $ix-marg-b;
+}
+
+.builder-card--handle {
+  flex: 0 0 8px;
+  border-radius: 3px;
+  background-color: #500;
+}
+
+.builder-card--handle__dragging {
+  background-color: #f00;
 }

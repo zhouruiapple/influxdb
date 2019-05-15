@@ -14,7 +14,7 @@ import {Dropdown} from 'src/clockface'
 import SearchableDropdown from 'src/shared/components/SearchableDropdown'
 import WaitingText from 'src/shared/components/WaitingText'
 import SelectorList from 'src/timeMachine/components/SelectorList'
-import BuilderCard from 'src/timeMachine/components/builderCard/BuilderCard'
+import BuilderCard from 'src/timeMachine/components/builderCard/ResizableBuilderCard'
 
 // Decorators
 import {ErrorHandling} from 'src/shared/decorators/errors'

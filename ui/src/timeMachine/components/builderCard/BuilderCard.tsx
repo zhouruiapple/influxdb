@@ -11,6 +11,7 @@ import BuilderCardEmpty from 'src/timeMachine/components/builderCard/BuilderCard
 interface Props {
   testID: string
   className?: string
+  resizable: boolean
 }
 
 export default class BuilderCard extends PureComponent<Props> {
@@ -21,6 +22,7 @@ export default class BuilderCard extends PureComponent<Props> {
 
   public static defaultProps = {
     testID: 'builder-card',
+    resizable: false,
   }
 
   public render() {
