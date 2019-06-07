@@ -11,13 +11,75 @@ import {VariableAssignment} from 'src/types/ast'
 
 const MAX_ROWS = 50000
 
+const MAX_BYTE_LENGTH = 10 * 1024 * 1024 // 10 MB
+
 export interface ExecuteFluxQueryResult {
   csv: string
   didTruncate: boolean
   rowCount: number
 }
 
-export const runQuery = (
+export const runQueryFetch = (
+  orgID: string,
+  query: string,
+  extern?: File
+): WrappedCancelablePromise<ExecuteFluxQueryResult> => {
+  const dialect = {annotations: ['group', 'datatype', 'default']}
+  const requestBody = extern ? {query, dialect, extern} : {query, dialect}
+
+  const request = fetch(`/api/v2/query?orgID=${encodeURIComponent(orgID)}`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(requestBody),
+  })
+
+  const promise = request.then(decodeFluxResponse).then(({csv, bytesRead}) => ({
+    csv,
+    didTruncate: bytesRead >= MAX_BYTE_LENGTH,
+    rowCount: -1,
+  }))
+
+  const cancel = () => {} // TODO
+
+  return {promise, cancel}
+}
+
+export const decodeFluxResponse = async (
+  response: Response
+): Promise<{csv: string; bytesRead: number}> => {
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+
+  let bytesRead = 0
+  let csv = ''
+  let currentRead = await reader.read()
+
+  while (!currentRead.done) {
+    const currentText = decoder.decode(currentRead.value)
+
+    bytesRead += currentRead.value.byteLength
+
+    if (bytesRead >= MAX_BYTE_LENGTH) {
+      // Discard last line since it may be partially read
+      const lines = currentText.split('\n')
+
+      csv += lines.slice(0, lines.length - 1).join('\n')
+
+      reader.cancel()
+
+      return {csv, bytesRead}
+    }
+
+    csv += currentText
+    currentRead = await reader.read()
+  }
+
+  reader.cancel()
+
+  return {csv, bytesRead}
+}
+
+export const runQueryClient = (
   orgID: string,
   query: string,
   extern?: File
@@ -64,6 +126,8 @@ export const runQuery = (
     },
   }
 }
+
+export const runQuery = runQueryFetch
 
 /*
   Execute a Flux query that uses external variables.
