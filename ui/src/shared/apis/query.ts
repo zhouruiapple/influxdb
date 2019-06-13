@@ -28,11 +28,12 @@ export const runQuery = (
 
   let didTruncate = false
   let rowCount = 0
-  let csv = ''
+  let csv = []
 
   conn.stream.on('data', d => {
     rowCount++
-    csv += d
+    debugger
+    csv.push(d.toString())
 
     if (rowCount < MAX_ROWS) {
       return
@@ -44,7 +45,7 @@ export const runQuery = (
 
   conn.stream.on('end', () => {
     const result: ExecuteFluxQueryResult = {
-      csv,
+      csv: csv.join(''),
       didTruncate,
       rowCount,
     }
