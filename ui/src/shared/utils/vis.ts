@@ -124,11 +124,25 @@ export const chooseXColumn = (table: Table): string | null => {
 }
 
 export const chooseYColumn = (table: Table): string | null => {
-  return table.columnKeys.find(
+  const numericColumns = getNumericColumns(table)
+  const valueCol = numericColumns.find(k => k.startsWith('_value'))
+  const result = valueCol || numericColumns[0]
+
+  console.log(result)
+
+  return result
+}
+
+export const getNumericColumns = (table: Table): string[] => {
+  const numericColumns = table.columnKeys.filter(
     k =>
-      k.startsWith('_value') &&
-      (table.getColumnType(k) === 'number' || table.getColumnType(k) === 'time')
+      (table.getColumnType(k) === 'number' ||
+        table.getColumnType(k) === 'time') &&
+      k !== 'result' &&
+      k !== 'table'
   )
+
+  return numericColumns
 }
 
 export const checkResultsLength = (giraffeResult: FromFluxResult): boolean => {

@@ -5,7 +5,11 @@ import {fromFlux, Table} from '@influxdata/giraffe'
 
 // Utils
 import {parseResponse} from 'src/shared/parsing/flux/response'
-import {chooseYColumn, chooseXColumn} from 'src/shared/utils/vis'
+import {
+  chooseYColumn,
+  chooseXColumn,
+  getNumericColumns as getNumericColumnsUtil,
+} from 'src/shared/utils/vis'
 
 // Types
 import {
@@ -47,23 +51,7 @@ export const getVisTable = (
   return {table, fluxGroupKeyUnion}
 }
 
-const getNumericColumnsMemoized = memoizeOne(
-  (table: Table): string[] => {
-    const columnKeys = table.columnKeys
-    return columnKeys.reduce((numericColumns, key) => {
-      const columnType = table.getColumnType(key)
-      const columnName = table.getColumnName(key)
-      if (
-        (columnType === 'number' || columnType === 'time') &&
-        columnName !== 'result' &&
-        columnName !== 'table'
-      ) {
-        numericColumns.push(columnName)
-      }
-      return numericColumns
-    }, [])
-  }
-)
+const getNumericColumnsMemoized = memoizeOne(getNumericColumnsUtil)
 
 export const getNumericColumns = (state: AppState): string[] => {
   const {table} = getVisTable(state)
