@@ -26,5 +26,11 @@
     "esModuleInterop": true,
     "baseUrl": "./"
   },
-  "exclude": ["assets", "build", "node_modules", "cypress"]
+  "exclude": [
+    "build",
+    "node_modules",
+    "cypress",
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx"
+  ]
 }

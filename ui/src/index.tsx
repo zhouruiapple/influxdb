@@ -1,4 +1,3 @@
-import 'babel-polyfill'
 import 'src/cloud/utils/overrides'
 
 import React, {PureComponent} from 'react'
