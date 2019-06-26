@@ -19,6 +19,7 @@ import (
 	"github.com/influxdata/influxdb/cmd/influx_inspect/reporttsi"
 	"github.com/influxdata/influxdb/cmd/influx_inspect/verify/seriesfile"
 	"github.com/influxdata/influxdb/cmd/influx_inspect/verify/tsm"
+	"github.com/influxdata/influxdb/cmd/influx_inspect/verify/wal"
 	_ "github.com/influxdata/influxdb/tsdb/engine"
 )
 
@@ -111,6 +112,11 @@ func (m *Main) Run(args ...string) error {
 		name := seriesfile.NewCommand()
 		if err := name.Run(args...); err != nil {
 			return fmt.Errorf("verify-seriesfile: %s", err)
+		}
+	case "verify-wal":
+		name := wal.NewCommand()
+		if err := name.Run(args...); err != nil {
+			return fmt.Errorf("verify-wal: %s", err)
 		}
 	default:
 		return fmt.Errorf(`unknown command "%s"`+"\n"+`Run 'influx_inspect help' for usage`+"\n\n", name)
