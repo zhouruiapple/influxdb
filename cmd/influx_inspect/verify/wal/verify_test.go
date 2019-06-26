@@ -1,20 +1,36 @@
 package wal
 
 import (
-	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"testing"
 
-	"github.com/golang/snappy"
 	"github.com/influxdata/influxdb/tsdb/engine/tsm1"
+	"github.com/pkg/errors"
 )
 
 const numTestFiles = 1
 const numTestEntries = 100
 
-func TestReadValidEntries(t *testing.T) {
-	test := CreateTest(t)
+func TestVerifyValidEntries(t *testing.T) {
+	test := CreateTest(t, func() (string, error) {
+		dir := mustCreateTempDir(t)
+		w := tsm1.NewWAL(dir)
+		if err := w.Open(); err != nil {
+			return "", errors.Wrap(err, "error opening wal")
+		}
+
+		for i := 0; i < numTestEntries; i++ {
+			writeRandomEntry(w, t)
+		}
+
+		if err := w.Close(); err != nil {
+			return "", errors.Wrap(err, "error closing wal")
+		}
+
+		return dir, nil
+	})
 	defer test.Close()
 
 	verifier := &verifyWAL{}
@@ -26,48 +42,40 @@ func TestReadValidEntries(t *testing.T) {
 	}
 }
 
+func TestVerifyCorruptEntries(t *testing.T) {
+	test := CreateTest(t, func() (string, error) {
+		dir := mustCreateTempDir(t)
+		writeCorruptEntry(dir, t)
+		return dir, nil
+	})
+
+	defer test.Close()
+
+	verifier := &verifyWAL{}
+	verifier.Run(os.Stdout, test.dir)
+	expectedEntries := 1
+	expectedErrors := 1
+
+	if verifier.totalEntries != expectedEntries {
+		t.Fatalf("Error: expected %d entries, found %d entries", expectedEntries, verifier.totalEntries)
+	}
+
+	if verifier.totalErrors != expectedErrors {
+		t.Fatalf("Error: expected %d corrupt entries, found %d corrupt entries", expectedErrors, verifier.totalErrors)
+	}
+}
+
 type Test struct {
 	dir string
 }
 
-func CreateTest(t *testing.T) *Test {
+func CreateTest(t *testing.T, createFiles func() (string, error)) *Test {
 	t.Helper()
 
-	dir, err := ioutil.TempDir(".", "wal")
+	dir, err := createFiles()
+
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	defer os.RemoveAll(dir)
-	f, err := ioutil.TempFile(dir, "test.wal")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	w := tsm1.NewWALSegmentWriter(f)
-
-	p1 := tsm1.NewValue(1, int64(1))
-	p2 := tsm1.NewValue(1, int64(2))
-
-	exp := []struct {
-		key    string
-		values []tsm1.Value
-	}{
-		{"cpu,host=A#!~#value", []tsm1.Value{p1}},
-		{"cpu,host=B#!~#value", []tsm1.Value{p2}},
-	}
-
-	for _, v := range exp {
-		entry := &tsm1.WriteWALEntry{
-			Values: map[string][]tsm1.Value{v.key: v.values},
-		}
-
-		if err := w.Write(mustMarshalEntry(entry)); err != nil {
-			t.Fatal("failed to write points", err)
-		}
-		if err := w.Flush(); err != nil {
-			t.Fatal("Failed to flush points", err)
-		}
 	}
 
 	return &Test{
@@ -75,18 +83,42 @@ func CreateTest(t *testing.T) *Test {
 	}
 }
 
-// note: helper function for writing WAL data copied from internal WAL tests
-func mustMarshalEntry(entry tsm1.WALEntry) (tsm1.WalEntryType, []byte) {
-	bytes := make([]byte, 1024<<2)
-
-	b, err := entry.Encode(bytes)
-	if err != nil {
-		panic(fmt.Sprintf("error encoding: %v", err))
+func writeRandomEntry(w *tsm1.WAL, t *testing.T) {
+	if _, err := w.WriteMulti(map[string][]tsm1.Value{
+		"cpu,host=A#!~#value": []tsm1.Value{
+			tsm1.NewValue(rand.Int63(), rand.Float64()),
+		},
+	}); err != nil {
+		t.Fatalf("error writing points: %v", err)
 	}
+}
 
-	return entry.Type(), snappy.Encode(b, b)
+func writeCorruptEntry(walDir string, t *testing.T) {
+	f := mustCreateTempFile(t, walDir)
+	defer f.Close()
+	// random byte sequence
+	corrupt := []byte{0, 255, 0, 1, 3, 4, 8, 7}
+	f.Write(corrupt)
 }
 
 func (t *Test) Close() {
 	os.RemoveAll(t.dir)
+}
+
+func mustCreateTempDir(t *testing.T) string {
+	name, err := ioutil.TempDir(".", "wal-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return name
+}
+
+func mustCreateTempFile(t *testing.T, dir string) *os.File {
+	file, err := ioutil.TempFile(dir, "corrupt*.wal")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return file
 }
