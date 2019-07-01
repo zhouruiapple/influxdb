@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/influxdata/influxdb"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -83,6 +84,20 @@ func BindOptions(cmd *cobra.Command, opts []Opt) {
 			cmd.Flags().IntVar(destP, o.Flag, d, o.Desc)
 			mustBindPFlag(o.Flag, cmd)
 			*destP = viper.GetInt(o.Flag)
+		case *influxdb.ID:
+			var d influxdb.ID
+			if o.Default != nil {
+				d = o.Default.(influxdb.ID)
+			}
+
+			var tmp string
+			cmd.Flags().StringVar(&tmp, o.Flag, d.String(), o.Desc)
+			mustBindPFlag(o.Flag, cmd)
+			tmp = viper.GetString(o.Flag)
+			destP, err := influxdb.IDFromString(tmp)
+			if err != nil {
+				panic(err)
+			}
 		case *bool:
 			var d bool
 			if o.Default != nil {
