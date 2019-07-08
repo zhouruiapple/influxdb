@@ -1627,6 +1627,93 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /delete:
+    post:
+      operationId: PostDelete
+      tags:
+        - Delete
+      summary: delete range of points from influxdb
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - start
+                - stop
+              properties:
+                start:
+                  description: unix timestamp
+                  type: integer
+                stop:
+                  description: unix timestamp
+                  type: integer
+                tags:
+                  description: tag key/value pairs to filter on
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      key:
+                        type: string
+                      value:
+                        type: string
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
+        - in: query
+          name: org
+          description: specifies the destination organization to delete points from.
+          required: true
+          schema:
+            type: string
+            description: matching points are deleted from this organization.
+        - in: query
+          name: bucket
+          description: specifies the destination bucket to delete points from.
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: precision
+          description: specifies the precision for the unix timestamps within the body start/stop times.
+          schema:
+            $ref: "#/components/schemas/WritePrecision"
+      responses:
+        '204':
+          description: delete request is correctly formatted and accepted for deleting from the bucket.
+        '400':
+          description: invalid request and no points were deleted. Response describes which part of request is invalid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        '401':
+          description: token does not have sufficient permissions to perform this delete or the organization and bucket do not exist.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        '403':
+          description: no token was sent and they are required.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        '503':
+          description: server is temporarily unavailable to accept writes.  The Retry-After header describes when to try the write again.
+          headers:
+            Retry-After:
+              description: A non-negative decimal integer indicating the seconds to delay after the response is received.
+              schema:
+                type: integer
+                format: int32
+        default:
+          description: internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /ready:
     servers:
         - url: /

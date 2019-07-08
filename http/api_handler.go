@@ -32,6 +32,7 @@ type APIHandler struct {
 	TelegrafHandler      *TelegrafHandler
 	QueryHandler         *FluxHandler
 	WriteHandler         *WriteHandler
+	DeleteHandler        *DeleteHandler
 	DocumentHandler      *DocumentHandler
 	SetupHandler         *SetupHandler
 	SessionHandler       *SessionHandler
@@ -157,6 +158,9 @@ func NewAPIHandler(b *APIBackend) *APIHandler {
 	writeBackend := NewWriteBackend(b)
 	h.WriteHandler = NewWriteHandler(writeBackend)
 
+	deleteBackend := NewDeleteBackend(b)
+	h.DeleteHandler = NewDeleteHandler(deleteBackend)
+
 	fluxBackend := NewFluxBackend(b)
 	h.QueryHandler = NewFluxHandler(fluxBackend)
 
@@ -201,6 +205,7 @@ var apiLinks = map[string]interface{}{
 	"telegrafs": "/api/v2/telegrafs",
 	"users":     "/api/v2/users",
 	"write":     "/api/v2/write",
+	"delete":    "/api/v2/delete",
 }
 
 func (h *APIHandler) serveLinks(w http.ResponseWriter, r *http.Request) {
@@ -236,6 +241,11 @@ func (h *APIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if strings.HasPrefix(r.URL.Path, "/api/v2/write") {
 		h.WriteHandler.ServeHTTP(w, r)
+		return
+	}
+
+	if strings.HasPrefix(r.URL.Path, "/api/v2/delete") {
+		h.DeleteHandler.ServeHTTP(w, r)
 		return
 	}
 
