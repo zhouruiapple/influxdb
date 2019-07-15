@@ -17,8 +17,10 @@ import {
   FluxTable,
   QueryView,
   AppState,
-  DashboardDraftQuery,
+  DashboardQuery,
+  View,
   ViewType,
+  ViewShape,
 } from 'src/types'
 
 export const getActiveTimeMachine = (state: AppState) => {
@@ -28,7 +30,7 @@ export const getActiveTimeMachine = (state: AppState) => {
   return timeMachine
 }
 
-export const getActiveQuery = (state: AppState): DashboardDraftQuery => {
+export const getActiveQuery = (state: AppState): DashboardQuery => {
   const {draftQueries, activeQueryIndex} = getActiveTimeMachine(state)
 
   return draftQueries[activeQueryIndex]
@@ -136,6 +138,38 @@ export const getSymbolColumnsSelection = (state: AppState): string[] => {
     preference,
     fluxGroupKeyUnion
   )
+}
+
+export const getView = (state: AppState): View => {
+  const {
+    viewType,
+    viewName,
+    viewProperties,
+    draftQueries,
+  } = getActiveTimeMachine(state)
+
+  switch (viewType) {
+    case ViewType.Histogram:
+      return {
+        name: viewName,
+        properties: {
+          type: ViewType.Histogram,
+          shape: ViewShape.ChronografV2,
+          queries: draftQueries,
+          fillColumns: viewProperties.fillColumns,
+          xColumn: viewProperties.xColumn,
+          xDomain: viewProperties.xDomain,
+          xAxisLabel: viewProperties.xAxisLabel,
+          position: viewProperties.position,
+          binCount: viewProperties.binCount,
+          colors: viewProperties.colors,
+          note: viewProperties.note,
+          showNoteWhenEmpty: viewProperties.showNoteWhenEmpty,
+        },
+      }
+    default:
+      throw new Error('moo')
+  }
 }
 
 export const getSaveableView = (state: AppState): QueryView & {id?: string} => {

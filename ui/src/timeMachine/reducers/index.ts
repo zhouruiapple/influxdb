@@ -1,6 +1,7 @@
 // Libraries
 import {get, cloneDeep, isNumber} from 'lodash'
 import {produce} from 'immer'
+import {HistogramPosition} from '@influxdata/giraffe'
 import _ from 'lodash'
 
 // Utils
@@ -19,21 +20,28 @@ import {
 } from 'src/shared/constants/thresholds'
 
 // Types
-import {TimeRange, View, AutoRefresh} from 'src/types'
 import {
+  TimeRange,
+  View,
+  AutoRefresh,
   ViewType,
-  DashboardDraftQuery,
   BuilderConfig,
   QueryEditMode,
   QueryView,
   QueryViewProperties,
   ExtractWorkingView,
   AggregateWindow,
-} from 'src/types/dashboards'
-import {Action} from 'src/timeMachine/actions'
-import {TimeMachineTab} from 'src/types/timeMachine'
-import {RemoteDataState} from 'src/types'
-import {Color} from 'src/types/colors'
+  TimeMachineTab,
+  RemoteDataState,
+  Color,
+  XYViewGeom,
+  Axes,
+  Legend,
+  DecimalPlaces,
+  TableOptions,
+  FieldOption,
+  DashboardQuery,
+} from 'src/types'
 
 interface QueryBuilderState {
   buckets: string[]
@@ -58,11 +66,49 @@ interface QueryResultsState {
   errorMessage: string
 }
 
+interface ViewPropertiesState {
+  geom?: XYViewGeom
+  axes?: Axes
+  xColumn?: string
+  yColumn?: string
+  shadeBelow?: boolean
+  singleStatColors: Color[]
+  gaugeColors?: Color[]
+  colorScheme: Color[]
+  legend?: Legend
+  prefix?: string
+  suffix?: string
+  decimalPlaces?: DecimalPlaces
+  tableOptions?: TableOptions
+  fieldOptions?: FieldOption[]
+  timeFormat?: string
+  xDomain?: [number, number]
+  yDomain?: [number, number]
+  xAxisLabel?: string
+  yAxisLabel?: string
+  xPrefix?: string
+  xSuffix?: string
+  yPrefix?: string
+  ySuffix?: string
+  position?: HistogramPosition
+  colorSchemeHexes?: string[]
+  binCount?: number
+  binSize?: number
+  fillColumns?: string[]
+  symbolColumns?: string[]
+  note?: string
+  showNoteWhenEmpty?: boolean
+}
+
 export interface TimeMachineState {
-  view: QueryView
+  viewName: string
+  viewType: ViewType
+  viewProperties: ViewPropertiesState
   timeRange: TimeRange
   autoRefresh: AutoRefresh
-  draftQueries: DashboardDraftQuery[]
+  queries: DashboardQuery[]
+  draftQueries: DashboardQuery[]
+  hiddenQueries: number[]
   isViewingRawData: boolean
   activeTab: TimeMachineTab
   activeQueryIndex: number | null
@@ -80,8 +126,12 @@ export interface TimeMachinesState {
 export const initialStateHelper = (): TimeMachineState => ({
   timeRange: {lower: 'now() - 1h'},
   autoRefresh: AUTOREFRESH_DEFAULT,
-  view: createView(),
-  draftQueries: [{...defaultViewQuery(), hidden: false}],
+  viewType: ViewType.XY,
+  viewName: 'Untitled Cell',
+  viewProperties: {},
+  queries: [],
+  draftQueries: [defaultViewQuery()],
+  hiddenQueries: [],
   isViewingRawData: false,
   activeTab: TimeMachineTab.Queries,
   activeQueryIndex: 0,

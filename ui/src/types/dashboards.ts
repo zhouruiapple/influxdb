@@ -75,10 +75,6 @@ export interface DashboardQuery {
   name: string
 }
 
-export interface DashboardDraftQuery extends DashboardQuery {
-  hidden: boolean
-}
-
 export interface Legend {
   type?: string
   orientation?: string
