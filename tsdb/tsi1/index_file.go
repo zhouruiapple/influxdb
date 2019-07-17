@@ -121,9 +121,11 @@ func (f *IndexFile) Open() (err error) {
 	if err != nil {
 		return err
 	}
+	//f.sfile.Logger.Error("err before")
 
 	// Extract identifier from path name.
 	f.id, f.level = ParseFilename(f.Path())
+	//f.sfile.Logger.Error("err after")
 
 	data, err := mmap.Map(f.Path(), 0)
 	if err != nil {
