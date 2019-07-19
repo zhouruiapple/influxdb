@@ -1,6 +1,8 @@
 package influxdb
 
 import (
+	"context"
+	"errors"
 	"fmt"
 
 	"github.com/influxdata/flux"
@@ -11,7 +13,6 @@ import (
 	"github.com/influxdata/flux/values"
 	platform "github.com/influxdata/influxdb"
 	"github.com/influxdata/influxdb/query"
-	"github.com/pkg/errors"
 )
 
 func init() {
@@ -25,12 +26,12 @@ type BucketsDecoder struct {
 	alloc   *memory.Allocator
 }
 
-func (bd *BucketsDecoder) Connect() error {
+func (bd *BucketsDecoder) Connect(ctx context.Context) error {
 	return nil
 }
 
-func (bd *BucketsDecoder) Fetch() (bool, error) {
-	b, count := bd.deps.FindAllBuckets(bd.orgID)
+func (bd *BucketsDecoder) Fetch(ctx context.Context) (bool, error) {
+	b, count := bd.deps.FindAllBuckets(ctx, bd.orgID)
 	if count <= 0 {
 		return false, fmt.Errorf("no buckets found in organization %v", bd.orgID)
 	}
@@ -38,7 +39,7 @@ func (bd *BucketsDecoder) Fetch() (bool, error) {
 	return false, nil
 }
 
-func (bd *BucketsDecoder) Decode() (flux.Table, error) {
+func (bd *BucketsDecoder) Decode(ctx context.Context) (flux.Table, error) {
 	kb := execute.NewGroupKeyBuilder(nil)
 	kb.AddKeyValue("organizationID", values.NewString(bd.buckets[0].OrgID.String()))
 	gk, err := kb.Build()
@@ -115,7 +116,7 @@ func createBucketsSource(prSpec plan.ProcedureSpec, dsid execute.DatasetID, a ex
 }
 
 type AllBucketLookup interface {
-	FindAllBuckets(orgID platform.ID) ([]*platform.Bucket, int)
+	FindAllBuckets(ctx context.Context, orgID platform.ID) ([]*platform.Bucket, int)
 }
 type BucketDependencies AllBucketLookup
 
