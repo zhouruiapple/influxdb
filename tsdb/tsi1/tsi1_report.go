@@ -2,14 +2,16 @@ package tsi1
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"math"
-	"path"
+	"os"
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
 	"sync/atomic"
 	"text/tabwriter"
 
@@ -51,6 +53,7 @@ func NewReportTsi() *ReportTsi {
 	return &ReportTsi{
 		Logger:        zap.NewNop(),
 		shardIdxs:     map[uint64]*Index{},
+		shardPaths:    map[uint64]string{},
 		cardinalities: map[uint64]map[string]*cardinality{},
 		topN:          0,
 		byMeasurement: true,
@@ -62,83 +65,139 @@ func NewReportTsi() *ReportTsi {
 func (report *ReportTsi) RunTsiReport() error {
 	// Open all the indexes.
 	// Walk engine to find first each series file, then each index file
-	seriesFiles := make([]*tsdb.SeriesFile, 0)
+	//seriesFiles := make([]*tsdb.SeriesFile, 0)
 	seriesDir := filepath.Join(report.Path, "_series")
-	seriesFileInfos, err := ioutil.ReadDir(seriesDir)
-	if err != nil {
+	//seriesFileInfos, err := ioutil.ReadDir(seriesDir)
+	// if err != nil {
+	// 	return err
+	// }
+	report.Logger.Error("searching series: " + seriesDir)
+	sFile := tsdb.NewSeriesFile(seriesDir)
+	sFile.WithLogger(report.Logger)
+	if err := sFile.Open(context.Background()); err != nil {
+		report.Logger.Error("failed to open series")
 		return err
 	}
-	report.Logger.Error("searching series: " + seriesDir)
-	for _, seriesFolder := range seriesFileInfos {
-		folder := filepath.Join(seriesDir, seriesFolder.Name())
-		//folderInfos, err := ioutil.ReadDir(folder)
-		// if err != nil {
-		// 	return err
-		// }
+	defer sFile.Close()
 
-		sFile := tsdb.NewSeriesFile(folder)
-		sFile.WithLogger(report.Logger)
-		if err := sFile.Open(context.Background()); err != nil {
-			report.Logger.Error("failed")
-			return err
-		}
-		defer sFile.Close()
-		seriesFiles = append(seriesFiles, sFile)
+	// for _, seriesFolder := range seriesFileInfos {
+	// 	folder := filepath.Join(seriesDir, seriesFolder.Name())
+	// 	//folderInfos, err := ioutil.ReadDir(folder)
+	// 	// if err != nil {
+	// 	// 	return err
+	// // 	// }
 
-		// for _, seriesFile := range folderInfos {
-		// 	path := filepath.Join(folder, seriesFile.Name())
-		// 	report.Logger.Error("adding seriesFile: " + path)
-		// 	sFile := tsdb.NewSeriesFile(path)
-		// 	sFile.WithLogger(report.Logger)
-		// 	if err := sFile.Open(context.Background()); err != nil {
-		// 		report.Logger.Error("failed")
-		// 		return err
-		// 	}
-		// 	defer sFile.Close()
-		// 	seriesFiles = append(seriesFiles, sFile)
-		// }
-	}
+	// file, err := os.Open(folder)
+	// if err != nil {
+	// 	return err
+	// }
+	// fStat, err := file.Stat()
+	// if err != nil {
+	// 	return err
+	// }
 
-	indexFiles := make([]*IndexFile, 0)
+	// if !fStat.IsDir() {
+	// 	report.Logger.Error("not a dir: " + folder)
+	// 	continue
+	// }
+	// // 	report.Logger.Error("appending seriesfile: " + folder)
+
+	// 	sFile := tsdb.NewSeriesFile(folder)
+	// 	sFile.WithLogger(report.Logger)
+	// 	if err := sFile.Open(context.Background()); err != nil {
+	// 		report.Logger.Error("failed to open")
+	// 		return err
+	// 	}
+	// 	defer sFile.Close()
+	// 	seriesFiles = append(seriesFiles, sFile)
+
+	// for _, seriesFile := range folderInfos {
+	// 	path := filepath.Join(folder, seriesFile.Name())
+	// 	report.Logger.Error("adding seriesFile: " + path)
+	// 	sFile := tsdb.NewSeriesFile(path)
+	// 	sFile.WithLogger(report.Logger)
+	// 	if err := sFile.Open(context.Background()); err != nil {
+	// 		report.Logger.Error("failed")
+	// 		return err
+	// 	}
+	// 	defer sFile.Close()
+	// 	seriesFiles = append(seriesFiles, sFile)
+	// }
+	//}
+
+	indexFiles := make([]*Index, 0)
 	indexDir := filepath.Join(report.Path, "index")
-	indexFileInfos, err := ioutil.ReadDir(indexDir)
+	indexFileInfos, _ := ioutil.ReadDir(indexDir)
 	report.Logger.Error("searching index: " + indexDir)
 	for _, indexFile := range indexFileInfos {
 		path := filepath.Join(indexDir, indexFile.Name())
-		report.Logger.Error("adding: " + path)
-		indexFile := NewIndexFile(seriesFiles[len(indexFiles)])
-		if err := indexFile.Open(); err != nil {
+
+		file, err := os.Open(path)
+		if err != nil {
 			return err
 		}
+		fStat, err := file.Stat()
+		if err != nil {
+			return err
+		}
+
+		if !fStat.IsDir() {
+			report.Logger.Error("not a dir: " + path)
+			continue
+		}
+		report.Logger.Error("adding: " + path)
+		if ok, err := IsIndexDir(path); err != nil {
+			return err
+		} else if !ok {
+			return fmt.Errorf("not a TSI index directory: %q", path)
+		}
+
+		id, err := strconv.Atoi(fStat.Name())
+		if err != nil {
+			return err
+		}
+
+		//indexFile := NewIndexFile(seriesFiles[len(indexFiles)])
+		indexFile := NewIndex(sFile, NewConfig(), WithPath(path), DisableCompactions())
+		report.Logger.Error("created new index")
+		if err := indexFile.Open(context.Background()); err != nil {
+			return err
+		}
+		defer indexFile.Close()
+		report.Logger.Error("finished opening")
 		indexFiles = append(indexFiles, indexFile)
+		report.shardIdxs[uint64(id)] = indexFile
+		report.shardPaths[uint64(id)] = path
+		report.cardinalities[uint64(id)] = map[string]*cardinality{}
+		report.Logger.Error("finished mapping")
 	}
 
 	// Open all the indexes.
 	// Walk engine to find first each series file, then each index file
 	// TODO (me) we do not want manual entry of paths. We should be able to find all indexes
 	// start path at: ./influxdbv2/engine
-	for id, pth := range report.shardPaths {
-		pth = path.Join(pth, "index")
-		// Verify directory is an index before opening it.
-		if ok, err := IsIndexDir(pth); err != nil {
-			return err
-		} else if !ok {
-			return fmt.Errorf("not a TSI index directory: %q", pth)
-		}
+	// for id, pth := range report.shardPaths {
+	// 	pth = path.Join(pth, "index")
+	// 	// Verify directory is an index before opening it.
+	// 	if ok, err := IsIndexDir(pth); err != nil {
+	// 		return err
+	// 	} else if !ok {
+	// 		return fmt.Errorf("not a TSI index directory: %q", pth)
+	// 	}
 
-		report.shardIdxs[id] = NewIndex(report.sfile,
-			NewConfig(),
-			WithPath(pth),
-			DisableCompactions(),
-		)
-		if err := report.shardIdxs[id].Open(context.Background()); err != nil {
-			return err
-		}
-		defer report.shardIdxs[id].Close()
+	// 	report.shardIdxs[id] = NewIndex(report.sfile,
+	// 		NewConfig(),
+	// 		WithPath(pth),
+	// 		DisableCompactions(),
+	// 	)
+	// 	if err := report.shardIdxs[id].Open(context.Background()); err != nil {
+	// 		return err
+	// 	}
+	// 	defer report.shardIdxs[id].Close()
 
-		// Initialise cardinality set to store cardinalities for this shard.
-		report.cardinalities[id] = map[string]*cardinality{}
-	}
+	// 	// Initialise cardinality set to store cardinalities for this shard.
+	// 	report.cardinalities[id] = map[string]*cardinality{}
+	// }
 
 	// Calculate cardinalities of shards.
 	fn := report.cardinalityByMeasurement
@@ -148,11 +207,13 @@ func (report *ReportTsi) RunTsiReport() error {
 
 	// Blocks until all work done.
 	report.calculateCardinalities(fn)
+	report.Logger.Error("calculateCard")
 
 	// Print summary.
 	if err := report.printSummaryByMeasurement(); err != nil {
 		return err
 	}
+	report.Logger.Error("printed")
 
 	allIDs := make([]uint64, 0, len(report.shardIdxs))
 	for id := range report.shardIdxs {
@@ -349,82 +410,103 @@ func (a results) Less(i, j int) bool { return a[i].count < a[j].count }
 func (a results) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 
 func (report *ReportTsi) printSummaryByMeasurement() error {
-	// Get global set of measurement names across shards.
-	// idxs := &tsdb.IndexSet{SeriesFile: report.sfile}
+	//Get global set of measurement names across shards.
+	//idxs := &tsdb.IndexSet{SeriesFile: report.sfile}
 	// for _, idx := range report.shardIdxs {
 	// 	idxs.Indexes = append(idxs.Indexes, idx)
 	// }
 
-	// mitr, err := idxs.MeasurementIterator()
+	// we are going to get a measurement iterator for each index
+	count := 0
+	var mitr tsdb.MeasurementIterator
+	for _, index := range report.shardIdxs {
+		small, err := index.MeasurementIterator()
+		name, _ := small.Next()
+		report.Logger.Error("called small.Next1 " + strconv.Itoa(len(name)))
+		name, _ = small.Next()
+		report.Logger.Error("called small.Next2 " + strconv.Itoa(len(name)))
+		name, _ = small.Next()
+		report.Logger.Error("called small.Next3 " + strconv.Itoa(len(name)))
+		if err != nil {
+			return err
+		} else if small == nil {
+			return errors.New("got nil measurement iterator for index set")
+		}
+		//defer small.Close()
+		// name, _ := small.Next()
+		// report.Logger.Error("called small.Next " + string(name))
+		mitr = tsdb.MergeMeasurementIterators(mitr, small)
+		count++
+	}
+	//defer mitr.Close()
+	report.Logger.Error("alright we got " + strconv.Itoa(count))
+	report.Logger.Error("calling mitr next")
+	name, _ := mitr.Next()
+	report.Logger.Error("mitr next: " + string(name))
+
+	//var name []byte
+	var totalCardinality int64
+	measurements := results{}
+	for name, err := mitr.Next(); err == nil && name != nil; name, err = mitr.Next() {
+		res := &result{name: name}
+		report.Logger.Error("name: " + string(name))
+		for _, shardCards := range report.cardinalities {
+			report.Logger.Error("cards: " + strconv.Itoa(len(shardCards)))
+			other, ok := shardCards[string(name)]
+			if !ok {
+				continue // this shard doesn't have anything for this measurement.
+			}
+
+			if other.short != nil && other.set != nil {
+				panic("cardinality stored incorrectly")
+			}
+
+			if other.short != nil { // low cardinality case
+				res.addShort(other.short)
+			} else if other.set != nil { // High cardinality case
+				res.merge(other.set)
+			}
+
+			// Shard does not have any series for this measurement.
+		}
+
+		// Determine final cardinality and allow intermediate structures to be
+		// GCd.
+		if res.lowCardinality != nil {
+			res.count = int64(len(res.lowCardinality))
+		} else {
+			res.count = int64(res.set.Cardinality())
+		}
+		totalCardinality += res.count
+		res.set = nil
+		res.lowCardinality = nil
+		measurements = append(measurements, res)
+	}
+
 	// if err != nil {
 	// 	return err
-	// } else if mitr == nil {
-	// 	return errors.New("got nil measurement iterator for index set")
-	// }
-	// defer mitr.Close()
-
-	// var name []byte
-	// var totalCardinality int64
-	// measurements := results{}
-	// for name, err = mitr.Next(); err == nil && name != nil; name, err = mitr.Next() {
-	// 	res := &result{name: name}
-	// 	for _, shardCards := range report.cardinalities {
-	// 		other, ok := shardCards[string(name)]
-	// 		if !ok {
-	// 			continue // this shard doesn't have anything for this measurement.
-	// 		}
-
-	// 		if other.short != nil && other.set != nil {
-	// 			panic("cardinality stored incorrectly")
-	// 		}
-
-	// 		if other.short != nil { // low cardinality case
-	// 			res.addShort(other.short)
-	// 		} else if other.set != nil { // High cardinality case
-	// 			res.merge(other.set)
-	// 		}
-
-	// 		// Shard does not have any series for this measurement.
-	// 	}
-
-	// 	// Determine final cardinality and allow intermediate structures to be
-	// 	// GCd.
-	// 	if res.lowCardinality != nil {
-	// 		res.count = int64(len(res.lowCardinality))
-	// 	} else {
-	// 		res.count = int64(res.set.Cardinality())
-	// 	}
-	// 	totalCardinality += res.count
-	// 	res.set = nil
-	// 	res.lowCardinality = nil
-	// 	measurements = append(measurements, res)
 	// }
 
-	// if err != nil {
-	// 	return err
-	// }
+	// sort measurements by cardinality.
+	sort.Sort(sort.Reverse(measurements))
 
-	// // sort measurements by cardinality.
-	// sort.Sort(sort.Reverse(measurements))
+	if report.topN > 0 {
+		// There may not be "topN" measurement cardinality to sub-slice.
+		n := int(math.Min(float64(report.topN), float64(len(measurements))))
+		measurements = measurements[:n]
+	}
 
-	// if report.topN > 0 {
-	// 	// There may not be "topN" measurement cardinality to sub-slice.
-	// 	n := int(math.Min(float64(report.topN), float64(len(measurements))))
-	// 	measurements = measurements[:n]
-	// }
+	tw := tabwriter.NewWriter(report.Stdout, 4, 4, 1, '\t', 0)
+	fmt.Fprintf(tw, "Summary\nDatabase Path: %s\nCardinality (exact): %d\n\n", report.Path, totalCardinality)
+	fmt.Fprint(tw, "Measurement\tCardinality (exact)\n\n")
+	for _, res := range measurements {
+		fmt.Fprintf(tw, "%q\t\t%d\n", res.name, res.count)
+	}
 
-	// tw := tabwriter.NewWriter(report.Stdout, 4, 4, 1, '\t', 0)
-	// fmt.Fprintf(tw, "Summary\nDatabase Path: %s\nCardinality (exact): %d\n\n", report.dbPath, totalCardinality)
-	// fmt.Fprint(tw, "Measurement\tCardinality (exact)\n\n")
-	// for _, res := range measurements {
-	// 	fmt.Fprintf(tw, "%q\t\t%d\n", res.name, res.count)
-	// }
-
-	// if err := tw.Flush(); err != nil {
-	// 	return err
-	// }
-	// fmt.Fprint(report.Stdout, "\n\n")
-	// return nil
+	if err := tw.Flush(); err != nil {
+		return err
+	}
+	fmt.Fprint(report.Stdout, "\n\n")
 	return nil
 }
 
@@ -444,6 +526,7 @@ func (report *ReportTsi) printShardByMeasurement(id uint64) error {
 
 		totalCardinality += n
 		all = append(all, card)
+		report.Logger.Error("appended to all")
 	}
 
 	sort.Sort(sort.Reverse(all))
@@ -454,6 +537,8 @@ func (report *ReportTsi) printShardByMeasurement(id uint64) error {
 		n := int(math.Min(float64(report.topN), float64(len(all))))
 		all = all[:n]
 	}
+	report.Logger.Error("shard: " + strconv.Itoa(int(id)) + ", len " + strconv.Itoa(len(allMap)))
+	report.Logger.Error("shard: " + strconv.Itoa(int(id)) + ", path " + report.shardPaths[id])
 
 	tw := tabwriter.NewWriter(report.Stdout, 4, 4, 1, '\t', 0)
 	fmt.Fprintf(tw, "===============\nShard ID: %d\nPath: %s\nCardinality (exact): %d\n\n", id, report.shardPaths[id], totalCardinality)

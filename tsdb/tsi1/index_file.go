@@ -118,23 +118,23 @@ func (f *IndexFile) Open() (err error) {
 
 	// Try to acquire a reference to the series file.
 	f.sfileref, err = f.sfile.Acquire()
-	f.sfile.Logger.Error("err before1")
 	if err != nil {
 		return err
 	}
-	f.sfile.Logger.Error("err before")
 
 	// Extract identifier from path name.
 	f.id, f.level = ParseFilename(f.Path())
-	f.sfile.Logger.Error("err after")
 
 	data, err := mmap.Map(f.Path(), 0)
 	if err != nil {
+		f.sfile.Logger.Error("err here1")
 		f.sfileref.Release()
 		return err
 	}
 
 	if err := f.UnmarshalBinary(data); err != nil {
+		f.sfile.Logger.Error("err here2")
+
 		f.sfileref.Release()
 		f.Close()
 		return err
