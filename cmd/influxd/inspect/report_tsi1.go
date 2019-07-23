@@ -18,7 +18,9 @@ var tsiFlags = struct {
 	Stderr io.Writer
 	Stdout io.Writer
 
-	Path string
+	Path   string
+	org    string
+	bucket string
 
 	seriesFilePath string // optional. Defaults to dbPath/_series
 	sfile          *tsdb.SeriesFile
@@ -46,6 +48,8 @@ func NewReportTsiCommand() *cobra.Command {
 	// fs.BoolVar(&cmd.byTagKey, "tag-key", false, "Segment cardinality by tag keys (overrides `measurements`")
 	reportTsiCommand.Flags().IntVar(&tsiFlags.topN, "top", 0, "Limit results to top n")
 	reportTsiCommand.Flags().IntVar(&tsiFlags.concurrency, "c", runtime.GOMAXPROCS(0), "Set worker concurrency. Defaults to GOMAXPROCS setting.")
+	reportTsiCommand.Flags().StringVar(&tsiFlags.bucket, "bucket", "", "If bucket is specified, org must be specified")
+	reportTsiCommand.Flags().StringVar(&tsiFlags.org, "org", "", "org to be searched")
 
 	reportTsiCommand.SetOutput(tsiFlags.Stdout)
 
@@ -66,40 +70,12 @@ func RunReportTsi(cmd *cobra.Command, args []string) error {
 		tsiFlags.Path = os.Getenv("HOME") + "/.influxdbv2/engine"
 	}
 
-	// // Walk database directory to get shards.
-	// if err := filepath.Walk(cmd.dbPath, func(path string, info os.FileInfo, err error) error {
-	// 	if err != nil {
-	// 		return err
-	// 	}
-
-	// 	if !info.IsDir() {
-	// 		return nil
-	// 	}
-
-	// 	// TODO(edd): this would be a problem if the retention policy was named
-	// 	// "index".
-	// 	if info.Name() == tsdb.SeriesFileDirectory || info.Name() == "index" {
-	// 		return filepath.SkipDir
-	// 	}
-
-	// 	id, err := strconv.Atoi(info.Name())
-	// 	if err != nil {
-	// 		return nil
-	// 	}
-	// 	cmd.shardPaths[uint64(id)] = path
-	// 	return nil
-	// }); err != nil {
-	// 	return err
-	// }
-
-	// if len(cmd.shardPaths) == 0 {
-	// 	fmt.Fprintf(cmd.Stderr, "No shards under %s\n", cmd.dbPath)
-	// 	return nil
-	// }
 	report := tsi1.NewReportTsi()
 	report.Concurrency = tsiFlags.concurrency
 	report.Path = tsiFlags.Path
 	report.Logger = log
+	report.Org = tsiFlags.org
+	report.Bucket = tsiFlags.bucket
 	report.Logger.Error("running report")
 	err = report.RunTsiReport()
 	if err != nil {

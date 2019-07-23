@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"text/tabwriter"
 
+	"github.com/influxdata/influxdb"
 	"github.com/influxdata/influxdb/tsdb"
 	"go.uber.org/zap"
 )
@@ -29,7 +30,15 @@ type ReportTsi struct {
 	Stdout io.Writer
 	Logger *zap.Logger
 
-	Path          string
+	// Filters
+	Path   string
+	Org    string
+	Bucket string
+
+	// Maps org and bucket IDs with measurement name
+	orgs    map[uint64]map[string]*cardinality // The exact or estimated unique set of series keys segmented by org.
+	buckets map[uint64]map[string]*cardinality
+
 	shardPaths    map[uint64]string
 	shardIdxs     map[uint64]*Index
 	cardinalities map[uint64]map[string]*cardinality
@@ -77,6 +86,7 @@ func (report *ReportTsi) RunTsiReport() error {
 		return err
 	}
 	defer sFile.Close()
+	report.sfile = sFile
 
 	// for _, seriesFolder := range seriesFileInfos {
 	// 	folder := filepath.Join(seriesDir, seriesFolder.Name())
@@ -123,7 +133,8 @@ func (report *ReportTsi) RunTsiReport() error {
 	// }
 	//}
 	path := filepath.Join(report.Path, "index")
-	report.indexFile = NewIndex(sFile, NewConfig(), WithPath(path), DisableCompactions())
+	//report.indexFile = NewIndex(sFile, NewConfig(), WithPath(path), DisableCompactions())
+	report.indexFile = NewIndex(sFile, NewConfig(), WithPath(path))
 	if err := report.indexFile.Open(context.Background()); err != nil {
 		return err
 	}
@@ -146,6 +157,10 @@ func (report *ReportTsi) RunTsiReport() error {
 	report.shardIdxs[uint64(id)] = report.indexFile
 	report.shardPaths[uint64(id)] = path
 	report.cardinalities[uint64(id)] = map[string]*cardinality{}
+
+	report.orgs = make(map[uint64]map[string]*cardinality)
+
+	report.buckets = make(map[uint64]map[string]*cardinality)
 
 	// report.Logger.Error("attempting new indexfile")
 	// var indexFileIndex *IndexFile
@@ -379,6 +394,34 @@ OUTER:
 				panic(fmt.Sprintf("series ID is too large: %d (max %d). Corrupted series file?", e.SeriesID, uint32(math.MaxUint32)))
 			}
 			c.add(e.SeriesID.ID)
+
+			// org by measurement
+			// bucket by measurement
+			seriesID := e.SeriesID
+			key := report.sfile.SeriesKey(seriesID)
+			var a [16]byte // TODO(edd) if this shows up we can use a different API to DecodeName.
+			copy(a[:], key[:16])
+			org, bucket := tsdb.DecodeName(a)
+			card := &cardinality{name: key}
+
+			if _, ok := report.orgs[uint64(org)]; !ok {
+				report.orgs[uint64(org)] = make(map[string]*cardinality)
+			}
+			if c, ok := report.orgs[uint64(org)][string(name)]; !ok {
+				report.orgs[uint64(org)][string(name)] = card
+			} else {
+				c.add(e.SeriesID.ID)
+			}
+
+			if _, ok := report.buckets[uint64(bucket)]; !ok {
+				report.buckets[uint64(bucket)] = make(map[string]*cardinality)
+			}
+			if c, ok := report.buckets[uint64(bucket)][string(name)]; !ok {
+				report.buckets[uint64(bucket)][string(name)] = card
+			} else {
+				c.add(e.SeriesID.ID)
+			}
+
 		}
 		sitr.Close()
 
@@ -535,17 +578,18 @@ func (report *ReportTsi) printSummaryByMeasurement() error {
 		measurements = measurements[:n]
 	}
 
-	tw := tabwriter.NewWriter(report.Stdout, 4, 4, 1, '\t', 0)
-	fmt.Fprintf(tw, "Summary\nDatabase Path: %s\nCardinality (exact): %d\n\n", report.Path, totalCardinality)
-	fmt.Fprint(tw, "Measurement\tCardinality (exact)\n\n")
-	for _, res := range measurements {
-		fmt.Fprintf(tw, "%q\t\t%d\n", res.name, res.count)
-	}
+	// tw := tabwriter.NewWriter(report.Stdout, 4, 4, 1, '\t', 0)
+	// fmt.Fprintf(tw, "Summary\nDatabase Path: %s\nCardinality (exact): %d\n\n", report.Path, totalCardinality)
+	// fmt.Fprint(tw, "Measurement\tCardinality (exact)\n\n")
+	// for _, res := range measurements {
+	// 	fmt.Fprintf(tw, "%q\t\t%d\n", res.name, res.count)
+	// }
 
-	if err := tw.Flush(); err != nil {
-		return err
-	}
-	fmt.Fprint(report.Stdout, "\n\n")
+	// if err := tw.Flush(); err != nil {
+	// 	return err
+	// }
+	// fmt.Fprint(report.Stdout, "\n\n")
+	report.printOrgCardinality()
 	return nil
 }
 
@@ -588,4 +632,34 @@ func (report *ReportTsi) printShardByMeasurement(id uint64) error {
 	}
 	fmt.Fprint(report.Stdout, "\n\n")
 	return nil
+}
+
+func (report *ReportTsi) printOrgCardinality() {
+	tw := tabwriter.NewWriter(report.Stdout, 4, 4, 1, '\t', 0)
+	totalCount := int64(0)
+	orgCount := int64(0)
+	bucketCount := int64(0)
+	for k, v := range report.orgs {
+		report.Logger.Error("calculating org")
+		for _, j := range v {
+			cCard := j.cardinality()
+			totalCount = totalCount + j.cardinality()
+			if influxdb.ID(k).String() == report.Org {
+				orgCount += cCard
+			}
+		}
+	}
+
+	for k, v := range report.buckets {
+
+		for _, j := range v {
+			cCard := j.cardinality()
+			if influxdb.ID(k).String() == report.Bucket {
+				bucketCount += cCard
+			}
+		}
+	}
+	fmt.Fprintf(tw, "Summary (total): %v \n\n", totalCount)
+	fmt.Fprintf(tw, "Org (%v): %v \n\n", report.Org, orgCount)
+	fmt.Fprintf(tw, "Bucket (%v): %v \n\n", report.Bucket, bucketCount)
 }
