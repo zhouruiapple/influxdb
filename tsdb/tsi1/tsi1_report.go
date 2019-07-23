@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
-	"strconv"
 	"sync/atomic"
 	"text/tabwriter"
 
@@ -71,7 +70,6 @@ func (report *ReportTsi) RunTsiReport() error {
 	// if err != nil {
 	// 	return err
 	// }
-	report.Logger.Error("searching series: " + seriesDir)
 	sFile := tsdb.NewSeriesFile(seriesDir)
 	sFile.WithLogger(report.Logger)
 	if err := sFile.Open(context.Background()); err != nil {
@@ -126,12 +124,10 @@ func (report *ReportTsi) RunTsiReport() error {
 	//}
 	path := filepath.Join(report.Path, "index")
 	report.indexFile = NewIndex(sFile, NewConfig(), WithPath(path), DisableCompactions())
-	report.Logger.Error("created new index")
 	if err := report.indexFile.Open(context.Background()); err != nil {
 		return err
 	}
 	defer report.indexFile.Close()
-	report.Logger.Error("finished opening")
 
 	// file, err := os.Open(path)
 	// if err != nil {
@@ -150,7 +146,6 @@ func (report *ReportTsi) RunTsiReport() error {
 	report.shardIdxs[uint64(id)] = report.indexFile
 	report.shardPaths[uint64(id)] = path
 	report.cardinalities[uint64(id)] = map[string]*cardinality{}
-	report.Logger.Error("finished mapping")
 
 	// report.Logger.Error("attempting new indexfile")
 	// var indexFileIndex *IndexFile
@@ -163,15 +158,10 @@ func (report *ReportTsi) RunTsiReport() error {
 	// report.Logger.Error("attempting itr next")
 	// report.Logger.Error("itr: " + string(itr.Next().Name()))
 
-	mitr, err := report.indexFile.MeasurementIterator()
-	if err != nil {
-		return err
-	}
-	n, err := mitr.Next()
-	if err != nil {
-		report.Logger.Error("err on next")
-	}
-	report.Logger.Error("mitr: " + string(n))
+	// mitr, err := report.indexFile.MeasurementIterator()
+	// if err != nil {
+	// 	return err
+	// }
 
 	// indexFiles := make([]*Index, 0)
 	// indexDir := filepath.Join(report.Path, "index")
@@ -255,13 +245,11 @@ func (report *ReportTsi) RunTsiReport() error {
 
 	// Blocks until all work done.
 	report.calculateCardinalities(fn)
-	report.Logger.Error("calculateCard")
 
 	// Print summary.
 	if err := report.printSummaryByMeasurement(); err != nil {
 		return err
 	}
-	report.Logger.Error("printed")
 
 	allIDs := make([]uint64, 0, len(report.shardIdxs))
 	for id := range report.shardIdxs {
@@ -274,7 +262,6 @@ func (report *ReportTsi) RunTsiReport() error {
 			return err
 		}
 	}
-	report.Logger.Error("why am i stuck in here")
 	return nil
 }
 
@@ -503,11 +490,8 @@ func (report *ReportTsi) printSummaryByMeasurement() error {
 	measurements := results{}
 	for name, err := mitr.Next(); err == nil && name != nil; name, err = mitr.Next() {
 		res := &result{name: name}
-		report.Logger.Error("name: " + string(name))
 		for _, shardCards := range report.cardinalities {
-			report.Logger.Error("cards: " + strconv.Itoa(len(shardCards)))
 			other, ok := shardCards[string(name)]
-			report.Logger.Error("mapped name: " + strconv.FormatBool(ok))
 			if !ok {
 				continue // this shard doesn't have anything for this measurement.
 			}
@@ -536,7 +520,6 @@ func (report *ReportTsi) printSummaryByMeasurement() error {
 		res.set = nil
 		res.lowCardinality = nil
 		measurements = append(measurements, res)
-		report.Logger.Error("did we make it heeer")
 	}
 
 	// if err != nil {
@@ -551,13 +534,10 @@ func (report *ReportTsi) printSummaryByMeasurement() error {
 		n := int(math.Min(float64(report.topN), float64(len(measurements))))
 		measurements = measurements[:n]
 	}
-	report.Logger.Error("stuck her?")
 
 	tw := tabwriter.NewWriter(report.Stdout, 4, 4, 1, '\t', 0)
-	report.Logger.Error("stuck her? 2.0")
 	fmt.Fprintf(tw, "Summary\nDatabase Path: %s\nCardinality (exact): %d\n\n", report.Path, totalCardinality)
 	fmt.Fprint(tw, "Measurement\tCardinality (exact)\n\n")
-	report.Logger.Error("must be her")
 	for _, res := range measurements {
 		fmt.Fprintf(tw, "%q\t\t%d\n", res.name, res.count)
 	}
@@ -585,7 +565,6 @@ func (report *ReportTsi) printShardByMeasurement(id uint64) error {
 
 		totalCardinality += n
 		all = append(all, card)
-		report.Logger.Error("appended to all")
 	}
 
 	sort.Sort(sort.Reverse(all))
@@ -596,8 +575,6 @@ func (report *ReportTsi) printShardByMeasurement(id uint64) error {
 		n := int(math.Min(float64(report.topN), float64(len(all))))
 		all = all[:n]
 	}
-	report.Logger.Error("shard: " + strconv.Itoa(int(id)) + ", len " + strconv.Itoa(len(allMap)))
-	report.Logger.Error("shard: " + strconv.Itoa(int(id)) + ", path " + report.shardPaths[id])
 
 	tw := tabwriter.NewWriter(report.Stdout, 4, 4, 1, '\t', 0)
 	fmt.Fprintf(tw, "===============\nShard ID: %d\nPath: %s\nCardinality (exact): %d\n\n", id, report.shardPaths[id], totalCardinality)
@@ -610,6 +587,5 @@ func (report *ReportTsi) printShardByMeasurement(id uint64) error {
 		return err
 	}
 	fmt.Fprint(report.Stdout, "\n\n")
-	report.Logger.Error("do we escape? yes")
 	return nil
 }

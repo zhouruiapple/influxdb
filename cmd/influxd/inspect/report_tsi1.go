@@ -102,10 +102,8 @@ func RunReportTsi(cmd *cobra.Command, args []string) error {
 	report.Logger = log
 	report.Logger.Error("running report")
 	err = report.RunTsiReport()
-	report.Logger.Error("tf")
 	if err != nil {
 		return err
 	}
-	report.Logger.Error("this is it")
 	return nil
 }
