@@ -2,7 +2,6 @@ package inspect
 
 import (
 	"io"
-	"io/ioutil"
 	"os"
 	"runtime"
 
@@ -60,18 +59,7 @@ func RunReportTsi(cmd *cobra.Command, args []string) error {
 	config.Level = zapcore.InfoLevel
 	log, err := config.New(os.Stderr)
 	// do some filepath walking, we are looking for index files
-	dir := os.Getenv("HOME") + "/.influxdbv2/engine/index"
-	dbs, err := ioutil.ReadDir(dir)
-	log.Error("reading dir: " + dir)
-	for _, db := range dbs {
-		if db.IsDir() {
-			log.Error("dir: " + db.Name())
-		}
-		log.Error("file: " + db.Name())
-	}
-	if err != nil {
-		return err
-	}
+	//dir := os.Getenv("HOME") + "/.influxdbv2/engine/index"
 
 	// if path is unset, set to os.Getenv("HOME") + "/.influxdbv2/engine"
 	if tsiFlags.Path == "" {
@@ -114,8 +102,10 @@ func RunReportTsi(cmd *cobra.Command, args []string) error {
 	report.Logger = log
 	report.Logger.Error("running report")
 	err = report.RunTsiReport()
+	report.Logger.Error("tf")
 	if err != nil {
 		return err
 	}
+	report.Logger.Error("this is it")
 	return nil
 }
