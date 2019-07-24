@@ -1,9 +1,12 @@
 package inspect
 
 import (
+	"errors"
 	"io"
 	"os"
 	"runtime"
+
+	"github.com/influxdata/influxdb"
 
 	"github.com/influxdata/influxdb/logger"
 	"github.com/influxdata/influxdb/tsdb"
@@ -70,14 +73,31 @@ func RunReportTsi(cmd *cobra.Command, args []string) error {
 		tsiFlags.Path = os.Getenv("HOME") + "/.influxdbv2/engine"
 	}
 
-	report := tsi1.NewReportTsi()
+	report := tsi1.NewReportCommand()
 	report.Concurrency = tsiFlags.concurrency
-	report.Path = tsiFlags.Path
+	report.DataPath = tsiFlags.Path
 	report.Logger = log
-	report.Org = tsiFlags.org
-	report.Bucket = tsiFlags.bucket
+
+	if tsiFlags.org != "" {
+		if orgID, err := influxdb.IDFromString(tsiFlags.org); err != nil {
+			return err
+		} else {
+			report.OrgID = orgID
+		}
+	}
+
+	if tsiFlags.bucket != "" {
+		if bucketID, err := influxdb.IDFromString(tsiFlags.bucket); err != nil {
+			return err
+		} else if report.OrgID == nil {
+			return errors.New("org must be provided if filtering by bucket ")
+		} else {
+			report.BucketID = bucketID
+		}
+	}
+
 	report.Logger.Error("running report")
-	err = report.RunTsiReport()
+	err = report.Run()
 	if err != nil {
 		return err
 	}
