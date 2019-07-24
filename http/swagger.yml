@@ -6552,7 +6552,7 @@ components:
             labels:
               $ref: "#/components/schemas/Link"
       required: [id, name, orgID, flux]
-    TaskStatusType:
+    StatusType:
       type: string
       enum: [active, inactive]
     User:
