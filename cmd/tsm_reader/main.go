@@ -69,6 +69,8 @@ func main() {
 		fmt.Fprintf(os.Stderr, err.Error())
 		return
 	}
+
+	fmt.Println("got out tsm file")
 	outBytes, err := ioutil.ReadAll(out)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, err.Error())

@@ -1,11 +1,15 @@
 package influxdb
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"hash/crc32"
 	"io"
 	"time"
+
+	"github.com/influxdata/flux"
 
 	"github.com/influxdata/flux/execute"
 
@@ -16,7 +20,6 @@ import (
 
 	"github.com/influxdata/influxdb"
 
-	"github.com/influxdata/flux"
 	"github.com/influxdata/flux/semantic"
 	"github.com/influxdata/flux/values"
 )
@@ -29,6 +32,10 @@ const (
 	stopArg        = "stop"
 	ExtractTSMKind = "extractTSM"
 )
+
+func init() {
+	flux.RegisterPackageValue("influxdata/influxdb", ExtractTSMKind, extractTSM)
+}
 
 var extractTSM = values.NewFunction(
 	"extractTSM",
@@ -45,7 +52,66 @@ var extractTSM = values.NewFunction(
 		Return:       semantic.Stream,
 	}),
 	func(args values.Object) (values.Value, error) {
-		return nil, nil
+		stream, exists := args.Get(streamArg)
+		if !exists {
+			return nil, fmt.Errorf("missing argument %s", streamArg)
+		} else if stream.Type().Nature() != semantic.Stream {
+			return nil, errors.New("stream must be of type stream")
+		}
+
+		var startTime, stopTime values.Time
+		start, exists := args.Get(startArg)
+		if !exists {
+			startTime = values.ConvertTime(flux.MinTime.Absolute)
+		} else if start.Type().Nature() != semantic.Time {
+			return nil, errors.New("start must be of type time")
+		} else {
+			startTime = start.Time()
+		}
+
+		stop, exists := args.Get(stopArg)
+		if !exists {
+			stopTime = values.ConvertTime(flux.MaxTime.Absolute)
+		} else if stop.Type().Nature() != semantic.Time {
+			return nil, errors.New("stop must be of type time")
+		} else {
+			stopTime = stop.Time()
+		}
+
+		var org, bucket string
+		orgArg, exists := args.Get(orgArg)
+		if !exists {
+			return nil, fmt.Errorf("missing argument %s", orgArg)
+		} else if orgArg.Type().Nature() != semantic.String {
+			return nil, fmt.Errorf("org id must be string")
+		}
+		org = orgArg.Str()
+
+		bucketArg, exists := args.Get(bucketArg)
+		if !exists {
+			bucket = ""
+		} else if bucketArg.Type().Nature() != semantic.String {
+			return nil, fmt.Errorf("bucket id must be string")
+		} else {
+			bucket = bucketArg.Str()
+		}
+
+		timeBounds := execute.Bounds{
+			Start: startTime,
+			Stop:  stopTime,
+		}
+
+		tsmFilter, err := NewTSMFilter(org, bucket, timeBounds, stream)
+		if err != nil {
+			return nil, err
+		}
+
+		outStream, err := tsmFilter.FilteredTSMStream()
+		if err != nil {
+			return nil, err
+		}
+
+		return values.NewReadStream(outStream), nil
 	}, false,
 )
 
@@ -84,31 +150,24 @@ func NewTSMFilter(org, bucket string, bounds execute.Bounds, src values.Stream) 
 }
 
 func (t *TSMFilter) FilteredTSMStream() (io.Reader, error) {
-	entries, err := filterBlocks(t.source, t.Org, t.Bucket, t.Bounds)
+	s, _ := t.source.(io.ReadSeeker)
+	entries, err := filterBlocks(s, t.Org, t.Bucket, t.Bounds)
 	if err != nil {
 		return nil, err
 	}
 
-	fmt.Println("entries: ", entries)
-
-	fmt.Println("filtered blocks...")
-
-	tsmWriter, err := tsm1.NewTSMWriter(t.pipeWriter)
+	buf := &bytes.Buffer{}
+	tsmWriter, err := tsm1.NewTSMWriter(buf)
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println("created tsm writer...")
-	iter := NewBlockIterator(entries, t.source)
 
-	fmt.Println("created block iterator...")
+	iter := NewBlockIterator(entries, s)
 
 	for iter.HasNext() {
-		fmt.Println("about to get next")
 		if err := iter.Next(); err != nil {
 			return nil, err
 		}
-
-		fmt.Println("got next block...")
 
 		entryBytes := iter.BlockBytes()
 		entryKey := iter.SeriesKey()
@@ -117,20 +176,17 @@ func (t *TSMFilter) FilteredTSMStream() (io.Reader, error) {
 		if err := tsmWriter.WriteBlock(entryKey, minTime, maxTime, entryBytes); err != nil {
 			return nil, err
 		}
-		fmt.Println("wrote block")
 	}
 
 	if err := tsmWriter.WriteIndex(); err != nil {
 		return nil, err
 	}
 
-	tsmWriter.Close()
+	if err := tsmWriter.Close(); err != nil {
+		return nil, err
+	}
 
-	return t.pipeReader, nil
-}
-
-func init() {
-	flux.RegisterPackageValue("influxdata/influxdb", ExtractTSMKind, extractTSM)
+	return buf, nil
 }
 
 type BlockIterator struct {
@@ -151,19 +207,16 @@ func NewBlockIterator(entries []ReadEntry, stream io.ReadSeeker) *BlockIterator 
 }
 
 func (b *BlockIterator) HasNext() bool {
-	fmt.Println("HasNext()")
 	return b.pos < len(b.entries)
 }
 
 func (b *BlockIterator) Next() error {
-	fmt.Println("Next()")
 	b.currentBlockInfo = b.entries[b.pos]
 	//vals, err := decodeBlockForEntry(b.stream, b.currentBlockInfo)
 	blockBytes, err := readBytesForEntry(b.stream, b.currentBlockInfo)
 	if err != nil {
 		return err
 	}
-	fmt.Println("read bytes for entry...")
 	//_, tags := tsdb.ParseSeriesKey(b.currentBlockInfo.seriesKey)
 
 	//b.currentTags = tags
@@ -201,7 +254,6 @@ type ReadEntry struct {
 }
 
 func filterBlocks(stream io.ReadSeeker, targetOrg, targetBucket *influxdb.ID, bounds execute.Bounds) ([]ReadEntry, error) {
-	fmt.Println("filterBlocks()")
 	if targetOrg == nil {
 		return nil, errors.New("must provide org")
 	}
@@ -210,8 +262,6 @@ func filterBlocks(stream io.ReadSeeker, targetOrg, targetBucket *influxdb.ID, bo
 	if err != nil {
 		return nil, err
 	}
-
-	fmt.Println("got file index pos")
 
 	indexBytes, err := readIndexBytes(stream, start, end)
 	if err != nil {
@@ -233,10 +283,6 @@ func filterBlocks(stream io.ReadSeeker, targetOrg, targetBucket *influxdb.ID, bo
 		copy(a[:], key[:16])
 		org, bucket := tsdb.DecodeName(a)
 
-		// filtering
-		fmt.Printf("org: %s, bucket %s\n", org.String(), bucket.String())
-		fmt.Printf("key: %s, entry: %v\n", string(key), entry)
-
 		if org == *targetOrg {
 			if targetBucket == nil || bucket == *targetBucket {
 				b := execute.Bounds{
@@ -247,15 +293,10 @@ func filterBlocks(stream io.ReadSeeker, targetOrg, targetBucket *influxdb.ID, bo
 				// only add the block to our list if there is a non-empty overlap
 				if b.Overlaps(bounds) {
 					overlapping := b.Intersect(bounds)
-					fmt.Println("bounds for block: ", b)
-
 					// get the overlap between the bounds we're interested in and the
 					// bounds for this particular block
-
-					fmt.Println("b.Intersect(bounds): ", overlapping)
-					fmt.Println("overlapping.IsEmpty(): ", overlapping.IsEmpty())
 					blockEntries = append(blockEntries, ReadEntry{
-						seriesKey: key[16:],
+						seriesKey: key,
 						blockData: entry,
 						bounds:    overlapping,
 					})
@@ -281,12 +322,9 @@ func decodeBlockForEntry(stream io.ReadSeeker, entry ReadEntry) ([]tsm1.Value, e
 }
 
 func readBytesForEntry(stream io.ReadSeeker, entry ReadEntry) ([]byte, error) {
-	fmt.Println("readBytesForEntry() start")
 	if _, err := stream.Seek(entry.blockData.Offset, 0); err != nil {
 		return nil, err
 	}
-
-	fmt.Println("seek succeeded")
 
 	var blockBytes = make([]byte, entry.blockData.Size)
 	n, err := stream.Read(blockBytes)
@@ -300,9 +338,24 @@ func readBytesForEntry(stream io.ReadSeeker, entry ReadEntry) ([]byte, error) {
 		return nil, errors.New("block too short to read")
 	}
 
-	fmt.Println("readBytesForEntry() end")
+	oldSum := blockBytes[:4]
+	blockBytes = blockBytes[4:]
+	if err := verifyChecksum(oldSum, blockBytes); err != nil {
+		return nil, err
+	}
 
 	return blockBytes, nil
+}
+
+func verifyChecksum(want []byte, data []byte) error {
+	var checksum [crc32.Size]byte
+	binary.BigEndian.PutUint32(checksum[:], crc32.ChecksumIEEE(data))
+
+	if bytes.Compare(want, checksum[:]) != 0 {
+		return errors.New("invalid checksum for block")
+	}
+
+	return nil
 }
 
 func readIndexBytes(stream io.ReadSeeker, start, end int64) ([]byte, error) {
@@ -330,8 +383,6 @@ func getFileIndexPos(stream io.ReadSeeker) (int64, int64, error) {
 		return 0, 0, err
 	}
 
-	fmt.Println("footerStartPos: ", footerStartPos)
-
 	var footer [8]byte
 	if n, err := stream.Read(footer[:]); err != nil {
 		return 0, 0, err
@@ -340,8 +391,6 @@ func getFileIndexPos(stream io.ReadSeeker) (int64, int64, error) {
 	}
 
 	indexStartPos := binary.BigEndian.Uint64(footer[:])
-	fmt.Println("read footer: ", indexStartPos)
-
 	return int64(indexStartPos), footerStartPos, nil
 }
 
