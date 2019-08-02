@@ -13,8 +13,6 @@ import (
 
 	"github.com/influxdata/flux/execute"
 
-	"github.com/influxdata/influxdb/models"
-
 	"github.com/influxdata/influxdb/tsdb"
 	"github.com/influxdata/influxdb/tsdb/tsm1"
 
@@ -191,16 +189,23 @@ func (t *TSMFilter) FilteredTSMStream() (io.Reader, error) {
 }
 
 type BlockIterator struct {
-	entries           []ReadEntry
-	currentBlockInfo  ReadEntry
-	currentTags       []models.Tag
-	currentValues     []tsm1.Value
-	currentBlockBytes []byte
-	pos               int
-	stream            io.ReadSeeker
+	entries          []*ReadEntry
+	currentBlockInfo *ReadEntry
+
+	currentBlockList [][]byte
+
+	currentBlock []byte
+
+	blockListIdx int
+
+	readEntryPos  int
+	blockChunkPos int
+	stream        io.ReadSeeker
+
+	fetchNext bool
 }
 
-func NewBlockIterator(entries []ReadEntry, stream io.ReadSeeker) *BlockIterator {
+func NewBlockIterator(entries []*ReadEntry, stream io.ReadSeeker) *BlockIterator {
 	return &BlockIterator{
 		entries: entries,
 		stream:  stream,
@@ -208,36 +213,59 @@ func NewBlockIterator(entries []ReadEntry, stream io.ReadSeeker) *BlockIterator 
 }
 
 func (b *BlockIterator) HasNext() bool {
-	return b.pos < len(b.entries)
+	return b.readEntryPos < len(b.entries)
 }
 
 func (b *BlockIterator) Next() error {
-	b.currentBlockInfo = b.entries[b.pos]
-	//vals, err := decodeBlockForEntry(b.stream, b.currentBlockInfo)
-	blockBytes, err := readBytesForEntry(b.stream, b.currentBlockInfo)
-	if err != nil {
-		return err
+	if b.currentBlockInfo == nil || b.fetchNext {
+		b.currentBlockInfo = b.entries[b.readEntryPos]
 	}
-	//_, tags := tsdb.ParseSeriesKey(b.currentBlockInfo.seriesKey)
 
-	//b.currentTags = tags
-	//b.currentValues = vals
-	b.currentBlockBytes = blockBytes
-	b.pos++
+	if b.currentBlockList == nil {
+		if err := b.FetchBlockList(); err != nil {
+			return err
+		}
+	}
+
+	if b.blockListIdx >= len(b.currentBlockList) {
+		if err := b.FetchBlockList(); err != nil {
+			return err
+		}
+		b.blockListIdx = 0
+		b.readEntryPos++
+		b.fetchNext = true
+	}
+
+	if len(b.currentBlockList) == 0 {
+		return errors.New("empty block list")
+	}
+
+	b.currentBlock = b.currentBlockList[b.blockListIdx]
+	b.blockListIdx++
 
 	return nil
 }
 
-func (b *BlockIterator) Tags() []models.Tag {
-	return b.currentTags
+func (b *BlockIterator) FetchBlockList() error {
+	blockList, err := readBytesForEntry(b.stream, b.currentBlockInfo)
+	if err != nil {
+		return err
+	}
+	b.currentBlockList = blockList
+
+	return nil
 }
 
-func (b *BlockIterator) Values() []tsm1.Value {
-	return b.currentValues
-}
+//func (b *BlockIterator) Tags() []models.Tag {
+//	return b.currentTags
+//}
+//
+//func (b *BlockIterator) Values() []tsm1.Value {
+//	return b.currentValues
+//}
 
 func (b *BlockIterator) BlockBytes() []byte {
-	return b.currentBlockBytes
+	return b.currentBlock
 }
 
 func (b *BlockIterator) SeriesKey() []byte {
@@ -245,16 +273,20 @@ func (b *BlockIterator) SeriesKey() []byte {
 }
 
 func (b *BlockIterator) BlockMinMaxTime() (int64, int64) {
-	return b.currentBlockInfo.blockData.MinTime, b.currentBlockInfo.blockData.MaxTime
+	bnds := b.currentBlockInfo.bounds
+	return bnds.Start.Time().UnixNano(), bnds.Stop.Time().UnixNano()
 }
 
 type ReadEntry struct {
-	blockData *tsm1.IndexEntry
+	blockData []tsm1.IndexEntry
 	seriesKey []byte
 	bounds    execute.Bounds
+
+	blocksChunkStart int64
+	blocksChunkLen   int64
 }
 
-func (t *TSMFilter) filterBlocks(stream io.ReadSeeker, targetOrg, targetBucket *influxdb.ID, bounds execute.Bounds) ([]ReadEntry, error) {
+func (t *TSMFilter) filterBlocks(stream io.ReadSeeker, targetOrg, targetBucket *influxdb.ID, bounds execute.Bounds) ([]*ReadEntry, error) {
 	if targetOrg == nil {
 		return nil, errors.New("must provide org")
 	}
@@ -276,7 +308,7 @@ func (t *TSMFilter) filterBlocks(stream io.ReadSeeker, targetOrg, targetBucket *
 
 	iter := idx.IteratorFullIndex()
 
-	var blockEntries []ReadEntry
+	var blockEntries []*ReadEntry
 	for iter.Next() {
 		key := iter.Key()
 		var a [16]byte
@@ -292,22 +324,28 @@ func (t *TSMFilter) filterBlocks(stream io.ReadSeeker, targetOrg, targetBucket *
 					return nil, err
 				}
 
-				for _, entry := range entries {
-					fmt.Printf("entry for key %s: %v\n", key, entry)
-					b := execute.Bounds{
-						Start: values.ConvertTime(time.Unix(0, entry.MinTime)),
-						Stop:  values.ConvertTime(time.Unix(0, entry.MaxTime)),
+				minTime, maxTime := minMaxTime(entries)
+				b := execute.Bounds{
+					Start: values.ConvertTime(time.Unix(0, minTime)),
+					Stop:  values.ConvertTime(time.Unix(0, maxTime)),
+				}
+				// only add the block to our list if there is a non-empty overlap
+				if b.Overlaps(bounds) {
+					overlapping := b.Intersect(bounds)
+					// get the overlap between the bounds we're interested in and the
+					// bounds for this particular block
+					re := &ReadEntry{
+						seriesKey: key,
+						blockData: entries,
+						bounds:    overlapping,
 					}
-					// only add the block to our list if there is a non-empty overlap
-					if b.Overlaps(bounds) {
-						overlapping := b.Intersect(bounds)
-						// get the overlap between the bounds we're interested in and the
-						// bounds for this particular block
-						blockEntries = append(blockEntries, ReadEntry{
-							seriesKey: key,
-							blockData: &entry,
-							bounds:    overlapping,
-						})
+					if err := re.setReadRange(); err != nil {
+						return nil, err
+					}
+
+					blockEntries = append(blockEntries, re)
+
+					for _, entry := range entries {
 						t.dataSize += entry.Size
 					}
 				}
@@ -318,43 +356,104 @@ func (t *TSMFilter) filterBlocks(stream io.ReadSeeker, targetOrg, targetBucket *
 	return blockEntries, nil
 }
 
-func decodeBlockForEntry(stream io.ReadSeeker, entry ReadEntry) ([]tsm1.Value, error) {
-	blockBytes, err := readBytesForEntry(stream, entry)
-	if err != nil {
-		return nil, err
-	}
-	values := []tsm1.Value{}
-	if values, err = tsm1.DecodeBlock(blockBytes[4:], values); err != nil {
-		return nil, err
+func minMaxTime(entries []tsm1.IndexEntry) (int64, int64) {
+	if len(entries) == 0 {
+		return flux.MinTime.Absolute.UnixNano(), flux.MaxTime.Absolute.UnixNano()
 	}
 
-	return values, nil
+	var minTime = entries[0].MinTime
+	var maxTime = entries[0].MaxTime
+	for _, entry := range entries {
+		if entry.MinTime < minTime {
+			minTime = entry.MinTime
+		}
+
+		if entry.MaxTime > maxTime {
+			maxTime = entry.MaxTime
+		}
+	}
+
+	return minTime, maxTime
 }
 
-func readBytesForEntry(stream io.ReadSeeker, entry ReadEntry) ([]byte, error) {
-	if _, err := stream.Seek(entry.blockData.Offset, 0); err != nil {
+//func decodeBlockForEntry(stream io.ReadSeeker, entry ReadEntry) ([]tsm1.Value, error) {
+//	blockBytes, err := readBytesForEntry(stream, entry)
+//	if err != nil {
+//		return nil, err
+//	}
+//	values := []tsm1.Value{}
+//	if values, err = tsm1.DecodeBlock(blockBytes[4:], values); err != nil {
+//		return nil, err
+//	}
+//
+//	return values, nil
+//}
+
+func readBytesForEntry(stream io.ReadSeeker, entry *ReadEntry) ([][]byte, error) {
+	if entry == nil {
+		return nil, nil
+	}
+	//
+	//for _, entry := range entry.blockData {
+	//	fmt.Println("entry offset: ", entry.Offset)
+	//	fmt.Println("entry offset + entry size: ", entry.Offset+int64(entry.Size))
+	//}
+	if _, err := stream.Seek(entry.blocksChunkStart, 0); err != nil {
 		return nil, err
 	}
 
-	var blockBytes = make([]byte, entry.blockData.Size)
+	var blockBytes = make([]byte, entry.blocksChunkLen)
 	n, err := stream.Read(blockBytes)
 	if err != nil {
 		return nil, err
-	} else if n != int(entry.blockData.Size) {
+	} else if n != int(entry.blocksChunkLen) {
 		return nil, errors.New("could not read full block")
 	}
 
-	if len(blockBytes) < 4 {
-		return nil, errors.New("block too short to read")
+	blockList := make([][]byte, len(entry.blockData))
+	for i, idxEntry := range entry.blockData {
+
+		blockStart := idxEntry.Offset - entry.blocksChunkStart
+		blockEnd := blockStart + int64(idxEntry.Size)
+		blockData := blockBytes[blockStart:blockEnd]
+
+		if len(blockData) < 4 {
+			return nil, errors.New("block too short")
+		}
+
+		sum := blockData[:4]
+		blockData = blockData[4:]
+
+		if err := verifyChecksum(sum, blockData); err != nil {
+			return nil, err
+		}
+
+		blockList[i] = blockData
 	}
 
-	oldSum := blockBytes[:4]
-	blockBytes = blockBytes[4:]
-	if err := verifyChecksum(oldSum, blockBytes); err != nil {
-		return nil, err
-	}
+	//if len(blockBytes) < 4 {
+	//	return nil, errors.New("block too short to read")
+	//}
+	//
+	//oldSum := blockBytes[:4]
+	//blockBytes = blockBytes[4:]
+	//if err := verifyChecksum(oldSum, blockBytes); err != nil {
+	//	return nil, err
+	//}
 
-	return blockBytes, nil
+	return blockList, nil
+}
+
+func (entry *ReadEntry) setReadRange() error {
+	if len(entry.blockData) < 1 {
+		return fmt.Errorf("no blocks for key: %s", entry.seriesKey)
+	}
+	startEntry, endEntry := entry.blockData[0], entry.blockData[len(entry.blockData)-1]
+
+	entry.blocksChunkStart = startEntry.Offset
+	entry.blocksChunkLen = endEntry.Offset + int64(endEntry.Size)
+
+	return nil
 }
 
 func verifyChecksum(want []byte, data []byte) error {
