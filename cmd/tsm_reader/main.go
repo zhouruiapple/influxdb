@@ -58,7 +58,7 @@ func main() {
 	//} else if err := printBlockData(f, entries); err != nil {
 	//	fmt.Fprintf(os.Stderr, err.Error())
 	//}
-	tsmFilter, err := influx_stdlib.NewTSMFilter(org, bucket, execute.AllTime, values.NewStream(f))
+	tsmFilter, err := influx_stdlib.NewTSMFilter(org, bucket, execute.AllTime, values.NewReadSeekStream(f))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error filtering tsm: %v\n", err)
 		return

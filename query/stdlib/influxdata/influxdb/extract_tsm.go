@@ -119,8 +119,8 @@ type TSMFilter struct {
 	Org, Bucket *influxdb.ID
 	Bounds      execute.Bounds
 	source      values.Stream
-	pipeReader  *io.PipeReader
-	pipeWriter  *io.PipeWriter
+
+	dataSize uint32
 }
 
 func NewTSMFilter(org, bucket string, bounds execute.Bounds, src values.Stream) (*TSMFilter, error) {
@@ -137,21 +137,17 @@ func NewTSMFilter(org, bucket string, bounds execute.Bounds, src values.Stream) 
 		}
 	}
 
-	reader, writer := io.Pipe()
-
 	return &TSMFilter{
-		Org:        orgID,
-		Bucket:     bucketID,
-		Bounds:     bounds,
-		source:     src,
-		pipeReader: reader,
-		pipeWriter: writer,
+		Org:    orgID,
+		Bucket: bucketID,
+		Bounds: bounds,
+		source: src,
 	}, nil
 }
 
 func (t *TSMFilter) FilteredTSMStream() (io.Reader, error) {
 	s, _ := t.source.(io.ReadSeeker)
-	entries, err := filterBlocks(s, t.Org, t.Bucket, t.Bounds)
+	entries, err := t.filterBlocks(s, t.Org, t.Bucket, t.Bounds)
 	if err != nil {
 		return nil, err
 	}
@@ -164,10 +160,13 @@ func (t *TSMFilter) FilteredTSMStream() (io.Reader, error) {
 
 	iter := NewBlockIterator(entries, s)
 
+	var read uint32 = 0
 	for iter.HasNext() {
 		if err := iter.Next(); err != nil {
 			return nil, err
 		}
+
+		fmt.Printf("\rwrote %d out of total %d; %3.2f%% finished", read, t.dataSize, float32(read)/float32(t.dataSize)*100)
 
 		entryBytes := iter.BlockBytes()
 		entryKey := iter.SeriesKey()
@@ -176,6 +175,8 @@ func (t *TSMFilter) FilteredTSMStream() (io.Reader, error) {
 		if err := tsmWriter.WriteBlock(entryKey, minTime, maxTime, entryBytes); err != nil {
 			return nil, err
 		}
+
+		read += uint32(len(entryBytes))
 	}
 
 	if err := tsmWriter.WriteIndex(); err != nil {
@@ -253,7 +254,7 @@ type ReadEntry struct {
 	bounds    execute.Bounds
 }
 
-func filterBlocks(stream io.ReadSeeker, targetOrg, targetBucket *influxdb.ID, bounds execute.Bounds) ([]ReadEntry, error) {
+func (t *TSMFilter) filterBlocks(stream io.ReadSeeker, targetOrg, targetBucket *influxdb.ID, bounds execute.Bounds) ([]ReadEntry, error) {
 	if targetOrg == nil {
 		return nil, errors.New("must provide org")
 	}
@@ -268,38 +269,47 @@ func filterBlocks(stream io.ReadSeeker, targetOrg, targetBucket *influxdb.ID, bo
 		return nil, err
 	}
 
-	iter := NewIndexIterator(indexBytes)
+	idx := tsm1.NewIndirectIndex()
+	if err := idx.UnmarshalBinary(indexBytes); err != nil {
+		return nil, err
+	}
+
+	iter := idx.IteratorFullIndex()
 
 	var blockEntries []ReadEntry
-	for iter.HasNext() {
-		if err := iter.Next(); err != nil {
-			return nil, err
-		}
-
+	for iter.Next() {
 		key := iter.Key()
-		entry := iter.Entry()
-
 		var a [16]byte
 		copy(a[:], key[:16])
 		org, bucket := tsdb.DecodeName(a)
 
 		if org == *targetOrg {
 			if targetBucket == nil || bucket == *targetBucket {
-				b := execute.Bounds{
-					Start: values.ConvertTime(time.Unix(0, entry.MinTime)),
-					Stop:  values.ConvertTime(time.Unix(0, entry.MaxTime)),
+
+				var e []tsm1.IndexEntry
+				entries, err := idx.ReadEntries(key, e)
+				if err != nil {
+					return nil, err
 				}
 
-				// only add the block to our list if there is a non-empty overlap
-				if b.Overlaps(bounds) {
-					overlapping := b.Intersect(bounds)
-					// get the overlap between the bounds we're interested in and the
-					// bounds for this particular block
-					blockEntries = append(blockEntries, ReadEntry{
-						seriesKey: key,
-						blockData: entry,
-						bounds:    overlapping,
-					})
+				for _, entry := range entries {
+					fmt.Printf("entry for key %s: %v\n", key, entry)
+					b := execute.Bounds{
+						Start: values.ConvertTime(time.Unix(0, entry.MinTime)),
+						Stop:  values.ConvertTime(time.Unix(0, entry.MaxTime)),
+					}
+					// only add the block to our list if there is a non-empty overlap
+					if b.Overlaps(bounds) {
+						overlapping := b.Intersect(bounds)
+						// get the overlap between the bounds we're interested in and the
+						// bounds for this particular block
+						blockEntries = append(blockEntries, ReadEntry{
+							seriesKey: key,
+							blockData: &entry,
+							bounds:    overlapping,
+						})
+						t.dataSize += entry.Size
+					}
 				}
 			}
 		}
@@ -363,7 +373,12 @@ func readIndexBytes(stream io.ReadSeeker, start, end int64) ([]byte, error) {
 		return nil, err
 	}
 
+	fmt.Printf("start: %d; end: %d\n", start, end)
+
 	indexSize := end - start
+
+	fmt.Println("indexSize is: ", indexSize)
+
 	indexBytes := make([]byte, indexSize)
 
 	n, err := stream.Read(indexBytes)
@@ -383,6 +398,8 @@ func getFileIndexPos(stream io.ReadSeeker) (int64, int64, error) {
 		return 0, 0, err
 	}
 
+	fmt.Println("footer start pos: ", footerStartPos)
+
 	var footer [8]byte
 	if n, err := stream.Read(footer[:]); err != nil {
 		return 0, 0, err
@@ -394,51 +411,57 @@ func getFileIndexPos(stream io.ReadSeeker) (int64, int64, error) {
 	return int64(indexStartPos), footerStartPos, nil
 }
 
-type IndexIterator struct {
-	buffer []byte
-	offset int
-
-	currentEntry *tsm1.IndexEntry
-	currentKey   []byte
-}
-
-func NewIndexIterator(b []byte) *IndexIterator {
-	return &IndexIterator{
-		buffer: b,
-	}
-}
-
-func (iter *IndexIterator) HasNext() bool {
-	return iter.offset < len(iter.buffer)
-}
-
-func (iter *IndexIterator) Key() []byte {
-	return iter.currentKey
-}
-
-func (iter *IndexIterator) Entry() *tsm1.IndexEntry {
-	return iter.currentEntry
-}
-
-func (iter *IndexIterator) Next() error {
-	keyLenBytes := iter.buffer[iter.offset : iter.offset+2]
-
-	keyLen := binary.BigEndian.Uint16(keyLenBytes)
-	iter.offset += 2
-	seriesKey := iter.buffer[iter.offset : iter.offset+int(keyLen)]
-
-	iter.currentKey = seriesKey
-	iter.offset += int(keyLen) + 3
-
-	entry := &tsm1.IndexEntry{}
-	if err := entry.UnmarshalBinary(iter.buffer[iter.offset : iter.offset+28]); err != nil {
-		return err
-	}
-
-	iter.offset += 28
-
-	iter.currentEntry = entry
-	iter.currentKey = seriesKey
-
-	return nil
-}
+//type IndexIterator struct {
+//	buffer []byte
+//	offset int
+//
+//	currentEntry *tsm1.IndexEntry
+//	currentKey   []byte
+//}
+//
+//func NewIndexIterator(b []byte) *IndexIterator {
+//	return &IndexIterator{
+//		buffer: b,
+//	}
+//}
+//
+//func (iter *IndexIterator) HasNext() bool {
+//	fmt.Println("HasNext(): ")
+//	fmt.Println("offset is: ", iter.offset)
+//	fmt.Println("buffer is: ", len(iter.buffer))
+//	return iter.offset < len(iter.buffer)
+//}
+//
+//func (iter *IndexIterator) Key() []byte {
+//	return iter.currentKey
+//}
+//
+//func (iter *IndexIterator) Entry() *tsm1.IndexEntry {
+//	return iter.currentEntry
+//}
+//
+//func (iter *IndexIterator) Next() error {
+//	keyLenBytes := iter.buffer[iter.offset : iter.offset+2]
+//
+//	keyLen := binary.BigEndian.Uint16(keyLenBytes)
+//	iter.offset += 2
+//	fmt.Println("iter.offset: ", iter.offset)
+//	fmt.Println("len(iter.buffer): ", len(iter.buffer))
+//	fmt.Println("keyLen: ", int(keyLen))
+//	seriesKey := iter.buffer[iter.offset : iter.offset+int(keyLen)]
+//
+//	iter.currentKey = seriesKey
+//	iter.offset += int(keyLen) + 3
+//
+//	entry := &tsm1.IndexEntry{}
+//	if err := entry.UnmarshalBinary(iter.buffer[iter.offset : iter.offset+28]); err != nil {
+//		return err
+//	}
+//
+//	iter.offset += 28
+//
+//	iter.currentEntry = entry
+//	iter.currentKey = seriesKey
+//
+//	return nil
+//}

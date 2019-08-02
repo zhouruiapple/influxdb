@@ -228,6 +228,23 @@ func (d *indirectIndex) Iterator(key []byte) *TSMIndexIterator {
 	return ti
 }
 
+func (d *indirectIndex) IteratorFullIndex() *TSMIndexIterator {
+	d.mu.RLock()
+	iter := d.ro.Iterator()
+	//_, ok := iter.Seek(key, &d.b)
+	ti := &TSMIndexIterator{
+		d:     d,
+		n:     int(len(d.ro.offsets)),
+		b:     &d.b,
+		iter:  &iter,
+		first: true,
+		ok:    true,
+	}
+	d.mu.RUnlock()
+
+	return ti
+}
+
 // Delete removes the given keys from the index.
 func (d *indirectIndex) Delete(keys [][]byte) bool {
 	if len(keys) == 0 {

@@ -783,23 +783,34 @@ func (t *tsmWriter) WriteIndex() error {
 		t.index.(*directIndex).f = f
 	}
 
+	fmt.Println("about to write to t.w")
+
 	// Write the index
 	if _, err := t.index.WriteTo(t.w); err != nil {
 		return err
 	}
 
+	fmt.Println("wrote to t.w")
+
 	var buf [8]byte
 	binary.BigEndian.PutUint64(buf[:], uint64(indexPos))
 
+	fmt.Println("about to write index position...")
 	// Write the index index position
 	_, err := t.w.Write(buf[:])
+
+	fmt.Println("wrote index position")
 	return err
 }
 
 func (t *tsmWriter) Flush() error {
+	fmt.Println("about to flush...")
+	fmt.Println("internal tsm writer data size: ", t.w.Size())
 	if err := t.w.Flush(); err != nil {
 		return err
 	}
+
+	fmt.Println("syncing...")
 
 	return t.sync()
 }
@@ -841,9 +852,12 @@ func (t *tsmWriter) writeStatsFile() error {
 }
 
 func (t *tsmWriter) Close() error {
+	fmt.Println("Close()")
 	if err := t.Flush(); err != nil {
 		return err
 	}
+
+	fmt.Println("Close(): flushed")
 
 	if err := t.index.Close(); err != nil {
 		return err
