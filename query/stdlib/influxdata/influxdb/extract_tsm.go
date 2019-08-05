@@ -353,9 +353,13 @@ func (t *TSMFilter) filterBlocks(stream io.ReadSeeker, targetOrg, targetBucket *
 
 					blockEntries = append(blockEntries, re)
 
+					s := uint32(0)
 					for _, entry := range entries {
-						t.dataSize += entry.Size
+						s += entry.Size
 					}
+					t.dataSize += s
+
+					fmt.Printf("sum of data for block: %d; block chunk length: %d\n", s, re.blocksChunkLen)
 				}
 			}
 		}
@@ -413,7 +417,7 @@ func readBytesForEntry(stream io.ReadSeeker, entry *ReadEntry) ([][]byte, error)
 	var blockBytes = make([]byte, entry.blocksChunkLen)
 	start := time.Now()
 	n, err := stream.Read(blockBytes)
-	fmt.Printf("read took: %v\n", time.Since(start))
+	fmt.Printf("read took: %v for %d bytes\n", time.Since(start), n)
 	if err != nil {
 		return nil, err
 	} else if n != int(entry.blocksChunkLen) {
@@ -422,10 +426,9 @@ func readBytesForEntry(stream io.ReadSeeker, entry *ReadEntry) ([][]byte, error)
 
 	blockList := make([][]byte, len(entry.blockData))
 
-	fmt.Println("splitting block start")
+	blockListSz := 0
 	start = time.Now()
 	for i, idxEntry := range entry.blockData {
-
 		blockStart := idxEntry.Offset - entry.blocksChunkStart
 		blockEnd := blockStart + int64(idxEntry.Size)
 		blockData := blockBytes[blockStart:blockEnd]
@@ -442,7 +445,9 @@ func readBytesForEntry(stream io.ReadSeeker, entry *ReadEntry) ([][]byte, error)
 		}
 
 		blockList[i] = blockData
+		blockListSz += len(blockData)
 	}
+	fmt.Printf("blockListSz: %d; blocksChunLen: %d\n", blockListSz, entry.blocksChunkLen)
 	fmt.Printf("splitting blocks took: %v\n", time.Since(start))
 
 	//if len(blockBytes) < 4 {
@@ -465,7 +470,9 @@ func (entry *ReadEntry) setReadRange() error {
 	startEntry, endEntry := entry.blockData[0], entry.blockData[len(entry.blockData)-1]
 
 	entry.blocksChunkStart = startEntry.Offset
-	entry.blocksChunkLen = endEntry.Offset + int64(endEntry.Size)
+	// length of the chunk will be first block offset subtracted from (last block position + last block size)
+	//
+	entry.blocksChunkLen = endEntry.Offset + int64(endEntry.Size) - startEntry.Offset
 
 	return nil
 }
