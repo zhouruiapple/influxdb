@@ -150,9 +150,9 @@ func (t *TSMFilter) FilteredTSMStream() (io.Reader, error) {
 		return nil, err
 	}
 
-	for _, entry := range entries {
-		fmt.Println("entry: ", entry.blocksChunkLen)
-	}
+	//for _, entry := range entries {
+	//	fmt.Println("entry: ", entry.blocksChunkLen)
+	//}
 
 	buf := &bytes.Buffer{}
 	tsmWriter, err := tsm1.NewTSMWriter(buf)
@@ -160,30 +160,41 @@ func (t *TSMFilter) FilteredTSMStream() (io.Reader, error) {
 		return nil, err
 	}
 
-	fmt.Println("len(entries): ", len(entries))
+	//fmt.Println("len(entries): ", len(entries))
 	iter := NewBlockIterator(entries, s)
 
+	nBlocks := 0
+	totalSize := 0
+	for _, entry := range entries {
+		nBlocks += len(entry.blockData)
+		totalSize += int(entry.blocksChunkLen)
+	}
+
 	var read uint32 = 0
+	last := time.Now()
 	for iter.HasNext() {
-		start := time.Now()
+		//start := time.Now()
 		if err := iter.Next(); err != nil {
 			return nil, err
 		}
 
-		fmt.Println("time to fetch next block: ", time.Since(start))
-
-		fmt.Printf("\rwrote %d out of total %d; %3.2f%% finished", read, t.dataSize, float32(read)/float32(t.dataSize)*100)
+		//fmt.Println("time to fetch next block: ", time.Since(start))
 
 		entryBytes := iter.BlockBytes()
 		entryKey := iter.SeriesKey()
 		minTime, maxTime := iter.BlockMinMaxTime()
 
-		fmt.Println("len(entryBytes): ", len(entryBytes))
-		start = time.Now()
+		delta := time.Since(last)
+		rate := float64(len(entryBytes)) / 1000 / delta.Seconds()
+		last = time.Now()
+		fmt.Printf("\r %f kiB/s wrote %d out of total %d; %3.2f%% finished", rate, read, t.dataSize, float32(read)/float32(t.dataSize)*100)
+
+		//fmt.Println("len(entryBytes): ", len(entryBytes))
+		//start = time.Now()
 		if err := tsmWriter.WriteBlock(entryKey, minTime, maxTime, entryBytes); err != nil {
 			return nil, err
 		}
-		fmt.Printf("time to write block: %v\n", time.Since(start))
+		//fmt.Printf("time to write block: %v\n", time.Since(start))
 
 		read += uint32(len(entryBytes))
 	}
@@ -195,6 +206,10 @@ func (t *TSMFilter) FilteredTSMStream() (io.Reader, error) {
 	if err := tsmWriter.Close(); err != nil {
 		return nil, err
 	}
+
+	//fmt.Printf("expected %d fewer bytes from stripped checksum: \n", nBlocks*4)
+	//fmt.Printf("sum of block chunk lengths: %d\n, t.dataSize: %d\n", totalSize, t.dataSize)
+	//fmt.Printf("wrote %d\n", read)
 
 	return buf, nil
 }
@@ -209,6 +224,7 @@ type BlockIterator struct {
 	blockListIdx int // the block currently referenced by the iterator
 
 	stream io.ReadSeeker // our source for reading block data given read entries
+	cnt    int
 }
 
 func NewBlockIterator(entries []*ReadEntry, stream io.ReadSeeker) *BlockIterator {
@@ -223,23 +239,24 @@ func (b *BlockIterator) HasNext() bool {
 }
 
 func (b *BlockIterator) Next() error {
+	if b.blockListIdx >= len(b.blockList) || len(b.blockList) == 0 {
+		if err := b.FetchBlockList(); err != nil {
+			return err
+		}
+		b.blockListIdx = 0
+
+		b.entry = b.entries[b.nextEntryPos]
+		b.nextEntryPos++
+	}
+
 	// if we're still processing the current
 	// list of block data, simply increment the
 	// block list index
 	if b.blockListIdx < len(b.blockList) {
-		fmt.Println("returning early after setting block...")
 		b.block = b.blockList[b.blockListIdx]
 		b.blockListIdx++
 		return nil
 	}
-
-	// Otherwise, fetch list of block data for
-	// next read entry
-	if err := b.FetchBlockList(); err != nil {
-		return err
-	}
-
-	b.entry = b.entries[b.nextEntryPos]
 
 	// at this point, we should never have an empty block list
 	if len(b.blockList) == 0 {
@@ -248,8 +265,6 @@ func (b *BlockIterator) Next() error {
 
 	// Reset the index into the block list and
 	// move to the next read entry
-	b.blockListIdx = 0
-	b.nextEntryPos++
 
 	return nil
 }
@@ -271,8 +286,16 @@ func (b *BlockIterator) FetchBlockList() error {
 //func (b *BlockIterator) Values() []tsm1.Value {
 //	return b.currentValues
 //}
+var lastBlock []byte
 
 func (b *BlockIterator) BlockBytes() []byte {
+	//if bytes.Compare(b.block, lastBlock) == 0 {
+	//	fmt.Println("blocks identical")
+	//	fmt.Println("b.nextEntryPos", b.nextEntryPos)
+	//	panic("last block same as this block")
+	//}
+	//lastBlock = b.block
+
 	return b.block
 }
 
@@ -359,7 +382,7 @@ func (t *TSMFilter) filterBlocks(stream io.ReadSeeker, targetOrg, targetBucket *
 					}
 					t.dataSize += s
 
-					fmt.Printf("sum of data for block: %d; block chunk length: %d\n", s, re.blocksChunkLen)
+					//fmt.Printf("sum of data for block: %d; block chunk length: %d\n", s, re.blocksChunkLen)
 				}
 			}
 		}
@@ -415,9 +438,9 @@ func readBytesForEntry(stream io.ReadSeeker, entry *ReadEntry) ([][]byte, error)
 	}
 
 	var blockBytes = make([]byte, entry.blocksChunkLen)
-	start := time.Now()
+	//start := time.Now()
 	n, err := stream.Read(blockBytes)
-	fmt.Printf("read took: %v for %d bytes\n", time.Since(start), n)
+	//fmt.Printf("read took: %v for %d bytes\n", time.Since(start), n)
 	if err != nil {
 		return nil, err
 	} else if n != int(entry.blocksChunkLen) {
@@ -427,7 +450,7 @@ func readBytesForEntry(stream io.ReadSeeker, entry *ReadEntry) ([][]byte, error)
 	blockList := make([][]byte, len(entry.blockData))
 
 	blockListSz := 0
-	start = time.Now()
+	//start = time.Now()
 	for i, idxEntry := range entry.blockData {
 		blockStart := idxEntry.Offset - entry.blocksChunkStart
 		blockEnd := blockStart + int64(idxEntry.Size)
@@ -447,8 +470,8 @@ func readBytesForEntry(stream io.ReadSeeker, entry *ReadEntry) ([][]byte, error)
 		blockList[i] = blockData
 		blockListSz += len(blockData)
 	}
-	fmt.Printf("blockListSz: %d; blocksChunLen: %d\n", blockListSz, entry.blocksChunkLen)
-	fmt.Printf("splitting blocks took: %v\n", time.Since(start))
+	//fmt.Printf("blockListSz: %d; blocksChunLen: %d\n", blockListSz, entry.blocksChunkLen)
+	//fmt.Printf("splitting blocks took: %v\n", time.Since(start))
 
 	//if len(blockBytes) < 4 {
 	//	return nil, errors.New("block too short to read")
@@ -493,12 +516,7 @@ func readIndexBytes(stream io.ReadSeeker, start, end int64) ([]byte, error) {
 		return nil, err
 	}
 
-	fmt.Printf("start: %d; end: %d\n", start, end)
-
 	indexSize := end - start
-
-	fmt.Println("indexSize is: ", indexSize)
-
 	indexBytes := make([]byte, indexSize)
 
 	n, err := stream.Read(indexBytes)
