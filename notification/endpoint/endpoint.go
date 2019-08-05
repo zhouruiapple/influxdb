@@ -7,15 +7,22 @@ import (
 	"github.com/influxdata/influxdb"
 )
 
+const (
+	SlackType     = "slack"
+	SMTPType      = "smtp"
+	PagerDutyType = "pagerduty"
+	WebhookType   = "webhook"
+)
+
 var typeToEndpoint = map[string](func() influxdb.NotificationEndpoint){
-	"slack":     func() influxdb.NotificationEndpoint { return &Slack{} },
-	"smtp":      func() influxdb.NotificationEndpoint { return &SMTP{} },
-	"pagerduty": func() influxdb.NotificationEndpoint { return &PagerDuty{} },
-	"webhook":   func() influxdb.NotificationEndpoint { return &WebHook{} },
+	SlackType:     func() influxdb.NotificationEndpoint { return &Slack{} },
+	SMTPType:      func() influxdb.NotificationEndpoint { return &SMTP{} },
+	PagerDutyType: func() influxdb.NotificationEndpoint { return &PagerDuty{} },
+	WebhookType:   func() influxdb.NotificationEndpoint { return &WebHook{} },
 }
 
 type rawRuleJSON struct {
-	Typ string `json:"type"`
+	Type string `json:"type"`
 }
 
 // UnmarshalJSON will convert
@@ -26,10 +33,10 @@ func UnmarshalJSON(b []byte) (influxdb.NotificationEndpoint, error) {
 			Msg: "unable to detect the notification endpoint type from json",
 		}
 	}
-	convertedFunc, ok := typeToEndpoint[raw.Typ]
+	convertedFunc, ok := typeToEndpoint[raw.Type]
 	if !ok {
 		return nil, &influxdb.Error{
-			Msg: fmt.Sprintf("invalid notification endpoint type %s", raw.Typ),
+			Msg: fmt.Sprintf("invalid notification endpoint type %s", raw.Type),
 		}
 	}
 	converted := convertedFunc()
@@ -48,6 +55,8 @@ type Base struct {
 }
 
 func (b Base) valid() error {
+	// check for valid type here
+	// if type, ok := typeToEndpoint[b.Type]
 	if !b.ID.Valid() {
 		return &influxdb.Error{
 			Code: influxdb.EInvalid,

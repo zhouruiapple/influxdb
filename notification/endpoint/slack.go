@@ -15,8 +15,8 @@ var _ influxdb.NotificationEndpoint = &Slack{}
 // Slack is the notification endpoint config of slack.
 type Slack struct {
 	Base
-	// Path is the API path of Slack
-	// example: https://slack.com/api/chat.postMessage
+	// URL is a valid slack webhook URL
+	// TODO(jm): validate this in unmarshaler
 	URL string `json:"url"`
 	// Token is the bearer token for authorization
 	Token influxdb.SecretField `json:"token"`
