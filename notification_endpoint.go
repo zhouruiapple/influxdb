@@ -27,11 +27,20 @@ type NotificationEndpoint interface {
 	ParseResponse(resp *http.Response) error
 }
 
+// ops for checks error
+var (
+	OpFindNotificationEndpointByID = "FindNotificationEndpointByID"
+	OpFindNotificationEndpoint     = "FindNotificationEndpoint"
+	OpFindNotificationEndpoints    = "FindNotificationEndpoints"
+	OpCreateNotificationEndpoint   = "CreateNotificationEndpoint"
+	OpUpdateNotificationEndpoint   = "UpdateNotificationEndpoint"
+	OpDeleteNotificationEndpoint   = "DeleteNotificationEndpoint"
+)
+
 // NotificationEndpointFilter represents a set of filter that restrict the returned notification endpoints.
 type NotificationEndpointFilter struct {
 	OrgID        *ID
 	Organization *string
-	UserResourceMappingFilter
 }
 
 // QueryParams Converts NotificationEndpointFilter fields to url query params.
@@ -81,16 +90,8 @@ func (n *NotificationEndpointUpdate) Valid() error {
 	return nil
 }
 
-// NotificationEndpointStore represents a service for managing notification endpoint.
-type NotificationEndpointStore interface {
-	// UserResourceMappingService must be part of all NotificationEndpointStore service,
-	// for create, delete.
-	UserResourceMappingService
-	// OrganizationService is needed for search filter
-	OrganizationService
-	// SecretService is needed to check if the secret key exists.
-	SecretService
-
+// NotificationEndpointService represents a service for managing notification endpoints.
+type NotificationEndpointService interface {
 	// FindNotificationEndpointByID returns a single notification endpoint by ID.
 	FindNotificationEndpointByID(ctx context.Context, id ID) (NotificationEndpoint, error)
 
@@ -99,16 +100,12 @@ type NotificationEndpointStore interface {
 	FindNotificationEndpoints(ctx context.Context, filter NotificationEndpointFilter, opt ...FindOptions) ([]NotificationEndpoint, int, error)
 
 	// CreateNotificationEndpoint creates a new notification endpoint and sets b.ID with the new identifier.
-	CreateNotificationEndpoint(ctx context.Context, nr NotificationEndpoint, userID ID) error
-
-	// UpdateNotificationEndpointUpdateNotificationEndpoint updates a single notification endpoint.
-	// Returns the new notification endpoint after update.
-	UpdateNotificationEndpoint(ctx context.Context, id ID, nr NotificationEndpoint, userID ID) (NotificationEndpoint, error)
+	CreateNotificationEndpoint(ctx context.Context, ne NotificationEndpoint) error
 
 	// PatchNotificationEndpoint updates a single  notification endpoint with changeset.
 	// Returns the new notification endpoint state after update.
 	PatchNotificationEndpoint(ctx context.Context, id ID, upd NotificationEndpointUpdate) (NotificationEndpoint, error)
 
 	// DeleteNotificationEndpoint removes a notification endpoint by ID.
-	DeleteNotificationRule(ctx context.Context, id ID) error
+	DeleteNotificationEndpoint(ctx context.Context, id ID) error
 }

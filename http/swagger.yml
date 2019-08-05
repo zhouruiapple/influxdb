@@ -9134,8 +9134,6 @@ components:
           type: string
         orgID:
           type: string
-        userID:
-          type: string
         createdAt:
           type: string
           format: date-time

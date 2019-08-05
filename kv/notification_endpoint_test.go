@@ -9,41 +9,24 @@ import (
 	influxdbtesting "github.com/influxdata/influxdb/testing"
 )
 
-func TestBoltNotificationEndpointStore(t *testing.T) {
-	influxdbtesting.NotificationEndpointStore(initBoltNotificationEndpointStore, t)
+func TestNotificationEndpointService(t *testing.T) {
+	influxdbtesting.NotificationEndpointService(initInmemNotificationEndpointService, t)
 }
 
-func TestNotificationEndpointStore(t *testing.T) {
-	influxdbtesting.NotificationEndpointStore(initInmemNotificationEndpointStore, t)
-}
-
-func initBoltNotificationEndpointStore(f influxdbtesting.NotificationEndpointFields, t *testing.T) (influxdb.NotificationEndpointStore, func()) {
-	s, closeBolt, err := NewTestBoltStore()
+func initInmemNotificationEndpointService(f influxdbtesting.NotificationEndpointFields, t *testing.T) (influxdb.NotificationEndpointService, string, func()) {
+	s, closeInmem, err := NewTestInmemStore()
 	if err != nil {
 		t.Fatalf("failed to create new kv store: %v", err)
 	}
 
-	svc, closeSvc := initNotificationEndpointStore(s, f, t)
-	return svc, func() {
+	svc, op, closeSvc := initNotificationEndpointService(s, f, t)
+	return svc, op, func() {
 		closeSvc()
-		closeBolt()
+		closeInmem()
 	}
 }
 
-func initInmemNotificationEndpointStore(f influxdbtesting.NotificationEndpointFields, t *testing.T) (influxdb.NotificationEndpointStore, func()) {
-	s, closeBolt, err := NewTestInmemStore()
-	if err != nil {
-		t.Fatalf("failed to create new kv store: %v", err)
-	}
-
-	svc, closeSvc := initNotificationEndpointStore(s, f, t)
-	return svc, func() {
-		closeSvc()
-		closeBolt()
-	}
-}
-
-func initNotificationEndpointStore(s kv.Store, f influxdbtesting.NotificationEndpointFields, t *testing.T) (influxdb.NotificationEndpointStore, func()) {
+func initNotificationEndpointService(s kv.Store, f influxdbtesting.NotificationEndpointFields, t *testing.T) (influxdb.NotificationEndpointService, string, func()) {
 	svc := kv.NewService(s)
 	svc.IDGenerator = f.IDGenerator
 	svc.TimeGenerator = f.TimeGenerator
@@ -62,30 +45,19 @@ func initNotificationEndpointStore(s kv.Store, f influxdbtesting.NotificationEnd
 		}
 	}
 
-	for _, m := range f.UserResourceMappings {
-		if err := svc.CreateUserResourceMapping(ctx, m); err != nil {
-			t.Fatalf("failed to populate user resource mapping: %v", err)
-		}
-	}
-
-	for _, o := range f.Orgs {
+	for _, o := range f.Organizations {
 		if err := svc.PutOrganization(ctx, o); err != nil {
 			t.Fatalf("failed to populate org: %v", err)
 		}
 	}
 
-	return svc, func() {
+	return svc, kv.OpPrefix, func() {
 		for _, nr := range f.NotificationEndpoints {
 			if err := svc.DeleteNotificationEndpoint(ctx, nr.GetID()); err != nil {
 				t.Logf("failed to remove notification endpoint: %v", err)
 			}
 		}
-		for _, urm := range f.UserResourceMappings {
-			if err := svc.DeleteUserResourceMapping(ctx, urm.ResourceID, urm.UserID); err != nil && influxdb.ErrorCode(err) != influxdb.ENotFound {
-				t.Logf("failed to remove urm endpoint: %v", err)
-			}
-		}
-		for _, o := range f.Orgs {
+		for _, o := range f.Organizations {
 			if err := svc.DeleteOrganization(ctx, o.ID); err != nil {
 				t.Fatalf("failed to remove org: %v", err)
 			}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	icontext "github.com/influxdata/influxdb/context"
 	"github.com/influxdata/influxdb/notification/endpoint"
 
 	"github.com/influxdata/influxdb"
@@ -27,7 +28,7 @@ var (
 	}
 )
 
-var _ influxdb.NotificationEndpointStore = (*Service)(nil)
+var _ influxdb.NotificationEndpointService = (*Service)(nil)
 
 func (s *Service) initializeNotificationEndpoint(ctx context.Context, tx Tx) error {
 	if _, err := s.notificationEndpointBucket(tx); err != nil {
@@ -36,9 +37,9 @@ func (s *Service) initializeNotificationEndpoint(ctx context.Context, tx Tx) err
 	return nil
 }
 
-// UnavailableNotificationEndpointStoreError is used if we aren't able to interact with the
+// UnavailableNotificationEndpointServiceError is used if we aren't able to interact with the
 // store, it means the store is not available at the moment (e.g. network).
-func UnavailableNotificationEndpointStoreError(err error) *influxdb.Error {
+func UnavailableNotificationEndpointServiceError(err error) *influxdb.Error {
 	return &influxdb.Error{
 		Code: influxdb.EInternal,
 		Msg:  fmt.Sprintf("Unable to connect to notification endpoint store service. Please try again; Err: %v", err),
@@ -46,9 +47,9 @@ func UnavailableNotificationEndpointStoreError(err error) *influxdb.Error {
 	}
 }
 
-// InternalNotificationEndpointStoreError is used when the error comes from an
+// InternalNotificationEndpointServiceError is used when the error comes from an
 // internal system.
-func InternalNotificationEndpointStoreError(err error) *influxdb.Error {
+func InternalNotificationEndpointServiceError(err error) *influxdb.Error {
 	return &influxdb.Error{
 		Code: influxdb.EInternal,
 		Msg:  fmt.Sprintf("Unknown internal notification endpoint data error; Err: %v", err),
@@ -59,19 +60,24 @@ func InternalNotificationEndpointStoreError(err error) *influxdb.Error {
 func (s *Service) notificationEndpointBucket(tx Tx) (Bucket, error) {
 	b, err := tx.Bucket(notificationEndpointBucket)
 	if err != nil {
-		return nil, UnavailableNotificationEndpointStoreError(err)
+		return nil, UnavailableNotificationEndpointServiceError(err)
 	}
 	return b, nil
 }
 
 // CreateNotificationEndpoint creates a new notification endpoint and sets b.ID with the new identifier.
-func (s *Service) CreateNotificationEndpoint(ctx context.Context, nr influxdb.NotificationEndpoint, userID influxdb.ID) error {
+func (s *Service) CreateNotificationEndpoint(ctx context.Context, nr influxdb.NotificationEndpoint) error {
 	return s.kv.Update(ctx, func(tx Tx) error {
-		return s.createNotificationEndpoint(ctx, tx, nr, userID)
+		return s.createNotificationEndpoint(ctx, tx, nr)
 	})
 }
 
-func (s *Service) createNotificationEndpoint(ctx context.Context, tx Tx, nr influxdb.NotificationEndpoint, userID influxdb.ID) error {
+func (s *Service) createNotificationEndpoint(ctx context.Context, tx Tx, nr influxdb.NotificationEndpoint) error {
+	userAuth, err := icontext.GetAuthorizer(ctx)
+	if err != nil {
+		return err
+	}
+
 	id := s.IDGenerator.ID()
 	nr.SetID(id)
 	now := s.TimeGenerator.Now()
@@ -83,37 +89,11 @@ func (s *Service) createNotificationEndpoint(ctx context.Context, tx Tx, nr infl
 
 	urm := &influxdb.UserResourceMapping{
 		ResourceID:   id,
-		UserID:       userID,
+		UserID:       userAuth.GetUserID(),
 		UserType:     influxdb.Owner,
 		ResourceType: influxdb.NotificationEndpointResourceType,
 	}
 	return s.createUserResourceMapping(ctx, tx, urm)
-}
-
-// UpdateNotificationEndpoint updates a single notification endpoint.
-// Returns the new notification endpoint after update.
-func (s *Service) UpdateNotificationEndpoint(ctx context.Context, id influxdb.ID, nr influxdb.NotificationEndpoint, userID influxdb.ID) (influxdb.NotificationEndpoint, error) {
-	var err error
-	err = s.kv.Update(ctx, func(tx Tx) error {
-		nr, err = s.updateNotificationEndpoint(ctx, tx, id, nr, userID)
-		return err
-	})
-	return nr, err
-}
-
-func (s *Service) updateNotificationEndpoint(ctx context.Context, tx Tx, id influxdb.ID, nr influxdb.NotificationEndpoint, userID influxdb.ID) (influxdb.NotificationEndpoint, error) {
-	current, err := s.findNotificationEndpointByID(ctx, tx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	// ID and OrganizationID cannot be updated
-	nr.SetID(current.GetID())
-	nr.SetOrgID(current.GetOrgID())
-	nr.SetCreatedAt(current.GetCRUDLog().CreatedAt)
-	nr.SetUpdatedAt(s.TimeGenerator.Now())
-	err = s.putNotificationEndpoint(ctx, tx, nr)
-	return nr, err
 }
 
 // PatchNotificationEndpoint updates a single  notification endpoint with changeset.
@@ -181,7 +161,7 @@ func (s *Service) putNotificationEndpoint(ctx context.Context, tx Tx, nr influxd
 	}
 
 	if err := bucket.Put(encodedID, v); err != nil {
-		return UnavailableNotificationEndpointStoreError(err)
+		return UnavailableNotificationEndpointServiceError(err)
 	}
 	return nil
 }
@@ -217,7 +197,7 @@ func (s *Service) findNotificationEndpointByID(ctx context.Context, tx Tx, id in
 		return nil, ErrNotificationEndpointNotFound
 	}
 	if err != nil {
-		return nil, InternalNotificationEndpointStoreError(err)
+		return nil, InternalNotificationEndpointServiceError(err)
 	}
 
 	return endpoint.UnmarshalJSON(v)
@@ -236,19 +216,19 @@ func (s *Service) FindNotificationEndpoints(ctx context.Context, filter influxdb
 func (s *Service) findNotificationEndpoints(ctx context.Context, tx Tx, filter influxdb.NotificationEndpointFilter, opt ...influxdb.FindOptions) ([]influxdb.NotificationEndpoint, int, error) {
 	nrs := make([]influxdb.NotificationEndpoint, 0)
 
-	m, err := s.findUserResourceMappings(ctx, tx, filter.UserResourceMappingFilter)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	if len(m) == 0 {
-		return nrs, 0, nil
-	}
-
-	idMap := make(map[influxdb.ID]bool)
-	for _, item := range m {
-		idMap[item.ResourceID] = false
-	}
+	// m, err := s.findUserResourceMappings(ctx, tx, filter.UserResourceMappingFilter)
+	// if err != nil {
+	// 	return nil, 0, err
+	// }
+	//
+	// if len(m) == 0 {
+	// 	return nrs, 0, nil
+	// }
+	//
+	// idMap := make(map[influxdb.ID]bool)
+	// for _, item := range m {
+	// 	idMap[item.ResourceID] = false
+	// }
 
 	if filter.OrgID != nil || filter.Organization != nil {
 		o, err := s.FindOrganization(ctx, influxdb.OrganizationFilter{
@@ -269,11 +249,11 @@ func (s *Service) findNotificationEndpoints(ctx context.Context, tx Tx, filter i
 		limit = opt[0].Limit
 		descending = opt[0].Descending
 	}
-	filterFn := filterNotificationEndpointsFn(idMap, filter)
-	err = s.forEachNotificationEndpoint(ctx, tx, descending, func(nr influxdb.NotificationEndpoint) bool {
+	filterFn := filterNotificationEndpointsFn(filter)
+	err := s.forEachNotificationEndpoint(ctx, tx, descending, func(nr *influxdb.NotificationEndpoint) bool {
 		if filterFn(nr) {
 			if count >= offset {
-				nrs = append(nrs, nr)
+				nrs = append(nrs, *nr)
 			}
 			count++
 		}
@@ -289,7 +269,7 @@ func (s *Service) findNotificationEndpoints(ctx context.Context, tx Tx, filter i
 }
 
 // forEachNotificationEndpoint will iterate through all notification endpoints while fn returns true.
-func (s *Service) forEachNotificationEndpoint(ctx context.Context, tx Tx, descending bool, fn func(influxdb.NotificationEndpoint) bool) error {
+func (s *Service) forEachNotificationEndpoint(ctx context.Context, tx Tx, descending bool, fn func(*influxdb.NotificationEndpoint) bool) error {
 
 	bkt, err := s.notificationEndpointBucket(tx)
 	if err != nil {
@@ -313,7 +293,7 @@ func (s *Service) forEachNotificationEndpoint(ctx context.Context, tx Tx, descen
 		if err != nil {
 			return err
 		}
-		if !fn(nr) {
+		if !fn(&nr) {
 			break
 		}
 
@@ -327,19 +307,17 @@ func (s *Service) forEachNotificationEndpoint(ctx context.Context, tx Tx, descen
 	return nil
 }
 
-func filterNotificationEndpointsFn(
-	idMap map[influxdb.ID]bool,
-	filter influxdb.NotificationEndpointFilter) func(nr influxdb.NotificationEndpoint) bool {
-	if filter.OrgID != nil {
-		return func(nr influxdb.NotificationEndpoint) bool {
-			_, ok := idMap[nr.GetID()]
-			return nr.GetOrgID() == *filter.OrgID && ok
-		}
-	}
+func filterNotificationEndpointsFn(filter influxdb.NotificationEndpointFilter) func(nr *influxdb.NotificationEndpoint) bool {
+	// if filter.OrgID != nil {
+	// 	return func(nr influxdb.NotificationEndpoint) bool {
+	// 		return nr.Get
+	// 		_, ok := idMap[nr.GetID()]
+	// 		return nr.GetOrgID() == *filter.OrgID && ok
+	// 	}
+	// }
 
-	return func(nr influxdb.NotificationEndpoint) bool {
-		_, ok := idMap[nr.GetID()]
-		return ok
+	return func(nr *influxdb.NotificationEndpoint) bool {
+		return true
 	}
 }
 
@@ -366,11 +344,11 @@ func (s *Service) deleteNotificationEndpoint(ctx context.Context, tx Tx, id infl
 		return ErrNotificationEndpointNotFound
 	}
 	if err != nil {
-		return InternalNotificationEndpointStoreError(err)
+		return InternalNotificationEndpointServiceError(err)
 	}
 
 	if err := bucket.Delete(encodedID); err != nil {
-		return InternalNotificationEndpointStoreError(err)
+		return InternalNotificationEndpointServiceError(err)
 	}
 
 	return s.deleteUserResourceMappings(ctx, tx, influxdb.UserResourceMappingFilter{

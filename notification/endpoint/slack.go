@@ -67,7 +67,7 @@ func (s Slack) MarshalJSON() ([]byte, error) {
 		})
 }
 
-// Type returns the
+// Type returns the type
 func (s Slack) Type() string {
 	return "slack"
 }
