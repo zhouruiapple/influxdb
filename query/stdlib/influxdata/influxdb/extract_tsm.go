@@ -150,19 +150,27 @@ func (t *TSMFilter) FilteredTSMStream() (io.Reader, error) {
 		return nil, err
 	}
 
+	for _, entry := range entries {
+		fmt.Println("entry: ", entry.blocksChunkLen)
+	}
+
 	buf := &bytes.Buffer{}
 	tsmWriter, err := tsm1.NewTSMWriter(buf)
 	if err != nil {
 		return nil, err
 	}
 
+	fmt.Println("len(entries): ", len(entries))
 	iter := NewBlockIterator(entries, s)
 
 	var read uint32 = 0
 	for iter.HasNext() {
+		start := time.Now()
 		if err := iter.Next(); err != nil {
 			return nil, err
 		}
+
+		fmt.Println("time to fetch next block: ", time.Since(start))
 
 		fmt.Printf("\rwrote %d out of total %d; %3.2f%% finished", read, t.dataSize, float32(read)/float32(t.dataSize)*100)
 
@@ -170,9 +178,12 @@ func (t *TSMFilter) FilteredTSMStream() (io.Reader, error) {
 		entryKey := iter.SeriesKey()
 		minTime, maxTime := iter.BlockMinMaxTime()
 
+		fmt.Println("len(entryBytes): ", len(entryBytes))
+		start = time.Now()
 		if err := tsmWriter.WriteBlock(entryKey, minTime, maxTime, entryBytes); err != nil {
 			return nil, err
 		}
+		fmt.Printf("time to write block: %v\n", time.Since(start))
 
 		read += uint32(len(entryBytes))
 	}
@@ -189,20 +200,15 @@ func (t *TSMFilter) FilteredTSMStream() (io.Reader, error) {
 }
 
 type BlockIterator struct {
-	entries          []*ReadEntry
-	currentBlockInfo *ReadEntry
+	entries      []*ReadEntry // contains all relevant series keys and their associated blocks
+	entry        *ReadEntry   // current series key/min max time
+	nextEntryPos int          // current index into entries
 
-	currentBlockList [][]byte
+	blockList    [][]byte // array of actual data for all blocks referenced in the given entry
+	block        []byte
+	blockListIdx int // the block currently referenced by the iterator
 
-	currentBlock []byte
-
-	blockListIdx int
-
-	readEntryPos  int
-	blockChunkPos int
-	stream        io.ReadSeeker
-
-	fetchNext bool
+	stream io.ReadSeeker // our source for reading block data given read entries
 }
 
 func NewBlockIterator(entries []*ReadEntry, stream io.ReadSeeker) *BlockIterator {
@@ -213,45 +219,47 @@ func NewBlockIterator(entries []*ReadEntry, stream io.ReadSeeker) *BlockIterator
 }
 
 func (b *BlockIterator) HasNext() bool {
-	return b.readEntryPos < len(b.entries)
+	return b.nextEntryPos < len(b.entries)
 }
 
 func (b *BlockIterator) Next() error {
-	if b.currentBlockInfo == nil || b.fetchNext {
-		b.currentBlockInfo = b.entries[b.readEntryPos]
+	// if we're still processing the current
+	// list of block data, simply increment the
+	// block list index
+	if b.blockListIdx < len(b.blockList) {
+		fmt.Println("returning early after setting block...")
+		b.block = b.blockList[b.blockListIdx]
+		b.blockListIdx++
+		return nil
 	}
 
-	if b.currentBlockList == nil {
-		if err := b.FetchBlockList(); err != nil {
-			return err
-		}
+	// Otherwise, fetch list of block data for
+	// next read entry
+	if err := b.FetchBlockList(); err != nil {
+		return err
 	}
 
-	if b.blockListIdx >= len(b.currentBlockList) {
-		if err := b.FetchBlockList(); err != nil {
-			return err
-		}
-		b.blockListIdx = 0
-		b.readEntryPos++
-		b.fetchNext = true
-	}
+	b.entry = b.entries[b.nextEntryPos]
 
-	if len(b.currentBlockList) == 0 {
+	// at this point, we should never have an empty block list
+	if len(b.blockList) == 0 {
 		return errors.New("empty block list")
 	}
 
-	b.currentBlock = b.currentBlockList[b.blockListIdx]
-	b.blockListIdx++
+	// Reset the index into the block list and
+	// move to the next read entry
+	b.blockListIdx = 0
+	b.nextEntryPos++
 
 	return nil
 }
 
 func (b *BlockIterator) FetchBlockList() error {
-	blockList, err := readBytesForEntry(b.stream, b.currentBlockInfo)
+	blockList, err := readBytesForEntry(b.stream, b.entries[b.nextEntryPos])
 	if err != nil {
 		return err
 	}
-	b.currentBlockList = blockList
+	b.blockList = blockList
 
 	return nil
 }
@@ -265,15 +273,15 @@ func (b *BlockIterator) FetchBlockList() error {
 //}
 
 func (b *BlockIterator) BlockBytes() []byte {
-	return b.currentBlock
+	return b.block
 }
 
 func (b *BlockIterator) SeriesKey() []byte {
-	return b.currentBlockInfo.seriesKey
+	return b.entry.seriesKey
 }
 
 func (b *BlockIterator) BlockMinMaxTime() (int64, int64) {
-	bnds := b.currentBlockInfo.bounds
+	bnds := b.entry.bounds
 	return bnds.Start.Time().UnixNano(), bnds.Stop.Time().UnixNano()
 }
 
@@ -403,7 +411,9 @@ func readBytesForEntry(stream io.ReadSeeker, entry *ReadEntry) ([][]byte, error)
 	}
 
 	var blockBytes = make([]byte, entry.blocksChunkLen)
+	start := time.Now()
 	n, err := stream.Read(blockBytes)
+	fmt.Printf("read took: %v\n", time.Since(start))
 	if err != nil {
 		return nil, err
 	} else if n != int(entry.blocksChunkLen) {
@@ -411,6 +421,9 @@ func readBytesForEntry(stream io.ReadSeeker, entry *ReadEntry) ([][]byte, error)
 	}
 
 	blockList := make([][]byte, len(entry.blockData))
+
+	fmt.Println("splitting block start")
+	start = time.Now()
 	for i, idxEntry := range entry.blockData {
 
 		blockStart := idxEntry.Offset - entry.blocksChunkStart
@@ -430,6 +443,7 @@ func readBytesForEntry(stream io.ReadSeeker, entry *ReadEntry) ([][]byte, error)
 
 		blockList[i] = blockData
 	}
+	fmt.Printf("splitting blocks took: %v\n", time.Since(start))
 
 	//if len(blockBytes) < 4 {
 	//	return nil, errors.New("block too short to read")
