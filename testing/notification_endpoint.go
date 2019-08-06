@@ -205,29 +205,66 @@ func CreateNotificationEndpoint(
 				},
 			},
 		},
-		// {
-		// 	name: "create notificationEndpoint with orgID not exist",
-		// 	fields: NotificationEndpointFields{
-		// 		IDGenerator:           mock.NewIDGenerator(notificationEndpointOneID, t),
-		// 		TimeGenerator:         mock.TimeGenerator{FakeValue: time.Date(2006, 5, 4, 1, 2, 3, 0, time.UTC)},
-		// 		NotificationEndpoints: []*influxdb.NotificationEndpoint{},
-		// 		Organizations:         []*influxdb.Organization{},
-		// 	},
-		// 	args: args{
-		// 		notificationEndpoint: &influxdb.NotificationEndpoint{
-		// 			Name:  "name1",
-		// 			OrgID: MustIDBase16(orgOneID),
-		// 		},
-		// 	},
-		// 	wants: wants{
-		// 		notificationEndpoints: []*influxdb.NotificationEndpoint{},
-		// 		err: &influxdb.Error{
-		// 			Code: influxdb.ENotFound,
-		// 			Msg:  "organization not found",
-		// 			Op:   influxdb.OpCreateNotificationEndpoint,
-		// 		},
-		// 	},
-		// },
+		{
+			name: "org does not exist",
+			fields: NotificationEndpointFields{
+				IDGenerator:   mock.NewIDGenerator(notificationEndpointOneID, t),
+				TimeGenerator: mock.TimeGenerator{FakeValue: time.Date(2006, 5, 4, 1, 2, 3, 0, time.UTC)},
+				NotificationEndpoints: []influxdb.NotificationEndpoint{
+					&endpoint.Slack{
+						Base: endpoint.Base{
+							ID:          MustIDBase16(notificationEndpointOneID),
+							Name:        "name1",
+							Description: "description1",
+							OrgID:       MustIDBase16(orgOneID),
+							Status:      influxdb.Active,
+						},
+						URL:   "slackurl",
+						Token: influxdb.SecretField("token"),
+					},
+				},
+				Organizations: []*influxdb.Organization{
+					{
+						Name: "theorg",
+						ID:   MustIDBase16(orgOneID),
+					},
+				},
+			},
+			args: args{
+				userID: MustIDBase16(userOneID),
+				notificationEndpoint: &endpoint.PagerDuty{
+					Base: endpoint.Base{
+						Name:        "name3",
+						Description: "description3",
+						OrgID:       MustIDBase16(orgTwoID),
+						Status:      influxdb.Active,
+					},
+					URL:        "pgurl",
+					RoutingKey: influxdb.SecretField("key"),
+				},
+			},
+			wants: wants{
+				notificationEndpoints: []influxdb.NotificationEndpoint{
+					&endpoint.Slack{
+						Base: endpoint.Base{
+							ID:          MustIDBase16(notificationEndpointOneID),
+							Name:        "name1",
+							Description: "description1",
+							OrgID:       MustIDBase16(orgOneID),
+							Status:      influxdb.Active,
+						},
+						URL:   "slackurl",
+						Token: influxdb.SecretField("token"),
+					},
+				},
+				err: &influxdb.Error{
+					Code: influxdb.ENotFound,
+					Msg:  "organization not found",
+					Op:   influxdb.OpCreateNotificationEndpoint,
+				},
+			},
+		},
+
 		// {
 		// 	name: "create notificationEndpoint with invalid type",
 		// 	fields: NotificationEndpointFields{

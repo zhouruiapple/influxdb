@@ -72,6 +72,13 @@ func (s *Service) CreateNotificationEndpoint(ctx context.Context, nr influxdb.No
 }
 
 func (s *Service) createNotificationEndpoint(ctx context.Context, tx Tx, nr influxdb.NotificationEndpoint, userID influxdb.ID) error {
+	_, pe := s.findOrganizationByID(ctx, tx, nr.GetOrgID())
+	if pe != nil {
+		return &influxdb.Error{
+			Err: pe,
+		}
+	}
+
 	id := s.IDGenerator.ID()
 	nr.SetID(id)
 	now := s.TimeGenerator.Now()
