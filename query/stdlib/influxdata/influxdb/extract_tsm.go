@@ -143,16 +143,30 @@ func NewTSMFilter(org, bucket string, bounds execute.Bounds, src values.Stream) 
 	}, nil
 }
 
+// for sorting read entries to debug
+type readEntries []*ReadEntry
+
+func (r readEntries) Len() int {
+	return len(r)
+}
+
+func (r readEntries) Swap(i, j int) {
+	r[i], r[j] = r[j], r[i]
+}
+
+func (r readEntries) Less(i, j int) bool {
+	r1 := r[i]
+	r2 := r[j]
+
+	return r1.blocksChunkLen < r2.blocksChunkLen
+}
+
 func (t *TSMFilter) FilteredTSMStream() (io.Reader, error) {
 	s, _ := t.source.(io.ReadSeeker)
 	entries, err := t.filterBlocks(s, t.Org, t.Bucket, t.Bounds)
 	if err != nil {
 		return nil, err
 	}
-
-	//for _, entry := range entries {
-	//	fmt.Println("entry: ", entry.blocksChunkLen)
-	//}
 
 	buf := &bytes.Buffer{}
 	tsmWriter, err := tsm1.NewTSMWriter(buf)
@@ -163,39 +177,25 @@ func (t *TSMFilter) FilteredTSMStream() (io.Reader, error) {
 	//fmt.Println("len(entries): ", len(entries))
 	iter := NewBlockIterator(entries, s)
 
-	nBlocks := 0
-	totalSize := 0
-	for _, entry := range entries {
-		nBlocks += len(entry.blockData)
-		totalSize += int(entry.blocksChunkLen)
-	}
-
 	var read uint32 = 0
 	last := time.Now()
 	for iter.HasNext() {
-		//start := time.Now()
 		if err := iter.Next(); err != nil {
 			return nil, err
 		}
-
-		//fmt.Println("time to fetch next block: ", time.Since(start))
 
 		entryBytes := iter.BlockBytes()
 		entryKey := iter.SeriesKey()
 		minTime, maxTime := iter.BlockMinMaxTime()
 
 		delta := time.Since(last)
-		rate := float64(len(entryBytes)) / 1000 / delta.Seconds()
+		rate := float64(len(entryBytes)) / 1000000 / delta.Seconds()
 		last = time.Now()
-		fmt.Printf("\r %f kiB/s wrote %d out of total %d; %3.2f%% finished", rate, read, t.dataSize, float32(read)/float32(t.dataSize)*100)
+		fmt.Printf("\r %f MiB/s wrote %d out of total %d; %3.2f%% finished", rate, read, t.dataSize, float32(read)/float32(t.dataSize)*100)
 
-		//fmt.Println("len(entryBytes): ", len(entryBytes))
-		//start = time.Now()
 		if err := tsmWriter.WriteBlock(entryKey, minTime, maxTime, entryBytes); err != nil {
 			return nil, err
 		}
-		//fmt.Printf("time to write block: %v\n", time.Since(start))
-
 		read += uint32(len(entryBytes))
 	}
 
@@ -207,11 +207,28 @@ func (t *TSMFilter) FilteredTSMStream() (io.Reader, error) {
 		return nil, err
 	}
 
-	//fmt.Printf("expected %d fewer bytes from stripped checksum: \n", nBlocks*4)
-	//fmt.Printf("sum of block chunk lengths: %d\n, t.dataSize: %d\n", totalSize, t.dataSize)
-	//fmt.Printf("wrote %d\n", read)
-
 	return buf, nil
+}
+
+func MinMaxOffset(entries []*ReadEntry) (int64, int64) {
+	if len(entries) < 1 {
+		return -1, -1
+	}
+
+	minOffset := entries[0].blocksChunkStart
+	maxOffset := entries[len(entries)-1].blocksChunkStart
+	for _, entry := range entries {
+		offset := entry.blocksChunkStart
+		if entry.blocksChunkStart < minOffset {
+			minOffset = offset
+		}
+
+		if entry.blocksChunkStart > maxOffset {
+			maxOffset = offset
+		}
+	}
+
+	return minOffset, maxOffset
 }
 
 type BlockIterator struct {
@@ -239,6 +256,8 @@ func (b *BlockIterator) HasNext() bool {
 }
 
 func (b *BlockIterator) Next() error {
+	// fetch next list of blocks if we're outside the bounds
+	// of the current list
 	if b.blockListIdx >= len(b.blockList) || len(b.blockList) == 0 {
 		if err := b.FetchBlockList(); err != nil {
 			return err
@@ -263,9 +282,6 @@ func (b *BlockIterator) Next() error {
 		return errors.New("empty block list")
 	}
 
-	// Reset the index into the block list and
-	// move to the next read entry
-
 	return nil
 }
 
@@ -279,23 +295,7 @@ func (b *BlockIterator) FetchBlockList() error {
 	return nil
 }
 
-//func (b *BlockIterator) Tags() []models.Tag {
-//	return b.currentTags
-//}
-//
-//func (b *BlockIterator) Values() []tsm1.Value {
-//	return b.currentValues
-//}
-var lastBlock []byte
-
 func (b *BlockIterator) BlockBytes() []byte {
-	//if bytes.Compare(b.block, lastBlock) == 0 {
-	//	fmt.Println("blocks identical")
-	//	fmt.Println("b.nextEntryPos", b.nextEntryPos)
-	//	panic("last block same as this block")
-	//}
-	//lastBlock = b.block
-
 	return b.block
 }
 
@@ -324,6 +324,7 @@ func (t *TSMFilter) filterBlocks(stream io.ReadSeeker, targetOrg, targetBucket *
 
 	start, end, err := getFileIndexPos(stream)
 	if err != nil {
+		fmt.Println("error getting file index pos")
 		return nil, err
 	}
 
@@ -376,13 +377,9 @@ func (t *TSMFilter) filterBlocks(stream io.ReadSeeker, targetOrg, targetBucket *
 
 					blockEntries = append(blockEntries, re)
 
-					s := uint32(0)
 					for _, entry := range entries {
-						s += entry.Size
+						t.dataSize += entry.Size
 					}
-					t.dataSize += s
-
-					//fmt.Printf("sum of data for block: %d; block chunk length: %d\n", s, re.blocksChunkLen)
 				}
 			}
 		}
@@ -411,28 +408,11 @@ func minMaxTime(entries []tsm1.IndexEntry) (int64, int64) {
 	return minTime, maxTime
 }
 
-//func decodeBlockForEntry(stream io.ReadSeeker, entry ReadEntry) ([]tsm1.Value, error) {
-//	blockBytes, err := readBytesForEntry(stream, entry)
-//	if err != nil {
-//		return nil, err
-//	}
-//	values := []tsm1.Value{}
-//	if values, err = tsm1.DecodeBlock(blockBytes[4:], values); err != nil {
-//		return nil, err
-//	}
-//
-//	return values, nil
-//}
-
 func readBytesForEntry(stream io.ReadSeeker, entry *ReadEntry) ([][]byte, error) {
 	if entry == nil {
 		return nil, nil
 	}
-	//
-	//for _, entry := range entry.blockData {
-	//	fmt.Println("entry offset: ", entry.Offset)
-	//	fmt.Println("entry offset + entry size: ", entry.Offset+int64(entry.Size))
-	//}
+
 	if _, err := stream.Seek(entry.blocksChunkStart, 0); err != nil {
 		return nil, err
 	}
@@ -442,6 +422,7 @@ func readBytesForEntry(stream io.ReadSeeker, entry *ReadEntry) ([][]byte, error)
 	n, err := stream.Read(blockBytes)
 	//fmt.Printf("read took: %v for %d bytes\n", time.Since(start), n)
 	if err != nil {
+		fmt.Println("read error: ", err.Error())
 		return nil, err
 	} else if n != int(entry.blocksChunkLen) {
 		return nil, errors.New("could not read full block")
@@ -470,18 +451,6 @@ func readBytesForEntry(stream io.ReadSeeker, entry *ReadEntry) ([][]byte, error)
 		blockList[i] = blockData
 		blockListSz += len(blockData)
 	}
-	//fmt.Printf("blockListSz: %d; blocksChunLen: %d\n", blockListSz, entry.blocksChunkLen)
-	//fmt.Printf("splitting blocks took: %v\n", time.Since(start))
-
-	//if len(blockBytes) < 4 {
-	//	return nil, errors.New("block too short to read")
-	//}
-	//
-	//oldSum := blockBytes[:4]
-	//blockBytes = blockBytes[4:]
-	//if err := verifyChecksum(oldSum, blockBytes); err != nil {
-	//	return nil, err
-	//}
 
 	return blockList, nil
 }
@@ -494,7 +463,6 @@ func (entry *ReadEntry) setReadRange() error {
 
 	entry.blocksChunkStart = startEntry.Offset
 	// length of the chunk will be first block offset subtracted from (last block position + last block size)
-	//
 	entry.blocksChunkLen = endEntry.Offset + int64(endEntry.Size) - startEntry.Offset
 
 	return nil
@@ -518,7 +486,6 @@ func readIndexBytes(stream io.ReadSeeker, start, end int64) ([]byte, error) {
 
 	indexSize := end - start
 	indexBytes := make([]byte, indexSize)
-
 	n, err := stream.Read(indexBytes)
 	if err != nil {
 		return nil, err
@@ -536,8 +503,6 @@ func getFileIndexPos(stream io.ReadSeeker) (int64, int64, error) {
 		return 0, 0, err
 	}
 
-	fmt.Println("footer start pos: ", footerStartPos)
-
 	var footer [8]byte
 	if n, err := stream.Read(footer[:]); err != nil {
 		return 0, 0, err
@@ -548,58 +513,3 @@ func getFileIndexPos(stream io.ReadSeeker) (int64, int64, error) {
 	indexStartPos := binary.BigEndian.Uint64(footer[:])
 	return int64(indexStartPos), footerStartPos, nil
 }
-
-//type IndexIterator struct {
-//	buffer []byte
-//	offset int
-//
-//	currentEntry *tsm1.IndexEntry
-//	currentKey   []byte
-//}
-//
-//func NewIndexIterator(b []byte) *IndexIterator {
-//	return &IndexIterator{
-//		buffer: b,
-//	}
-//}
-//
-//func (iter *IndexIterator) HasNext() bool {
-//	fmt.Println("HasNext(): ")
-//	fmt.Println("offset is: ", iter.offset)
-//	fmt.Println("buffer is: ", len(iter.buffer))
-//	return iter.offset < len(iter.buffer)
-//}
-//
-//func (iter *IndexIterator) Key() []byte {
-//	return iter.currentKey
-//}
-//
-//func (iter *IndexIterator) Entry() *tsm1.IndexEntry {
-//	return iter.currentEntry
-//}
-//
-//func (iter *IndexIterator) Next() error {
-//	keyLenBytes := iter.buffer[iter.offset : iter.offset+2]
-//
-//	keyLen := binary.BigEndian.Uint16(keyLenBytes)
-//	iter.offset += 2
-//	fmt.Println("iter.offset: ", iter.offset)
-//	fmt.Println("len(iter.buffer): ", len(iter.buffer))
-//	fmt.Println("keyLen: ", int(keyLen))
-//	seriesKey := iter.buffer[iter.offset : iter.offset+int(keyLen)]
-//
-//	iter.currentKey = seriesKey
-//	iter.offset += int(keyLen) + 3
-//
-//	entry := &tsm1.IndexEntry{}
-//	if err := entry.UnmarshalBinary(iter.buffer[iter.offset : iter.offset+28]); err != nil {
-//		return err
-//	}
-//
-//	iter.offset += 28
-//
-//	iter.currentEntry = entry
-//	iter.currentKey = seriesKey
-//
-//	return nil
-//}
