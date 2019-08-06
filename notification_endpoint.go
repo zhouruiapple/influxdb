@@ -100,7 +100,7 @@ type NotificationEndpointService interface {
 	FindNotificationEndpoints(ctx context.Context, filter NotificationEndpointFilter, opt ...FindOptions) ([]NotificationEndpoint, int, error)
 
 	// CreateNotificationEndpoint creates a new notification endpoint and sets b.ID with the new identifier.
-	CreateNotificationEndpoint(ctx context.Context, ne NotificationEndpoint) error
+	CreateNotificationEndpoint(ctx context.Context, ne NotificationEndpoint, userID ID) error
 
 	// PatchNotificationEndpoint updates a single  notification endpoint with changeset.
 	// Returns the new notification endpoint state after update.

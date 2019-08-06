@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	icontext "github.com/influxdata/influxdb/context"
 	"github.com/influxdata/influxdb/notification/endpoint"
 
 	"github.com/influxdata/influxdb"
@@ -66,18 +65,13 @@ func (s *Service) notificationEndpointBucket(tx Tx) (Bucket, error) {
 }
 
 // CreateNotificationEndpoint creates a new notification endpoint and sets b.ID with the new identifier.
-func (s *Service) CreateNotificationEndpoint(ctx context.Context, nr influxdb.NotificationEndpoint) error {
+func (s *Service) CreateNotificationEndpoint(ctx context.Context, nr influxdb.NotificationEndpoint, userID influxdb.ID) error {
 	return s.kv.Update(ctx, func(tx Tx) error {
-		return s.createNotificationEndpoint(ctx, tx, nr)
+		return s.createNotificationEndpoint(ctx, tx, nr, userID)
 	})
 }
 
-func (s *Service) createNotificationEndpoint(ctx context.Context, tx Tx, nr influxdb.NotificationEndpoint) error {
-	userAuth, err := icontext.GetAuthorizer(ctx)
-	if err != nil {
-		return err
-	}
-
+func (s *Service) createNotificationEndpoint(ctx context.Context, tx Tx, nr influxdb.NotificationEndpoint, userID influxdb.ID) error {
 	id := s.IDGenerator.ID()
 	nr.SetID(id)
 	now := s.TimeGenerator.Now()
@@ -89,7 +83,7 @@ func (s *Service) createNotificationEndpoint(ctx context.Context, tx Tx, nr infl
 
 	urm := &influxdb.UserResourceMapping{
 		ResourceID:   id,
-		UserID:       userAuth.GetUserID(),
+		UserID:       userID,
 		UserType:     influxdb.Owner,
 		ResourceType: influxdb.NotificationEndpointResourceType,
 	}

@@ -93,6 +93,7 @@ func CreateNotificationEndpoint(
 ) {
 	type args struct {
 		notificationEndpoint influxdb.NotificationEndpoint
+		userID               influxdb.ID
 	}
 	type wants struct {
 		err                   error
@@ -150,6 +151,7 @@ func CreateNotificationEndpoint(
 				},
 			},
 			args: args{
+				userID: MustIDBase16(userOneID),
 				notificationEndpoint: &endpoint.PagerDuty{
 					Base: endpoint.Base{
 						Name:        "name3",
@@ -187,10 +189,15 @@ func CreateNotificationEndpoint(
 					},
 					&endpoint.PagerDuty{
 						Base: endpoint.Base{
+							ID:          MustIDBase16(notificationEndpointThreeID),
 							Name:        "name3",
 							Description: "description3",
 							OrgID:       MustIDBase16(orgTwoID),
 							Status:      influxdb.Active,
+							CRUDLog: influxdb.CRUDLog{
+								UpdatedAt: time.Date(2006, 5, 4, 1, 2, 3, 0, time.UTC),
+								CreatedAt: time.Date(2006, 5, 4, 1, 2, 3, 0, time.UTC),
+							},
 						},
 						URL:        "pgurl",
 						RoutingKey: influxdb.SecretField("key"),
@@ -251,13 +258,10 @@ func CreateNotificationEndpoint(
 			s, opPrefix, done := init(tt.fields, t)
 			defer done()
 			ctx := context.Background()
-			err := s.CreateNotificationEndpoint(ctx, tt.args.notificationEndpoint)
+			err := s.CreateNotificationEndpoint(ctx, tt.args.notificationEndpoint, tt.args.userID)
 			diffPlatformErrors(tt.name, err, tt.wants.err, opPrefix, t)
 
-			// Delete only newly created notificationEndpoints - ie., with a not nil ID
-			// if tt.args.notificationEndpoint.ID.Valid() {
 			defer s.DeleteNotificationEndpoint(ctx, tt.args.notificationEndpoint.GetID())
-			// }
 
 			notificationEndpoints, _, err := s.FindNotificationEndpoints(ctx, influxdb.NotificationEndpointFilter{})
 			if err != nil {
