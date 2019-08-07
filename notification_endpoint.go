@@ -39,6 +39,7 @@ var (
 
 // NotificationEndpointFilter represents a set of filter that restrict the returned notification endpoints.
 type NotificationEndpointFilter struct {
+	ID           *ID
 	OrgID        *ID
 	Organization *string
 }
