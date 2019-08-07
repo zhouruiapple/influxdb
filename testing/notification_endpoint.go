@@ -58,14 +58,14 @@ func NotificationEndpointService(
 			name: "CreateNotificationEndpoint",
 			fn:   CreateNotificationEndpoint,
 		},
-		// {
-		// 	name: "FindNotificationEndpointByID",
-		// 	fn:   FindNotificationEndpointByID,
-		// },
-		// {
-		// 	name: "FindNotificationEndpoints",
-		// 	fn:   FindNotificationEndpoints,
-		// },
+		{
+			name: "FindNotificationEndpointByID",
+			fn:   FindNotificationEndpointByID,
+		},
+		{
+			name: "FindNotificationEndpoints",
+			fn:   FindNotificationEndpoints,
+		},
 		// {
 		// 	name: "FindNotificationEndpoint",
 		// 	fn:   FindNotificationEndpoint,
@@ -264,30 +264,6 @@ func CreateNotificationEndpoint(
 				},
 			},
 		},
-
-		// {
-		// 	name: "create notificationEndpoint with invalid type",
-		// 	fields: NotificationEndpointFields{
-		// 		IDGenerator:           mock.NewIDGenerator(notificationEndpointOneID, t),
-		// 		TimeGenerator:         mock.TimeGenerator{FakeValue: time.Date(2006, 5, 4, 1, 2, 3, 0, time.UTC)},
-		// 		NotificationEndpoints: []*influxdb.NotificationEndpoint{},
-		// 		Organizations:         []*influxdb.Organization{},
-		// 	},
-		// 	args: args{
-		// 		notificationEndpoint: &influxdb.NotificationEndpoint{
-		// 			Name:  "name1",
-		// 			OrgID: MustIDBase16(orgOneID),
-		// 		},
-		// 	},
-		// 	wants: wants{
-		// 		notificationEndpoints: []*influxdb.NotificationEndpoint{},
-		// 		err: &influxdb.Error{
-		// 			Code: influxdb.ENotFound,
-		// 			Msg:  "organization not found",
-		// 			Op:   influxdb.OpCreateNotificationEndpoint,
-		// 		},
-		// 	},
-		// },
 	}
 
 	for _, tt := range tests {
@@ -312,444 +288,475 @@ func CreateNotificationEndpoint(
 }
 
 // FindNotificationEndpointByID testing
-// func FindNotificationEndpointByID(
-// 	init func(NotificationEndpointFields, *testing.T) (influxdb.NotificationEndpointService, string, func()),
-// 	t *testing.T,
-// ) {
-// 	type args struct {
-// 		id influxdb.ID
-// 	}
-// 	type wants struct {
-// 		err                  error
-// 		notificationEndpoint *influxdb.NotificationEndpoint
-// 	}
-//
-// 	tests := []struct {
-// 		name   string
-// 		fields NotificationEndpointFields
-// 		args   args
-// 		wants  wants
-// 	}{
-// 		{
-// 			name: "basic find notificationEndpoint by id",
-// 			fields: NotificationEndpointFields{
-// 				NotificationEndpoints: []*influxdb.NotificationEndpoint{
-// 					{
-// 						ID:    MustIDBase16(notificationEndpointOneID),
-// 						OrgID: MustIDBase16(orgOneID),
-// 						Name:  "notificationEndpoint1",
-// 					},
-// 					{
-// 						ID:    MustIDBase16(notificationEndpointTwoID),
-// 						OrgID: MustIDBase16(orgOneID),
-// 						Name:  "notificationEndpoint2",
-// 					},
-// 				},
-// 				Organizations: []*influxdb.Organization{
-// 					{
-// 						Name: "theorg",
-// 						ID:   MustIDBase16(orgOneID),
-// 					},
-// 				},
-// 			},
-// 			args: args{
-// 				id: MustIDBase16(notificationEndpointTwoID),
-// 			},
-// 			wants: wants{
-// 				notificationEndpoint: &influxdb.NotificationEndpoint{
-// 					ID:    MustIDBase16(notificationEndpointTwoID),
-// 					OrgID: MustIDBase16(orgOneID),
-// 					Name:  "notificationEndpoint2",
-// 				},
-// 			},
-// 		},
-// 		{
-// 			name: "find notificationEndpoint by id not exist",
-// 			fields: NotificationEndpointFields{
-// 				NotificationEndpoints: []*influxdb.NotificationEndpoint{
-// 					{
-// 						ID:    MustIDBase16(notificationEndpointOneID),
-// 						OrgID: MustIDBase16(orgOneID),
-// 						Name:  "notificationEndpoint1",
-// 					},
-// 					{
-// 						ID:    MustIDBase16(notificationEndpointTwoID),
-// 						OrgID: MustIDBase16(orgOneID),
-// 						Name:  "notificationEndpoint2",
-// 					},
-// 				},
-// 				Organizations: []*influxdb.Organization{
-// 					{
-// 						Name: "theorg",
-// 						ID:   MustIDBase16(orgOneID),
-// 					},
-// 				},
-// 			},
-// 			args: args{
-// 				id: MustIDBase16(threeID),
-// 			},
-// 			wants: wants{
-// 				err: &influxdb.Error{
-// 					Code: influxdb.ENotFound,
-// 					Op:   influxdb.OpFindNotificationEndpointByID,
-// 					Msg:  "notificationEndpoint not found",
-// 				},
-// 			},
-// 		},
-// 	}
-//
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			s, opPrefix, done := init(tt.fields, t)
-// 			defer done()
-// 			ctx := context.Background()
-//
-// 			notificationEndpoint, err := s.FindNotificationEndpointByID(ctx, tt.args.id)
-// 			diffPlatformErrors(tt.name, err, tt.wants.err, opPrefix, t)
-//
-// 			if diff := cmp.Diff(notificationEndpoint, tt.wants.notificationEndpoint, notificationEndpointCmpOptions...); diff != "" {
-// 				t.Errorf("notificationEndpoint is different -got/+want\ndiff %s", diff)
-// 			}
-// 		})
-// 	}
-// }
-//
-// // FindNotificationEndpoints testing
-// func FindNotificationEndpoints(
-// 	init func(NotificationEndpointFields, *testing.T) (influxdb.NotificationEndpointService, string, func()),
-// 	t *testing.T,
-// ) {
-// 	type args struct {
-// 		ID             influxdb.ID
-// 		name           string
-// 		organization   string
-// 		organizationID influxdb.ID
-// 		findOptions    influxdb.FindOptions
-// 	}
-//
-// 	type wants struct {
-// 		notificationEndpoints []*influxdb.NotificationEndpoint
-// 		err                   error
-// 	}
-// 	tests := []struct {
-// 		name   string
-// 		fields NotificationEndpointFields
-// 		args   args
-// 		wants  wants
-// 	}{
-// 		{
-// 			name: "find all notificationEndpoints",
-// 			fields: NotificationEndpointFields{
-// 				Organizations: []*influxdb.Organization{
-// 					{
-// 						Name: "theorg",
-// 						ID:   MustIDBase16(orgOneID),
-// 					},
-// 					{
-// 						Name: "otherorg",
-// 						ID:   MustIDBase16(orgTwoID),
-// 					},
-// 				},
-// 				NotificationEndpoints: []*influxdb.NotificationEndpoint{
-// 					{
-// 						ID:    MustIDBase16(notificationEndpointOneID),
-// 						OrgID: MustIDBase16(orgOneID),
-// 						Name:  "abc",
-// 					},
-// 					{
-// 						ID:    MustIDBase16(notificationEndpointTwoID),
-// 						OrgID: MustIDBase16(orgTwoID),
-// 						Name:  "xyz",
-// 					},
-// 				},
-// 			},
-// 			args: args{},
-// 			wants: wants{
-// 				notificationEndpoints: []*influxdb.NotificationEndpoint{
-// 					{
-// 						ID:    MustIDBase16(notificationEndpointOneID),
-// 						OrgID: MustIDBase16(orgOneID),
-// 						Name:  "abc",
-// 					},
-// 					{
-// 						ID:    MustIDBase16(notificationEndpointTwoID),
-// 						OrgID: MustIDBase16(orgTwoID),
-// 						Name:  "xyz",
-// 					},
-// 				},
-// 			},
-// 		},
-// 		{
-// 			name: "find all notificationEndpoints by offset and limit",
-// 			fields: NotificationEndpointFields{
-// 				Organizations: []*influxdb.Organization{
-// 					{
-// 						Name: "theorg",
-// 						ID:   MustIDBase16(orgOneID),
-// 					},
-// 				},
-// 				NotificationEndpoints: []*influxdb.NotificationEndpoint{
-// 					{
-// 						ID:    MustIDBase16(notificationEndpointOneID),
-// 						OrgID: MustIDBase16(orgOneID),
-// 						Name:  "abc",
-// 					},
-// 					{
-// 						ID:    MustIDBase16(notificationEndpointTwoID),
-// 						OrgID: MustIDBase16(orgOneID),
-// 						Name:  "def",
-// 					},
-// 					{
-// 						ID:    MustIDBase16(notificationEndpointThreeID),
-// 						OrgID: MustIDBase16(orgOneID),
-// 						Name:  "xyz",
-// 					},
-// 				},
-// 			},
-// 			args: args{
-// 				findOptions: influxdb.FindOptions{
-// 					Offset: 1,
-// 					Limit:  1,
-// 				},
-// 			},
-// 			wants: wants{
-// 				notificationEndpoints: []*influxdb.NotificationEndpoint{
-// 					{
-// 						ID:    MustIDBase16(notificationEndpointTwoID),
-// 						OrgID: MustIDBase16(orgOneID),
-// 						Name:  "def",
-// 					},
-// 				},
-// 			},
-// 		},
-// 		{
-// 			name: "find all notificationEndpoints by descending",
-// 			fields: NotificationEndpointFields{
-// 				Organizations: []*influxdb.Organization{
-// 					{
-// 						Name: "theorg",
-// 						ID:   MustIDBase16(orgOneID),
-// 					},
-// 				},
-// 				NotificationEndpoints: []*influxdb.NotificationEndpoint{
-// 					{
-// 						ID:    MustIDBase16(notificationEndpointOneID),
-// 						OrgID: MustIDBase16(orgOneID),
-// 						Name:  "abc",
-// 					},
-// 					{
-// 						ID:    MustIDBase16(notificationEndpointTwoID),
-// 						OrgID: MustIDBase16(orgOneID),
-// 						Name:  "def",
-// 					},
-// 					{
-// 						ID:    MustIDBase16(notificationEndpointThreeID),
-// 						OrgID: MustIDBase16(orgOneID),
-// 						Name:  "xyz",
-// 					},
-// 				},
-// 			},
-// 			args: args{
-// 				findOptions: influxdb.FindOptions{
-// 					Offset:     1,
-// 					Descending: true,
-// 				},
-// 			},
-// 			wants: wants{
-// 				notificationEndpoints: []*influxdb.NotificationEndpoint{
-// 					{
-// 						ID:    MustIDBase16(notificationEndpointTwoID),
-// 						OrgID: MustIDBase16(orgOneID),
-// 						Name:  "def",
-// 					},
-// 					{
-// 						ID:    MustIDBase16(notificationEndpointOneID),
-// 						OrgID: MustIDBase16(orgOneID),
-// 						Name:  "abc",
-// 					},
-// 				},
-// 			},
-// 		},
-// 		{
-// 			name: "find notificationEndpoints by organization name",
-// 			fields: NotificationEndpointFields{
-// 				Organizations: []*influxdb.Organization{
-// 					{
-// 						Name: "theorg",
-// 						ID:   MustIDBase16(orgOneID),
-// 					},
-// 					{
-// 						Name: "otherorg",
-// 						ID:   MustIDBase16(orgTwoID),
-// 					},
-// 				},
-// 				NotificationEndpoints: []*influxdb.NotificationEndpoint{
-// 					{
-// 						ID:    MustIDBase16(notificationEndpointOneID),
-// 						OrgID: MustIDBase16(orgOneID),
-// 						Name:  "abc",
-// 					},
-// 					{
-// 						ID:    MustIDBase16(notificationEndpointTwoID),
-// 						OrgID: MustIDBase16(orgTwoID),
-// 						Name:  "xyz",
-// 					},
-// 					{
-// 						ID:    MustIDBase16(notificationEndpointThreeID),
-// 						OrgID: MustIDBase16(orgOneID),
-// 						Name:  "123",
-// 					},
-// 				},
-// 			},
-// 			args: args{
-// 				organization: "theorg",
-// 			},
-// 			wants: wants{
-// 				notificationEndpoints: []*influxdb.NotificationEndpoint{
-// 					{
-// 						ID:    MustIDBase16(notificationEndpointOneID),
-// 						OrgID: MustIDBase16(orgOneID),
-// 						Name:  "abc",
-// 					},
-// 					{
-// 						ID:    MustIDBase16(notificationEndpointThreeID),
-// 						OrgID: MustIDBase16(orgOneID),
-// 						Name:  "123",
-// 					},
-// 				},
-// 			},
-// 		},
-// 		{
-// 			name: "find notificationEndpoints by organization id",
-// 			fields: NotificationEndpointFields{
-// 				Organizations: []*influxdb.Organization{
-// 					{
-// 						Name: "theorg",
-// 						ID:   MustIDBase16(orgOneID),
-// 					},
-// 					{
-// 						Name: "otherorg",
-// 						ID:   MustIDBase16(orgTwoID),
-// 					},
-// 				},
-// 				NotificationEndpoints: []*influxdb.NotificationEndpoint{
-// 					{
-// 						ID:    MustIDBase16(notificationEndpointOneID),
-// 						OrgID: MustIDBase16(orgOneID),
-// 						Name:  "abc",
-// 					},
-// 					{
-// 						ID:    MustIDBase16(notificationEndpointTwoID),
-// 						OrgID: MustIDBase16(orgTwoID),
-// 						Name:  "xyz",
-// 					},
-// 					{
-// 						ID:    MustIDBase16(notificationEndpointThreeID),
-// 						OrgID: MustIDBase16(orgOneID),
-// 						Name:  "123",
-// 					},
-// 				},
-// 			},
-// 			args: args{
-// 				organizationID: MustIDBase16(orgOneID),
-// 			},
-// 			wants: wants{
-// 				notificationEndpoints: []*influxdb.NotificationEndpoint{
-// 					{
-// 						ID:    MustIDBase16(notificationEndpointOneID),
-// 						OrgID: MustIDBase16(orgOneID),
-// 						Name:  "abc",
-// 					},
-// 					{
-// 						ID:    MustIDBase16(notificationEndpointThreeID),
-// 						OrgID: MustIDBase16(orgOneID),
-// 						Name:  "123",
-// 					},
-// 				},
-// 			},
-// 		},
-// 		{
-// 			name: "find notificationEndpoint by name",
-// 			fields: NotificationEndpointFields{
-// 				Organizations: []*influxdb.Organization{
-// 					{
-// 						Name: "theorg",
-// 						ID:   MustIDBase16(orgOneID),
-// 					},
-// 				},
-// 				NotificationEndpoints: []*influxdb.NotificationEndpoint{
-// 					{
-// 						ID:    MustIDBase16(notificationEndpointOneID),
-// 						OrgID: MustIDBase16(orgOneID),
-// 						Name:  "abc",
-// 					},
-// 					{
-// 						ID:    MustIDBase16(notificationEndpointTwoID),
-// 						OrgID: MustIDBase16(orgOneID),
-// 						Name:  "xyz",
-// 					},
-// 				},
-// 			},
-// 			args: args{
-// 				name: "xyz",
-// 			},
-// 			wants: wants{
-// 				notificationEndpoints: []*influxdb.NotificationEndpoint{
-// 					{
-// 						ID:    MustIDBase16(notificationEndpointTwoID),
-// 						OrgID: MustIDBase16(orgOneID),
-// 						Name:  "xyz",
-// 					},
-// 				},
-// 			},
-// 		},
-// 		{
-// 			name: "missing notificationEndpoint returns no notificationEndpoints",
-// 			fields: NotificationEndpointFields{
-// 				Organizations: []*influxdb.Organization{
-// 					{
-// 						Name: "theorg",
-// 						ID:   MustIDBase16(orgOneID),
-// 					},
-// 				},
-// 				NotificationEndpoints: []*influxdb.NotificationEndpoint{},
-// 			},
-// 			args: args{
-// 				name: "xyz",
-// 			},
-// 			wants: wants{},
-// 		},
-// 	}
-//
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			s, opPrefix, done := init(tt.fields, t)
-// 			defer done()
-// 			ctx := context.Background()
-//
-// 			filter := influxdb.NotificationEndpointFilter{}
-// 			if tt.args.ID.Valid() {
-// 				filter.ID = &tt.args.ID
-// 			}
-// 			if tt.args.organizationID.Valid() {
-// 				filter.OrganizationID = &tt.args.organizationID
-// 			}
-// 			if tt.args.organization != "" {
-// 				filter.Org = &tt.args.organization
-// 			}
-// 			if tt.args.name != "" {
-// 				filter.Name = &tt.args.name
-// 			}
-//
-// 			notificationEndpoints, _, err := s.FindNotificationEndpoints(ctx, filter, tt.args.findOptions)
-// 			diffPlatformErrors(tt.name, err, tt.wants.err, opPrefix, t)
-//
-// 			if diff := cmp.Diff(notificationEndpoints, tt.wants.notificationEndpoints, notificationEndpointCmpOptions...); diff != "" {
-// 				t.Errorf("notificationEndpoints are different -got/+want\ndiff %s", diff)
-// 			}
-// 		})
-// 	}
-// }
+func FindNotificationEndpointByID(
+	init func(NotificationEndpointFields, *testing.T) (influxdb.NotificationEndpointService, string, func()),
+	t *testing.T,
+) {
+	type args struct {
+		id influxdb.ID
+	}
+	type wants struct {
+		err                  error
+		notificationEndpoint influxdb.NotificationEndpoint
+	}
+
+	tests := []struct {
+		name   string
+		fields NotificationEndpointFields
+		args   args
+		wants  wants
+	}{
+		{
+			name: "basic find notificationEndpoint by id",
+			fields: NotificationEndpointFields{
+				NotificationEndpoints: []influxdb.NotificationEndpoint{
+					&endpoint.Slack{
+						Base: endpoint.Base{
+							ID:          MustIDBase16(notificationEndpointOneID),
+							OrgID:       MustIDBase16(orgOneID),
+							Name:        "notificationEndpoint1",
+							Description: "description1",
+							Status:      influxdb.Active,
+						},
+						URL:   "slackurl",
+						Token: influxdb.SecretField("token"),
+					},
+					&endpoint.Slack{
+						Base: endpoint.Base{
+							ID:          MustIDBase16(notificationEndpointTwoID),
+							OrgID:       MustIDBase16(orgOneID),
+							Name:        "notificationEndpoint2",
+							Description: "description2",
+							Status:      influxdb.Active,
+						},
+						URL:   "slackurl",
+						Token: influxdb.SecretField("token"),
+					},
+				},
+				Organizations: []*influxdb.Organization{
+					{
+						Name: "theorg",
+						ID:   MustIDBase16(orgOneID),
+					},
+				},
+			},
+			args: args{
+				id: MustIDBase16(notificationEndpointTwoID),
+			},
+			wants: wants{
+				notificationEndpoint: &endpoint.Slack{
+					Base: endpoint.Base{
+						ID:          MustIDBase16(notificationEndpointTwoID),
+						OrgID:       MustIDBase16(orgOneID),
+						Name:        "notificationEndpoint2",
+						Description: "description2",
+						Status:      influxdb.Active,
+					},
+					URL:   "slackurl",
+					Token: influxdb.SecretField("token"),
+				},
+			},
+		},
+		{
+			name: "find notificationEndpoint by id not exist",
+			fields: NotificationEndpointFields{
+				NotificationEndpoints: []influxdb.NotificationEndpoint{
+					&endpoint.Slack{
+						Base: endpoint.Base{
+							ID:          MustIDBase16(notificationEndpointOneID),
+							OrgID:       MustIDBase16(orgOneID),
+							Name:        "notificationEndpoint1",
+							Description: "description1",
+							Status:      influxdb.Active,
+						},
+						URL:   "slackurl",
+						Token: influxdb.SecretField("token"),
+					},
+					&endpoint.Slack{
+						Base: endpoint.Base{
+							ID:          MustIDBase16(notificationEndpointTwoID),
+							OrgID:       MustIDBase16(orgOneID),
+							Name:        "notificationEndpoint2",
+							Description: "description2",
+							Status:      influxdb.Active,
+						},
+						URL:   "slackurl",
+						Token: influxdb.SecretField("token"),
+					},
+				},
+				Organizations: []*influxdb.Organization{
+					{
+						Name: "theorg",
+						ID:   MustIDBase16(orgOneID),
+					},
+				},
+			},
+			args: args{
+				id: MustIDBase16(notificationEndpointThreeID),
+			},
+			wants: wants{
+				err: &influxdb.Error{
+					Code: influxdb.ENotFound,
+					Op:   influxdb.OpFindNotificationEndpointByID,
+					Msg:  "notification endpoint not found",
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s, opPrefix, done := init(tt.fields, t)
+			defer done()
+			ctx := context.Background()
+
+			notificationEndpoint, err := s.FindNotificationEndpointByID(ctx, tt.args.id)
+			diffPlatformErrors(tt.name, err, tt.wants.err, opPrefix, t)
+
+			if diff := cmp.Diff(notificationEndpoint, tt.wants.notificationEndpoint, notificationEndpointCmpOptions...); diff != "" {
+				t.Errorf("notificationEndpoint is different -got/+want\ndiff %s", diff)
+			}
+		})
+	}
+}
+
+// FindNotificationEndpoints testing
+func FindNotificationEndpoints(
+	init func(NotificationEndpointFields, *testing.T) (influxdb.NotificationEndpointService, string, func()),
+	t *testing.T,
+) {
+	type args struct {
+		ID             influxdb.ID
+		name           string
+		organization   string
+		organizationID influxdb.ID
+		findOptions    influxdb.FindOptions
+	}
+
+	type wants struct {
+		notificationEndpoints []*influxdb.NotificationEndpoint
+		err                   error
+	}
+	tests := []struct {
+		name   string
+		fields NotificationEndpointFields
+		args   args
+		wants  wants
+	}{
+		{
+			name: "find all notificationEndpoints",
+			fields: NotificationEndpointFields{
+				Organizations: []*influxdb.Organization{
+					{
+						Name: "theorg",
+						ID:   MustIDBase16(orgOneID),
+					},
+					{
+						Name: "otherorg",
+						ID:   MustIDBase16(orgTwoID),
+					},
+				},
+				NotificationEndpoints: []*influxdb.NotificationEndpoint{
+					{
+						ID:    MustIDBase16(notificationEndpointOneID),
+						OrgID: MustIDBase16(orgOneID),
+						Name:  "abc",
+					},
+					{
+						ID:    MustIDBase16(notificationEndpointTwoID),
+						OrgID: MustIDBase16(orgTwoID),
+						Name:  "xyz",
+					},
+				},
+			},
+			args: args{},
+			wants: wants{
+				notificationEndpoints: []*influxdb.NotificationEndpoint{
+					{
+						ID:    MustIDBase16(notificationEndpointOneID),
+						OrgID: MustIDBase16(orgOneID),
+						Name:  "abc",
+					},
+					{
+						ID:    MustIDBase16(notificationEndpointTwoID),
+						OrgID: MustIDBase16(orgTwoID),
+						Name:  "xyz",
+					},
+				},
+			},
+		},
+		{
+			name: "find all notificationEndpoints by offset and limit",
+			fields: NotificationEndpointFields{
+				Organizations: []*influxdb.Organization{
+					{
+						Name: "theorg",
+						ID:   MustIDBase16(orgOneID),
+					},
+				},
+				NotificationEndpoints: []*influxdb.NotificationEndpoint{
+					{
+						ID:    MustIDBase16(notificationEndpointOneID),
+						OrgID: MustIDBase16(orgOneID),
+						Name:  "abc",
+					},
+					{
+						ID:    MustIDBase16(notificationEndpointTwoID),
+						OrgID: MustIDBase16(orgOneID),
+						Name:  "def",
+					},
+					{
+						ID:    MustIDBase16(notificationEndpointThreeID),
+						OrgID: MustIDBase16(orgOneID),
+						Name:  "xyz",
+					},
+				},
+			},
+			args: args{
+				findOptions: influxdb.FindOptions{
+					Offset: 1,
+					Limit:  1,
+				},
+			},
+			wants: wants{
+				notificationEndpoints: []*influxdb.NotificationEndpoint{
+					{
+						ID:    MustIDBase16(notificationEndpointTwoID),
+						OrgID: MustIDBase16(orgOneID),
+						Name:  "def",
+					},
+				},
+			},
+		},
+		{
+			name: "find all notificationEndpoints by descending",
+			fields: NotificationEndpointFields{
+				Organizations: []*influxdb.Organization{
+					{
+						Name: "theorg",
+						ID:   MustIDBase16(orgOneID),
+					},
+				},
+				NotificationEndpoints: []*influxdb.NotificationEndpoint{
+					{
+						ID:    MustIDBase16(notificationEndpointOneID),
+						OrgID: MustIDBase16(orgOneID),
+						Name:  "abc",
+					},
+					{
+						ID:    MustIDBase16(notificationEndpointTwoID),
+						OrgID: MustIDBase16(orgOneID),
+						Name:  "def",
+					},
+					{
+						ID:    MustIDBase16(notificationEndpointThreeID),
+						OrgID: MustIDBase16(orgOneID),
+						Name:  "xyz",
+					},
+				},
+			},
+			args: args{
+				findOptions: influxdb.FindOptions{
+					Offset:     1,
+					Descending: true,
+				},
+			},
+			wants: wants{
+				notificationEndpoints: []*influxdb.NotificationEndpoint{
+					{
+						ID:    MustIDBase16(notificationEndpointTwoID),
+						OrgID: MustIDBase16(orgOneID),
+						Name:  "def",
+					},
+					{
+						ID:    MustIDBase16(notificationEndpointOneID),
+						OrgID: MustIDBase16(orgOneID),
+						Name:  "abc",
+					},
+				},
+			},
+		},
+		{
+			name: "find notificationEndpoints by organization name",
+			fields: NotificationEndpointFields{
+				Organizations: []*influxdb.Organization{
+					{
+						Name: "theorg",
+						ID:   MustIDBase16(orgOneID),
+					},
+					{
+						Name: "otherorg",
+						ID:   MustIDBase16(orgTwoID),
+					},
+				},
+				NotificationEndpoints: []*influxdb.NotificationEndpoint{
+					{
+						ID:    MustIDBase16(notificationEndpointOneID),
+						OrgID: MustIDBase16(orgOneID),
+						Name:  "abc",
+					},
+					{
+						ID:    MustIDBase16(notificationEndpointTwoID),
+						OrgID: MustIDBase16(orgTwoID),
+						Name:  "xyz",
+					},
+					{
+						ID:    MustIDBase16(notificationEndpointThreeID),
+						OrgID: MustIDBase16(orgOneID),
+						Name:  "123",
+					},
+				},
+			},
+			args: args{
+				organization: "theorg",
+			},
+			wants: wants{
+				notificationEndpoints: []*influxdb.NotificationEndpoint{
+					{
+						ID:    MustIDBase16(notificationEndpointOneID),
+						OrgID: MustIDBase16(orgOneID),
+						Name:  "abc",
+					},
+					{
+						ID:    MustIDBase16(notificationEndpointThreeID),
+						OrgID: MustIDBase16(orgOneID),
+						Name:  "123",
+					},
+				},
+			},
+		},
+		{
+			name: "find notificationEndpoints by organization id",
+			fields: NotificationEndpointFields{
+				Organizations: []*influxdb.Organization{
+					{
+						Name: "theorg",
+						ID:   MustIDBase16(orgOneID),
+					},
+					{
+						Name: "otherorg",
+						ID:   MustIDBase16(orgTwoID),
+					},
+				},
+				NotificationEndpoints: []*influxdb.NotificationEndpoint{
+					{
+						ID:    MustIDBase16(notificationEndpointOneID),
+						OrgID: MustIDBase16(orgOneID),
+						Name:  "abc",
+					},
+					{
+						ID:    MustIDBase16(notificationEndpointTwoID),
+						OrgID: MustIDBase16(orgTwoID),
+						Name:  "xyz",
+					},
+					{
+						ID:    MustIDBase16(notificationEndpointThreeID),
+						OrgID: MustIDBase16(orgOneID),
+						Name:  "123",
+					},
+				},
+			},
+			args: args{
+				organizationID: MustIDBase16(orgOneID),
+			},
+			wants: wants{
+				notificationEndpoints: []*influxdb.NotificationEndpoint{
+					{
+						ID:    MustIDBase16(notificationEndpointOneID),
+						OrgID: MustIDBase16(orgOneID),
+						Name:  "abc",
+					},
+					{
+						ID:    MustIDBase16(notificationEndpointThreeID),
+						OrgID: MustIDBase16(orgOneID),
+						Name:  "123",
+					},
+				},
+			},
+		},
+		{
+			name: "find notificationEndpoint by name",
+			fields: NotificationEndpointFields{
+				Organizations: []*influxdb.Organization{
+					{
+						Name: "theorg",
+						ID:   MustIDBase16(orgOneID),
+					},
+				},
+				NotificationEndpoints: []*influxdb.NotificationEndpoint{
+					{
+						ID:    MustIDBase16(notificationEndpointOneID),
+						OrgID: MustIDBase16(orgOneID),
+						Name:  "abc",
+					},
+					{
+						ID:    MustIDBase16(notificationEndpointTwoID),
+						OrgID: MustIDBase16(orgOneID),
+						Name:  "xyz",
+					},
+				},
+			},
+			args: args{
+				name: "xyz",
+			},
+			wants: wants{
+				notificationEndpoints: []*influxdb.NotificationEndpoint{
+					{
+						ID:    MustIDBase16(notificationEndpointTwoID),
+						OrgID: MustIDBase16(orgOneID),
+						Name:  "xyz",
+					},
+				},
+			},
+		},
+		{
+			name: "missing notificationEndpoint returns no notificationEndpoints",
+			fields: NotificationEndpointFields{
+				Organizations: []*influxdb.Organization{
+					{
+						Name: "theorg",
+						ID:   MustIDBase16(orgOneID),
+					},
+				},
+				NotificationEndpoints: []*influxdb.NotificationEndpoint{},
+			},
+			args: args{
+				name: "xyz",
+			},
+			wants: wants{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s, opPrefix, done := init(tt.fields, t)
+			defer done()
+			ctx := context.Background()
+
+			filter := influxdb.NotificationEndpointFilter{}
+			if tt.args.ID.Valid() {
+				filter.ID = &tt.args.ID
+			}
+			if tt.args.organizationID.Valid() {
+				filter.OrganizationID = &tt.args.organizationID
+			}
+			if tt.args.organization != "" {
+				filter.Org = &tt.args.organization
+			}
+			if tt.args.name != "" {
+				filter.Name = &tt.args.name
+			}
+
+			notificationEndpoints, _, err := s.FindNotificationEndpoints(ctx, filter, tt.args.findOptions)
+			diffPlatformErrors(tt.name, err, tt.wants.err, opPrefix, t)
+
+			if diff := cmp.Diff(notificationEndpoints, tt.wants.notificationEndpoints, notificationEndpointCmpOptions...); diff != "" {
+				t.Errorf("notificationEndpoints are different -got/+want\ndiff %s", diff)
+			}
+		})
+	}
+}
+
 //
 // // DeleteNotificationEndpoint testing
 // func DeleteNotificationEndpoint(
