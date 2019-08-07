@@ -159,7 +159,11 @@ func (t *TSMFilter) FilteredTSMStream() (io.Reader, error) {
 		return nil, err
 	}
 
-	chunks := segmentToChunks(entries)
+	chunks := SegmentToChunks(entries)
+	fmt.Println("len(chunks): ", len(chunks))
+	for _, chunk := range chunks[:20] {
+		fmt.Println(chunk.Start, chunk.End)
+	}
 	if err := t.BuildOutputTSM(chunks, s); err != nil {
 		return nil, err
 	}
@@ -175,14 +179,14 @@ func (t *TSMFilter) BuildOutputTSM(chunks []*DownloadChunk, stream io.ReadSeeker
 		return err
 	}
 
+	var read uint32 = 0
+	last := time.Now()
 	for _, chunk := range chunks {
 		iter, err := chunk.BlockIterator(stream)
 		if err != nil {
 			return err
 		}
 
-		var read uint32 = 0
-		last := time.Now()
 		for iter.HasNext() {
 			if err := iter.Next(); err != nil {
 				return err
@@ -250,8 +254,8 @@ func (b *BlockIterator) Next() error {
 
 func (b *BlockIterator) blockAt(i int) (*ReadEntry, []byte) {
 	entry := b.entries[i]
-	start := entry.blockData.Offset - b.offset
-	end := start + int64(entry.blockData.Size)
+	start := entry.BlockData.Offset - b.offset
+	end := start + int64(entry.BlockData.Size)
 
 	return entry, b.blocks[start:end]
 }
@@ -293,12 +297,12 @@ func (b *BlockIterator) BlockBytes() []byte {
 
 // Reports the series key for a given block
 func (b *BlockIterator) SeriesKey() []byte {
-	return b.blockInfo.seriesKey
+	return b.blockInfo.SeriesKey
 }
 
 // Reports the min and max time for the current block
 func (b *BlockIterator) BlockMinMaxTime() (int64, int64) {
-	bnds := b.blockInfo.bounds
+	bnds := b.blockInfo.Bounds
 	return bnds.Start.Time().UnixNano(), bnds.Stop.Time().UnixNano()
 }
 
@@ -306,9 +310,9 @@ func (b *BlockIterator) BlockMinMaxTime() (int64, int64) {
 // copy a block from a remote tsm file to the destination
 // TODO: store information about data that needs to be tombstoned
 type ReadEntry struct {
-	blockData tsm1.IndexEntry // index information for associated block
-	seriesKey []byte          // the block's series key
-	bounds    execute.Bounds  // the bounds for data included within this block
+	BlockData tsm1.IndexEntry // index information for associated block
+	SeriesKey []byte          // the block's series key
+	Bounds    execute.Bounds  // the bounds for data included within this block
 }
 
 func (t *TSMFilter) filterBlocks(stream io.ReadSeeker, targetOrg, targetBucket *influxdb.ID, bounds execute.Bounds) ([]*ReadEntry, error) {
@@ -361,9 +365,9 @@ func (t *TSMFilter) filterBlocks(stream io.ReadSeeker, targetOrg, targetBucket *
 						// get the overlap between the bounds we're interested in and the
 						// bounds for this particular block
 						re := &ReadEntry{
-							seriesKey: key,
-							blockData: entry,
-							bounds:    overlapping,
+							SeriesKey: key,
+							BlockData: entry,
+							Bounds:    overlapping,
 						}
 
 						blockEntries = append(blockEntries, re)
@@ -392,12 +396,12 @@ type DownloadChunk struct {
 // segmentToChunks splits up read entries into Download
 // chunks based on the position of their blocks in the tsm file,
 // to optimize aws read requests
-func segmentToChunks(entries []*ReadEntry) []*DownloadChunk {
+func SegmentToChunks(entries []*ReadEntry) []*DownloadChunk {
 	var endOffsetToChunk = make(map[int64]*DownloadChunk)
 
 	for _, entry := range entries {
-		startOff := entry.blockData.Offset
-		endOff := startOff + int64(entry.blockData.Size)
+		startOff := entry.BlockData.Offset
+		endOff := startOff + int64(entry.BlockData.Size)
 
 		// if we already have a chunk ending at this start offset...
 		if chunk, ok := endOffsetToChunk[startOff]; ok {
@@ -407,9 +411,9 @@ func segmentToChunks(entries []*ReadEntry) []*DownloadChunk {
 
 			delete(endOffsetToChunk, startOff)
 			endOffsetToChunk[endOff] = chunk
-		} else if chunk, ok := endOffsetToChunk[endOff]; ok && startOff == chunk.Start { // handles case where
-			// two series keys point to the same block
-			chunk.Entries = append(chunk.Entries, entry)
+			//} else if chunk, ok := endOffsetToChunk[endOff]; ok && startOff == chunk.Start { // handles case where
+			//	// two series keys point to the same block
+			//	chunk.Entries = append(chunk.Entries, entry)
 		} else {
 			// add a new download chunk
 			c := &DownloadChunk{
