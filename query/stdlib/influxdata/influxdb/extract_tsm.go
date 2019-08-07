@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"hash/crc32"
 	"io"
+	"sort"
 	"time"
 
 	"github.com/influxdata/flux"
@@ -113,10 +114,15 @@ var extractTSM = values.NewFunction(
 	}, false,
 )
 
+// TSMFilter contains parameters and state for
+// filtering a remote TSM file based on certain conditions,
+// and creating a new resulting TSM file
 type TSMFilter struct {
 	Org, Bucket *influxdb.ID
 	Bounds      execute.Bounds
 	source      values.Stream
+
+	buf io.ReadWriter
 
 	dataSize uint32
 }
@@ -140,27 +146,12 @@ func NewTSMFilter(org, bucket string, bounds execute.Bounds, src values.Stream) 
 		Bucket: bucketID,
 		Bounds: bounds,
 		source: src,
+		buf:    &bytes.Buffer{},
 	}, nil
 }
 
-// for sorting read entries to debug
-type readEntries []*ReadEntry
-
-func (r readEntries) Len() int {
-	return len(r)
-}
-
-func (r readEntries) Swap(i, j int) {
-	r[i], r[j] = r[j], r[i]
-}
-
-func (r readEntries) Less(i, j int) bool {
-	r1 := r[i]
-	r2 := r[j]
-
-	return r1.blocksChunkLen < r2.blocksChunkLen
-}
-
+// FilteredTSMStream returns a read stream to a tsm file
+// containing only data which matches predicates in the TSMFilter struct.
 func (t *TSMFilter) FilteredTSMStream() (io.Reader, error) {
 	s, _ := t.source.(io.ReadSeeker)
 	entries, err := t.filterBlocks(s, t.Org, t.Bucket, t.Bounds)
@@ -168,153 +159,156 @@ func (t *TSMFilter) FilteredTSMStream() (io.Reader, error) {
 		return nil, err
 	}
 
-	buf := &bytes.Buffer{}
-	tsmWriter, err := tsm1.NewTSMWriter(buf)
-	if err != nil {
+	chunks := segmentToChunks(entries)
+	if err := t.BuildOutputTSM(chunks, s); err != nil {
 		return nil, err
 	}
 
-	//fmt.Println("len(entries): ", len(entries))
-	iter := NewBlockIterator(entries, s)
-
-	var read uint32 = 0
-	last := time.Now()
-	for iter.HasNext() {
-		if err := iter.Next(); err != nil {
-			return nil, err
-		}
-
-		entryBytes := iter.BlockBytes()
-		entryKey := iter.SeriesKey()
-		minTime, maxTime := iter.BlockMinMaxTime()
-
-		delta := time.Since(last)
-		rate := float64(len(entryBytes)) / 1000000 / delta.Seconds()
-		last = time.Now()
-		fmt.Printf("\r %f MiB/s wrote %d out of total %d; %3.2f%% finished", rate, read, t.dataSize, float32(read)/float32(t.dataSize)*100)
-
-		if err := tsmWriter.WriteBlock(entryKey, minTime, maxTime, entryBytes); err != nil {
-			return nil, err
-		}
-		read += uint32(len(entryBytes))
-	}
-
-	if err := tsmWriter.WriteIndex(); err != nil {
-		return nil, err
-	}
-
-	if err := tsmWriter.Close(); err != nil {
-		return nil, err
-	}
-
-	return buf, nil
+	return t.buf, nil
 }
 
-func MinMaxOffset(entries []*ReadEntry) (int64, int64) {
-	if len(entries) < 1 {
-		return -1, -1
-	}
-
-	minOffset := entries[0].blocksChunkStart
-	maxOffset := entries[len(entries)-1].blocksChunkStart
-	for _, entry := range entries {
-		offset := entry.blocksChunkStart
-		if entry.blocksChunkStart < minOffset {
-			minOffset = offset
-		}
-
-		if entry.blocksChunkStart > maxOffset {
-			maxOffset = offset
-		}
-	}
-
-	return minOffset, maxOffset
-}
-
-type BlockIterator struct {
-	entries      []*ReadEntry // contains all relevant series keys and their associated blocks
-	entry        *ReadEntry   // current series key/min max time
-	nextEntryPos int          // current index into entries
-
-	blockList    [][]byte // array of actual data for all blocks referenced in the given entry
-	block        []byte
-	blockListIdx int // the block currently referenced by the iterator
-
-	stream io.ReadSeeker // our source for reading block data given read entries
-	cnt    int
-}
-
-func NewBlockIterator(entries []*ReadEntry, stream io.ReadSeeker) *BlockIterator {
-	return &BlockIterator{
-		entries: entries,
-		stream:  stream,
-	}
-}
-
-func (b *BlockIterator) HasNext() bool {
-	return b.nextEntryPos < len(b.entries)
-}
-
-func (b *BlockIterator) Next() error {
-	// fetch next list of blocks if we're outside the bounds
-	// of the current list
-	if b.blockListIdx >= len(b.blockList) || len(b.blockList) == 0 {
-		if err := b.FetchBlockList(); err != nil {
-			return err
-		}
-		b.blockListIdx = 0
-
-		b.entry = b.entries[b.nextEntryPos]
-		b.nextEntryPos++
-	}
-
-	// if we're still processing the current
-	// list of block data, simply increment the
-	// block list index
-	if b.blockListIdx < len(b.blockList) {
-		b.block = b.blockList[b.blockListIdx]
-		b.blockListIdx++
-		return nil
-	}
-
-	// at this point, we should never have an empty block list
-	if len(b.blockList) == 0 {
-		return errors.New("empty block list")
-	}
-
-	return nil
-}
-
-func (b *BlockIterator) FetchBlockList() error {
-	blockList, err := readBytesForEntry(b.stream, b.entries[b.nextEntryPos])
+//BuildOutputTSM downloads all relevant tsm data and writes the blocks into
+// a new tsm file (currently an in-memory buffer)
+func (t *TSMFilter) BuildOutputTSM(chunks []*DownloadChunk, stream io.ReadSeeker) error {
+	tsmWriter, err := tsm1.NewTSMWriter(t.buf)
 	if err != nil {
 		return err
 	}
-	b.blockList = blockList
+
+	for _, chunk := range chunks {
+		iter, err := chunk.BlockIterator(stream)
+		if err != nil {
+			return err
+		}
+
+		var read uint32 = 0
+		last := time.Now()
+		for iter.HasNext() {
+			if err := iter.Next(); err != nil {
+				return err
+			}
+
+			entryBytes := iter.BlockBytes()
+			entryKey := iter.SeriesKey()
+			minTime, maxTime := iter.BlockMinMaxTime()
+
+			delta := time.Since(last)
+			rate := float64(len(entryBytes)) / 1000000 / delta.Seconds()
+			last = time.Now()
+			fmt.Printf("\r %f MiB/s wrote %d out of total %d; %3.2f%% finished", rate, read, t.dataSize, float32(read)/float32(t.dataSize)*100)
+
+			if err := tsmWriter.WriteBlock(entryKey, minTime, maxTime, entryBytes); err != nil {
+				return err
+			}
+			read += uint32(len(entryBytes))
+		}
+	}
+
+	if err := tsmWriter.WriteIndex(); err != nil {
+		return err
+	}
+
+	if err := tsmWriter.Close(); err != nil {
+		return err
+	}
 
 	return nil
 }
 
+// BlockIterator represents state for iterating over
+// the blocks in a downloaded chunk of a tsm file
+type BlockIterator struct {
+	offset int64
+
+	n       int
+	blocks  []byte
+	entries []*ReadEntry
+
+	block     []byte
+	blockInfo *ReadEntry
+}
+
+// HasNext reports whether or not the iterator has another entry to return
+func (b *BlockIterator) HasNext() bool {
+	return b.n < len(b.entries)
+}
+
+// Next points the block iterator at the next block data and information
+func (b *BlockIterator) Next() error {
+	info, contents := b.blockAt(b.n)
+
+	contents, err := stripAndVerifyChecksum(contents)
+	if err != nil {
+		return err
+	}
+	b.block = contents
+	b.blockInfo = info
+	b.n++
+
+	return nil
+}
+
+func (b *BlockIterator) blockAt(i int) (*ReadEntry, []byte) {
+	entry := b.entries[i]
+	start := entry.blockData.Offset - b.offset
+	end := start + int64(entry.blockData.Size)
+
+	return entry, b.blocks[start:end]
+}
+
+// stripAndVerifyChecksum removes the first 4 bytes from a downloaded block (the checksum), and
+// verifies the checksum
+func stripAndVerifyChecksum(block []byte) ([]byte, error) {
+	if len(block) < 4 {
+		return nil, errors.New("block too short")
+	}
+
+	sum := block[:4]
+	block = block[4:]
+
+	if err := verifyChecksum(sum, block); err != nil {
+		return nil, err
+	}
+
+	return block, nil
+}
+
+// verifyChecksum verifies whether or not the checksum in a block matches
+// the actual block data
+func verifyChecksum(want []byte, data []byte) error {
+	var checksum [crc32.Size]byte
+	binary.BigEndian.PutUint32(checksum[:], crc32.ChecksumIEEE(data))
+
+	if bytes.Compare(want, checksum[:]) != 0 {
+		return errors.New("invalid checksum for block")
+	}
+
+	return nil
+}
+
+// Reports the raw, compressed bytes for a given block
 func (b *BlockIterator) BlockBytes() []byte {
 	return b.block
 }
 
+// Reports the series key for a given block
 func (b *BlockIterator) SeriesKey() []byte {
-	return b.entry.seriesKey
+	return b.blockInfo.seriesKey
 }
 
+// Reports the min and max time for the current block
 func (b *BlockIterator) BlockMinMaxTime() (int64, int64) {
-	bnds := b.entry.bounds
+	bnds := b.blockInfo.bounds
 	return bnds.Start.Time().UnixNano(), bnds.Stop.Time().UnixNano()
 }
 
+// ReadEntry represents information needed to
+// copy a block from a remote tsm file to the destination
+// TODO: store information about data that needs to be tombstoned
 type ReadEntry struct {
-	blockData []tsm1.IndexEntry
-	seriesKey []byte
-	bounds    execute.Bounds
-
-	blocksChunkStart int64
-	blocksChunkLen   int64
+	blockData tsm1.IndexEntry // index information for associated block
+	seriesKey []byte          // the block's series key
+	bounds    execute.Bounds  // the bounds for data included within this block
 }
 
 func (t *TSMFilter) filterBlocks(stream io.ReadSeeker, targetOrg, targetBucket *influxdb.ID, bounds execute.Bounds) ([]*ReadEntry, error) {
@@ -349,136 +343,140 @@ func (t *TSMFilter) filterBlocks(stream io.ReadSeeker, targetOrg, targetBucket *
 
 		if org == *targetOrg {
 			if targetBucket == nil || bucket == *targetBucket {
-
 				var e []tsm1.IndexEntry
 				entries, err := idx.ReadEntries(key, e)
 				if err != nil {
 					return nil, err
 				}
 
-				minTime, maxTime := minMaxTime(entries)
-				b := execute.Bounds{
-					Start: values.ConvertTime(time.Unix(0, minTime)),
-					Stop:  values.ConvertTime(time.Unix(0, maxTime)),
-				}
-				// only add the block to our list if there is a non-empty overlap
-				if b.Overlaps(bounds) {
-					overlapping := b.Intersect(bounds)
-					// get the overlap between the bounds we're interested in and the
-					// bounds for this particular block
-					re := &ReadEntry{
-						seriesKey: key,
-						blockData: entries,
-						bounds:    overlapping,
-					}
-					if err := re.setReadRange(); err != nil {
-						return nil, err
+				for _, entry := range entries {
+					b := execute.Bounds{
+						Start: values.ConvertTime(time.Unix(0, entry.MinTime)),
+						Stop:  values.ConvertTime(time.Unix(0, entry.MaxTime)),
 					}
 
-					blockEntries = append(blockEntries, re)
+					// only add the block to our list if there is a non-empty overlap
+					if b.Overlaps(bounds) {
+						overlapping := b.Intersect(bounds)
+						// get the overlap between the bounds we're interested in and the
+						// bounds for this particular block
+						re := &ReadEntry{
+							seriesKey: key,
+							blockData: entry,
+							bounds:    overlapping,
+						}
 
-					for _, entry := range entries {
-						t.dataSize += entry.Size
+						blockEntries = append(blockEntries, re)
+						t.dataSize += entry.Size - 4
 					}
 				}
 			}
 		}
 	}
-
 	return blockEntries, nil
 }
 
-func minMaxTime(entries []tsm1.IndexEntry) (int64, int64) {
-	if len(entries) == 0 {
-		return flux.MinTime.Absolute.UnixNano(), flux.MaxTime.Absolute.UnixNano()
-	}
+//DownloadChunk represents information to handle a single s3 download request
+type DownloadChunk struct {
+	// Start represents the offset of the first block in the chunk in this tsm file
+	Start int64
+	// End represents the end offset of the last block in the chunk
+	End int64
+	// Entries contains all the read entries (series key+index info) that are encompassed
+	// by this chunk
+	Entries []*ReadEntry
+	// Buffer represents the internal download buffer for this chunk
+	Buffer []byte
+}
 
-	var minTime = entries[0].MinTime
-	var maxTime = entries[0].MaxTime
+// segmentToChunks splits up read entries into Download
+// chunks based on the position of their blocks in the tsm file,
+// to optimize aws read requests
+func segmentToChunks(entries []*ReadEntry) []*DownloadChunk {
+	var endOffsetToChunk = make(map[int64]*DownloadChunk)
+
 	for _, entry := range entries {
-		if entry.MinTime < minTime {
-			minTime = entry.MinTime
-		}
+		startOff := entry.blockData.Offset
+		endOff := startOff + int64(entry.blockData.Size)
 
-		if entry.MaxTime > maxTime {
-			maxTime = entry.MaxTime
+		// if we already have a chunk ending at this start offset...
+		if chunk, ok := endOffsetToChunk[startOff]; ok {
+			// add this entry to the chunk
+			chunk.End = endOff
+			chunk.Entries = append(chunk.Entries, entry)
+
+			delete(endOffsetToChunk, startOff)
+			endOffsetToChunk[endOff] = chunk
+		} else if chunk, ok := endOffsetToChunk[endOff]; ok && startOff == chunk.Start { // handles case where
+			// two series keys point to the same block
+			chunk.Entries = append(chunk.Entries, entry)
+		} else {
+			// add a new download chunk
+			c := &DownloadChunk{
+				Start:   startOff,
+				End:     endOff,
+				Entries: []*ReadEntry{entry},
+			}
+			endOffsetToChunk[endOff] = c
 		}
 	}
 
-	return minTime, maxTime
+	return sortByOffset(endOffsetToChunk)
 }
 
-func readBytesForEntry(stream io.ReadSeeker, entry *ReadEntry) ([][]byte, error) {
-	if entry == nil {
-		return nil, nil
+// sorts entries by start offset within the tsm file
+// this is necessary, since blocks must be written
+// into the resulting tsm file in the same order
+// that they were read to maintain ordering
+func sortByOffset(m map[int64]*DownloadChunk) []*DownloadChunk {
+	offsets := make([]int, 0, len(m))
+	chunks := make([]*DownloadChunk, len(m))
+
+	for off := range m {
+		offsets = append(offsets, int(off))
+	}
+	sort.Ints(offsets)
+
+	for i, off := range offsets {
+		chunks[i] = m[int64(off)]
 	}
 
-	if _, err := stream.Seek(entry.blocksChunkStart, 0); err != nil {
-		return nil, err
-	}
-
-	var blockBytes = make([]byte, entry.blocksChunkLen)
-	//start := time.Now()
-	n, err := stream.Read(blockBytes)
-	//fmt.Printf("read took: %v for %d bytes\n", time.Since(start), n)
-	if err != nil {
-		fmt.Println("read error: ", err.Error())
-		return nil, err
-	} else if n != int(entry.blocksChunkLen) {
-		return nil, errors.New("could not read full block")
-	}
-
-	blockList := make([][]byte, len(entry.blockData))
-
-	blockListSz := 0
-	//start = time.Now()
-	for i, idxEntry := range entry.blockData {
-		blockStart := idxEntry.Offset - entry.blocksChunkStart
-		blockEnd := blockStart + int64(idxEntry.Size)
-		blockData := blockBytes[blockStart:blockEnd]
-
-		if len(blockData) < 4 {
-			return nil, errors.New("block too short")
-		}
-
-		sum := blockData[:4]
-		blockData = blockData[4:]
-
-		if err := verifyChecksum(sum, blockData); err != nil {
-			return nil, err
-		}
-
-		blockList[i] = blockData
-		blockListSz += len(blockData)
-	}
-
-	return blockList, nil
+	return chunks
 }
 
-func (entry *ReadEntry) setReadRange() error {
-	if len(entry.blockData) < 1 {
-		return fmt.Errorf("no blocks for key: %s", entry.seriesKey)
+// Download populates the internal buffer of a DownloadChunk from
+// a given read stream
+func (c *DownloadChunk) Download(stream io.ReadSeeker) error {
+	if _, err := stream.Seek(c.Start, 0); err != nil {
+		return err
 	}
-	startEntry, endEntry := entry.blockData[0], entry.blockData[len(entry.blockData)-1]
 
-	entry.blocksChunkStart = startEntry.Offset
-	// length of the chunk will be first block offset subtracted from (last block position + last block size)
-	entry.blocksChunkLen = endEntry.Offset + int64(endEntry.Size) - startEntry.Offset
+	bufSiz := c.End - c.Start
+	c.Buffer = make([]byte, bufSiz)
 
-	return nil
-}
-
-func verifyChecksum(want []byte, data []byte) error {
-	var checksum [crc32.Size]byte
-	binary.BigEndian.PutUint32(checksum[:], crc32.ChecksumIEEE(data))
-
-	if bytes.Compare(want, checksum[:]) != 0 {
-		return errors.New("invalid checksum for block")
+	if n, err := stream.Read(c.Buffer); err != nil {
+		return err
+	} else if int64(n) != bufSiz {
+		return errors.New("could not read all block data for chunk")
 	}
 
 	return nil
 }
 
+// BlockIterator returns an iterator which can be used to iterate over individual
+// blocks in a chunk
+func (c *DownloadChunk) BlockIterator(stream io.ReadSeeker) (*BlockIterator, error) {
+	if err := c.Download(stream); err != nil {
+		return nil, err
+	}
+	return &BlockIterator{
+		entries: c.Entries,
+		blocks:  c.Buffer,
+		offset:  c.Start,
+	}, nil
+}
+
+// readIndexBytes downloads the index portion of a tsm file
 func readIndexBytes(stream io.ReadSeeker, start, end int64) ([]byte, error) {
 	if _, err := stream.Seek(start, 0); err != nil {
 		return nil, err
@@ -496,6 +494,8 @@ func readIndexBytes(stream io.ReadSeeker, start, end int64) ([]byte, error) {
 	return indexBytes, nil
 }
 
+// getFileIndexPos reports the start and end offsets of the
+// index portion of a tsm file
 func getFileIndexPos(stream io.ReadSeeker) (int64, int64, error) {
 	var footerStartPos int64
 	footerStartPos, err := stream.Seek(-8, 2)
