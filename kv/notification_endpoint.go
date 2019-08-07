@@ -208,7 +208,7 @@ func (s *Service) findNotificationEndpointByID(ctx context.Context, tx Tx, id in
 // Additional options provide pagination & sorting.
 func (s *Service) FindNotificationEndpoints(ctx context.Context, filter influxdb.NotificationEndpointFilter, opt ...influxdb.FindOptions) (nrs []influxdb.NotificationEndpoint, n int, err error) {
 	err = s.kv.View(ctx, func(tx Tx) error {
-		nrs, n, err = s.findNotificationEndpoints(ctx, tx, filter)
+		nrs, n, err = s.findNotificationEndpoints(ctx, tx, filter, opt...)
 		return err
 	})
 	return nrs, n, err
@@ -231,17 +231,27 @@ func (s *Service) findNotificationEndpoints(ctx context.Context, tx Tx, filter i
 	// 	idMap[item.ResourceID] = false
 	// }
 
-	if filter.OrgID != nil || filter.Organization != nil {
-		o, err := s.FindOrganization(ctx, influxdb.OrganizationFilter{
-			ID:   filter.OrgID,
-			Name: filter.Organization,
-		})
-
+	if filter.Organization != nil {
+		o, err := s.findOrganizationByName(ctx, tx, *filter.Organization)
 		if err != nil {
-			return nrs, 0, err
+			return nil, 0, &influxdb.Error{
+				Err: err,
+			}
 		}
 		filter.OrgID = &o.ID
 	}
+
+	// if filter.OrgID != nil || filter.Organization != nil {
+	// 	o, err := s.FindOrganization(ctx, influxdb.OrganizationFilter{
+	// 		ID:   filter.OrgID,
+	// 		Name: filter.Organization,
+	// 	})
+	//
+	// 	if err != nil {
+	// 		return nrs, 0, err
+	// 	}
+	// 	filter.OrgID = &o.ID
+	// }
 
 	var offset, limit, count int
 	var descending bool
@@ -252,7 +262,7 @@ func (s *Service) findNotificationEndpoints(ctx context.Context, tx Tx, filter i
 	}
 	filterFn := filterNotificationEndpointsFn(filter)
 	err := s.forEachNotificationEndpoint(ctx, tx, descending, func(nr *influxdb.NotificationEndpoint) bool {
-		if filterFn(nr) {
+		if filterFn(*nr) {
 			if count >= offset {
 				nrs = append(nrs, *nr)
 			}
@@ -308,16 +318,14 @@ func (s *Service) forEachNotificationEndpoint(ctx context.Context, tx Tx, descen
 	return nil
 }
 
-func filterNotificationEndpointsFn(filter influxdb.NotificationEndpointFilter) func(nr *influxdb.NotificationEndpoint) bool {
-	// if filter.OrgID != nil {
-	// 	return func(nr influxdb.NotificationEndpoint) bool {
-	// 		return nr.Get
-	// 		_, ok := idMap[nr.GetID()]
-	// 		return nr.GetOrgID() == *filter.OrgID && ok
-	// 	}
-	// }
+func filterNotificationEndpointsFn(filter influxdb.NotificationEndpointFilter) func(nr influxdb.NotificationEndpoint) bool {
+	if filter.OrgID != nil {
+		return func(nr influxdb.NotificationEndpoint) bool {
+			return nr.GetOrgID() == *filter.OrgID
+		}
+	}
 
-	return func(nr *influxdb.NotificationEndpoint) bool {
+	return func(nr influxdb.NotificationEndpoint) bool {
 		return true
 	}
 }
