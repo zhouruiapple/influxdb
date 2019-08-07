@@ -217,20 +217,6 @@ func (s *Service) FindNotificationEndpoints(ctx context.Context, filter influxdb
 func (s *Service) findNotificationEndpoints(ctx context.Context, tx Tx, filter influxdb.NotificationEndpointFilter, opt ...influxdb.FindOptions) ([]influxdb.NotificationEndpoint, int, error) {
 	nrs := make([]influxdb.NotificationEndpoint, 0)
 
-	// m, err := s.findUserResourceMappings(ctx, tx, filter.UserResourceMappingFilter)
-	// if err != nil {
-	// 	return nil, 0, err
-	// }
-	//
-	// if len(m) == 0 {
-	// 	return nrs, 0, nil
-	// }
-	//
-	// idMap := make(map[influxdb.ID]bool)
-	// for _, item := range m {
-	// 	idMap[item.ResourceID] = false
-	// }
-
 	if filter.Organization != nil {
 		o, err := s.findOrganizationByName(ctx, tx, *filter.Organization)
 		if err != nil {
@@ -240,18 +226,6 @@ func (s *Service) findNotificationEndpoints(ctx context.Context, tx Tx, filter i
 		}
 		filter.OrgID = &o.ID
 	}
-
-	// if filter.OrgID != nil || filter.Organization != nil {
-	// 	o, err := s.FindOrganization(ctx, influxdb.OrganizationFilter{
-	// 		ID:   filter.OrgID,
-	// 		Name: filter.Organization,
-	// 	})
-	//
-	// 	if err != nil {
-	// 		return nrs, 0, err
-	// 	}
-	// 	filter.OrgID = &o.ID
-	// }
 
 	var offset, limit, count int
 	var descending bool
