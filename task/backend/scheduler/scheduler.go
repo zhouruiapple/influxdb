@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/influxdata/influxdb"
-	cron "gopkg.in/robfig/cron.v2"
 )
 
 // ID duplicates the influxdb ID so users of the scheduler don't have to
@@ -20,20 +19,6 @@ type Checkpointer interface {
 
 	// Last stored checkpoint.
 	Last(ctx context.Context, id ID) (time.Time, error)
-}
-
-// Executor is a system used by the scheduler to actually execute the scheduleable item.
-type Executor interface {
-	// Execute is used to execute run's for any schedulable object.
-	// the executor can go through manual runs, clean currently running, and then create a new run based on `now`.
-	// if Now is zero we can just do the first 2 steps (This is how we would trigger manual runs).
-	// Errors returned from the execute request imply that this attempt has failed and
-	// should be put back in scheduler and re executed at a alter time. We will add scheduler specific errors
-	// so the time can be configurable.
-	Execute(ctx context.Context, id ID, scheduledAt time.Time) (Promise, error)
-
-	// Cancel is used to cancel a running execution
-	Cancel(ctx context.Context, promiseID ID) error
 }
 
 // Promise is the currently executing element from the a call to Execute.
@@ -59,6 +44,9 @@ type Schedulable interface {
 
 	// Schedule is the schedule you want execution.
 	Schedule() Schedule
+
+	// Since returns when to start scheduling.
+	Since() time.Time
 }
 
 // Schedule is a timing mechanism that helps us know when the next schedulable is due.
