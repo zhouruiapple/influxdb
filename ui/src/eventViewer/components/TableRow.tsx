@@ -1,5 +1,10 @@
+// Libraries
 import React, {FC, CSSProperties} from 'react'
 
+// Components
+import DefaultTableField from 'src/eventViewer/components/DefaultTableField'
+
+// Types
 import {Row, FieldComponents} from 'src/eventViewer/types'
 
 interface Props {
@@ -21,16 +26,12 @@ const TableRow: FC<Props> = ({
     <div style={style}>
       <div className="event-row">
         {fields.map(field => {
-          const Component = fieldComponents[field]
+          const Component = fieldComponents[field] || DefaultTableField
           const style = {flexBasis: `${fieldWidths[field]}px`}
 
           return (
             <div key={field} className="event-row--field" style={style}>
-              {Component ? (
-                <Component key={field} row={row} />
-              ) : (
-                String(row[field])
-              )}
+              <Component key={field} row={row} field={field} />
             </div>
           )
         })}

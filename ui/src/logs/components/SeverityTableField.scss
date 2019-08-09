@@ -1,0 +1,35 @@
+.severity-table-field {
+  font-weight: 600;
+}
+
+.severity-table-field--emerg {
+  color: $c-fire;
+}
+
+.severity-table-field--alert {
+  color: $c-fire;
+}
+
+.severity-table-field--crit {
+  color: $c-fire;
+}
+
+.severity-table-field--err {
+  color: $c-fire;
+}
+
+.severity-table-field--warning {
+  color: $c-tiger;
+}
+
+.severity-table-field--notice {
+  color: $c-pool;
+}
+
+.severity-table-field--info {
+  color: $c-pool;
+}
+
+.severity-table-field--debug {
+  color: $c-amethyst;
+}

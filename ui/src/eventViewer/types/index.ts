@@ -46,5 +46,5 @@ export interface EventViewerChildProps {
 }
 
 export interface FieldComponents {
-  [fieldName: string]: ComponentType<{row: Row}>
+  [fieldName: string]: ComponentType<{row: Row; field?: string}>
 }

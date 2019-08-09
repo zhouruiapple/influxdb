@@ -83,6 +83,7 @@ import NewCheckEO from 'src/alerting/components/NewCheckEO'
 import EditCheckEO from 'src/alerting/components/EditCheckEO'
 import NewRuleOverlay from 'src/alerting/components/notifications/NewRuleOverlay'
 import EditRuleOverlay from 'src/alerting/components/notifications/EditRuleOverlay'
+import LogsIndex from 'src/logs/components/LogsIndex'
 
 import {FeatureFlag} from 'src/shared/utils/featureFlag'
 
@@ -181,6 +182,7 @@ class Root extends PureComponent {
                               component={DEDeleteDataOverlay}
                             />
                           </Route>
+                          <Route path="logs" component={LogsIndex} />
                           <Route path="dashboards" component={DashboardsIndex}>
                             <Route
                               path="import"

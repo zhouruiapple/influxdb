@@ -95,3 +95,9 @@ $event-table--field-margin: $ix-marg-b;
   animation-iteration-count: infinite;
   animation-direction: alternate;
 }
+
+.default-table-field {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}

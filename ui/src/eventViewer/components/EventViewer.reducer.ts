@@ -58,7 +58,7 @@ export type Dispatch = ReactDispatch<Action>
 export const INITIAL_STATE: State = {
   rows: [],
   offset: 0,
-  limit: 100,
+  limit: 1000,
   now: null,
   nextRowsStatus: RemoteDataState.NotStarted,
   nextRowsErrorMessage: null,
