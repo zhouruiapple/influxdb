@@ -7,6 +7,7 @@ import (
 	stderrors "errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 
 	platform "github.com/influxdata/influxdb"
@@ -60,19 +61,42 @@ func CheckError(resp *http.Response) (err error) {
 			Msg:  fmt.Sprintf("unexpected status code: %d %s", resp.StatusCode, resp.Status),
 		}
 	}
-	pe := new(platform.Error)
 
-	var buf bytes.Buffer
+	var (
+		pe  = &platform.Error{}
+		buf bytes.Buffer
+	)
+
 	if _, err := io.Copy(&buf, resp.Body); err != nil {
 		return &platform.Error{
 			Code: platform.EInternal,
 			Msg:  err.Error(),
 		}
 	}
-	parseErr := json.Unmarshal(buf.Bytes(), pe)
-	if parseErr != nil {
-		return errors.Wrap(stderrors.New(buf.String()), parseErr.Error())
+
+	mtyp := resp.Header.Get("Content-Type")
+	if mtyp, _, err = mime.ParseMediaType(mtyp); err != nil {
+		// treat errors parsing media type as text/plain
+		mtyp = ""
 	}
+
+	switch mtyp {
+	case "application/json":
+		parseErr := json.Unmarshal(buf.Bytes(), pe)
+		if parseErr != nil {
+			return errors.Wrap(stderrors.New(buf.String()), parseErr.Error())
+		}
+	case "", "text/plain":
+		fallthrough
+	default:
+		var ok bool
+		pe.Err = errors.New(buf.String())
+		pe.Code, ok = platformErrorStatusCode[resp.StatusCode]
+		if !ok {
+			pe.Code = platform.EInternal
+		}
+	}
+
 	return pe
 }
 
@@ -121,6 +145,14 @@ func UnauthorizedError(ctx context.Context, h platform.HTTPErrorHandler, w http.
 		Msg:  "unauthorized access",
 	}, w)
 }
+
+func init() {
+	for k, v := range statusCodePlatformError {
+		platformErrorStatusCode[v] = k
+	}
+}
+
+var platformErrorStatusCode = map[int]string{}
 
 // statusCodePlatformError is the map convert platform.Error to error
 var statusCodePlatformError = map[string]int{
