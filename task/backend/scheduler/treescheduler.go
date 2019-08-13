@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/btree"
 	"github.com/influxdata/cron"
-	"github.com/influxdata/influxdb/task/backend"
 )
 
 const cancelTimeOut = 30 * time.Second
@@ -16,7 +15,7 @@ const cancelTimeOut = 30 * time.Second
 const defaultMaxRunsOutstanding = 1 << 16
 
 type runningItem struct {
-	cancel func()
+	cancel func(ctx context.Context)
 	runID  ID
 	taskID ID
 }
@@ -33,8 +32,9 @@ type TreeScheduler struct {
 	running   btree.BTree
 	nextTime  map[ID]int64 // we need this index so we can delete items from the scheduled
 	when      time.Time
-	executor  func(ctx context.Context, id ID, scheduledAt time.Time) (backend.RunPromise, error)
-	onErr     func(ctx context.Context, id ID, scheduledAt time.Time, err error) bool
+	executor  func(ctx context.Context, id ID, scheduledAt time.Time) (Promise, error)
+	onErr     func(ctx context.Context, taskID ID, runID ID, scheduledAt time.Time, err error) bool
+	time      Time
 	timer     *time.Timer
 	done      chan struct{}
 	sema      chan struct{}
@@ -54,30 +54,29 @@ func (s *TreeScheduler) clearTask(taskID ID) btree.ItemIterator {
 	}
 }
 
-// clearTask is a method for deleting a range of tasks.
-func (s *TreeScheduler) runs(taskID ID, limit int) btree.ItemIterator {
-
+// runs is a method for accumulating the running runs of a task.
+func (s *TreeScheduler) runs(taskID ID, limit int) (btree.ItemIterator, []ID) {
 	acc := make([]ID, 0, limit)
-
 	return func(i btree.Item) bool {
-		match := i.(runningItem).taskID == taskID
+		ritem := i.(runningItem)
+		match := ritem.taskID == taskID
 		if !match {
 			return false
 		}
-
+		acc = append(acc, ritem.runID)
 		return true
-	}
+	}, acc
 }
 
 const maxWaitTime = 1000000 * time.Hour
 
-type ExecutorFunc func(ctx context.Context, id ID, scheduledAt time.Time) (backend.RunPromise, error)
+type ExecutorFunc func(ctx context.Context, id ID, scheduledAt time.Time) (Promise, error)
 
-type ErrorFunc func(ctx context.Context, id ID, scheduledAt time.Time, err error) bool
+type ErrorFunc func(ctx context.Context, taskID ID, runID ID, scheduledAt time.Time, err error) bool
 
 type treeSchedulerOptFunc func(t *TreeScheduler) error
 
-func WithOnErrorFn(fn func(ctx context.Context, id ID, scheduledAt time.Time, err error) bool) treeSchedulerOptFunc {
+func WithOnErrorFn(fn ErrorFunc) treeSchedulerOptFunc {
 	return func(t *TreeScheduler) error {
 		t.onErr = fn
 		return nil
@@ -91,12 +90,19 @@ func WithMaxRunsOutsanding(n int) treeSchedulerOptFunc {
 	}
 }
 
+func WithTime(t Time) treeSchedulerOptFunc {
+	return func(t *TreeScheduler) error {
+		t.time = stdTime{}
+		return nil
+	}
+}
+
 // Executor is any function that accepts an ID, a time, and a duration.
 // OnErr is a function that takes am error, it is called when we cannot find a viable time before jan 1, 2100.  The default behavior is to drop the task on error.
 func NewScheduler(Executor ExecutorFunc, opts ...treeSchedulerOptFunc) (*TreeScheduler, error) {
 	s := &TreeScheduler{
 		executor: Executor,
-		onErr:    func(_ context.Context, _ ID, _ time.Time, _ error) bool { return true },
+		onErr:    func(_ context.Context, _ ID, _ ID, _ time.Time, _ error) bool { return true },
 		sema:     make(chan struct{}, defaultMaxRunsOutstanding),
 	}
 
@@ -137,51 +143,43 @@ func NewScheduler(Executor ExecutorFunc, opts ...treeSchedulerOptFunc) (*TreeSch
 				}
 				it := iti.(item)
 				if prom, err := s.executor(context.Background(), it.id, time.Unix(it.next, 0)); err == nil {
-					t, err := it.cron.Next(time.Unix(it.next, 0))
+					t, err := it.cron.Next(s.time.Unix(it.next, 0))
 					it.next = t.Unix()
 					// we need to return the item to the scheduled before calling s.onErr
 					if err != nil {
 						it.nonce++
-						s.onErr(context.TODO(), it.id, time.Unix(it.next, 0), err)
+						s.onErr(context.TODO(), it.id, prom.ID(), time.Unix(it.next, 0), err)
 					}
 					s.scheduled.ReplaceOrInsert(it)
 					if prom == nil {
 						break
 					}
-					run := prom.Run()
 					s.Lock()
-					s.running.ReplaceOrInsert(runningItem{cancel: prom.Cancel, runID: ID(run.RunID), taskID: ID(run.TaskID)})
+					s.running.ReplaceOrInsert(runningItem{cancel: prom.Cancel, runID: prom.ID(), taskID: ID(it.id)})
 					s.Unlock()
 
 					s.wg.Add(1)
 
 					s.sema <- struct{}{}
-					go func() {
+					go func(it item) {
 						defer func() {
 							s.wg.Done()
 							<-s.sema
 						}()
-						res, err := prom.Wait()
+						<-prom.Done()
+						err := prom.Error()
 						if err != nil {
-							s.onErr(context.TODO(), it.id, time.Unix(it.next, 0), err)
-						}
-						// belt and suspenders
-						if res == nil {
+							s.onErr(context.TODO(), it.id, prom.ID(), time.Unix(it.next, 0), err)
 							return
 						}
-						run := prom.Run()
 						s.Lock()
-						s.running.Delete(runningItem{cancel: prom.Cancel, runID: ID(run.RunID), taskID: ID(run.TaskID)})
+						s.running.Delete(runningItem{cancel: prom.Cancel, runID: ID(prom.ID()), taskID: ID(it.id)})
 						s.Unlock()
 
-						if err = res.Err(); err != nil {
-							s.onErr(context.TODO(), it.id, time.Unix(it.next, 0), err)
-							return
-						}
 						// TODO(docmerlin); handle statistics on the run
-					}()
+					}(it)
 				} else if err != nil {
-					s.onErr(context.Background(), it.id, time.Unix(it.next, 0), err)
+					s.onErr(context.Background(), it.id, 0, time.Unix(it.next, 0), err)
 				}
 			}
 		}
@@ -256,6 +254,9 @@ func (s *TreeScheduler) Schedule(id ID, cronString string, offset time.Duration,
 
 	if s.when.Before(nt) {
 		s.when = nt
+		if !s.timer.Stop() {
+			<-s.timer.C()
+		}
 		s.timer.Reset(time.Until(s.when))
 	}
 
@@ -270,11 +271,12 @@ func (s *TreeScheduler) Schedule(id ID, cronString string, offset time.Duration,
 	return nil
 }
 
-func (s *TreeScheduler) Runs(taskID ID) {
+func (s *TreeScheduler) Runs(taskID ID, limit int) []ID {
 	s.RLock()
 	defer s.RUnlock()
-	s.running.AscendGreaterOrEqual(runningItem{taskID: 0})
-
+	iter, acc := s.runs(taskID, limit)
+	s.running.AscendGreaterOrEqual(runningItem{taskID: 0}, iter)
+	return acc
 }
 
 // Item is a task in the scheduler.

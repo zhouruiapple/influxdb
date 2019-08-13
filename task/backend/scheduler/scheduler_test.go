@@ -6,8 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/influxdata/influxdb/task/backend"
-
 	"github.com/influxdata/influxdb/task/backend/scheduler"
 )
 
@@ -15,10 +13,11 @@ type mockExecutor struct {
 	sync.Mutex
 }
 
-func (e *mockExecutor) Execute(ctx context.Context, id scheduler.ID, scheduledAt time.Time) (backend.RunPromise, error) {
+func (e *mockExecutor) Execute(ctx context.Context, id scheduler.ID, scheduledAt time.Time) (scheduler.Promise, error) {
 	select {
 	case <-ctx.Done():
 	}
+	return nil, nil
 }
 
 func TestSchedule_Next(t *testing.T) {

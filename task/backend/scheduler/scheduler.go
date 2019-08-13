@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/influxdata/cron"
 	"github.com/influxdata/influxdb"
 )
 
@@ -16,9 +17,6 @@ type ID influxdb.ID
 type Checkpointer interface {
 	// Checkpoint saves the last checkpoint a id has reached.
 	Checkpoint(ctx context.Context, id ID, t time.Time) error
-
-	// Last stored checkpoint.
-	Last(ctx context.Context, id ID) (time.Time, error)
 }
 
 // Promise is the currently executing element from the a call to Execute.
@@ -58,18 +56,17 @@ type Schedule struct {
 // Valid check to see if the schedule has a valid schedule string.
 // Valid schedule strings are a cron syntax `* * * * *` or `@every 1s`.
 func (s Schedule) Valid() error {
-	_, err := cron.Parse(s.Schedule)
+	_, err := cron.ParseUTC(s.Schedule)
 	return err
 }
 
 // Next returns the next time a schedule needs to run after checkpoint time.
 func (s Schedule) Next(checkpoint time.Time) (time.Time, error) {
-	sch, err := cron.Parse(s.Schedule)
+	sch, err := cron.ParseUTC(s.Schedule)
 	if err != nil {
 		return time.Time{}, err
 	}
-	nextScheduled := sch.Next(checkpoint)
-	return nextScheduled.Add(s.Offset), nil
+	return sch.Next(checkpoint)
 }
 
 // Scheduler is a example interface of a Scheduler.
