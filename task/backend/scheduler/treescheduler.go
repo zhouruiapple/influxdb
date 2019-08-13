@@ -39,6 +39,8 @@ type TreeScheduler struct {
 	done      chan struct{}
 	sema      chan struct{}
 	wg        sync.WaitGroup
+
+	sm *SchedulerMetrics
 }
 
 // clearTask is a method for deleting a range of tasks.
@@ -99,7 +101,7 @@ func WithTime(t Time) treeSchedulerOptFunc {
 
 // Executor is any function that accepts an ID, a time, and a duration.
 // OnErr is a function that takes am error, it is called when we cannot find a viable time before jan 1, 2100.  The default behavior is to drop the task on error.
-func NewScheduler(Executor ExecutorFunc, opts ...treeSchedulerOptFunc) (*TreeScheduler, error) {
+func NewScheduler(Executor ExecutorFunc, opts ...treeSchedulerOptFunc) (*TreeScheduler, *SchedulerMetrics, error) {
 	s := &TreeScheduler{
 		executor: Executor,
 		onErr:    func(_ context.Context, _ ID, _ ID, _ time.Time, _ error) bool { return true },
@@ -113,10 +115,11 @@ func NewScheduler(Executor ExecutorFunc, opts ...treeSchedulerOptFunc) (*TreeSch
 		}
 	}
 
+	s.sm = NewSchedulerMetrics(s)
 	s.when = time.Now().Add(maxWaitTime)
 	s.timer = time.NewTimer(time.Until(s.when)) //time.Until(s.when))
 	if Executor == nil {
-		return nil, errors.New("Executor must be a nnon-nil function")
+		return nil, errors.New("Executor must be a non-nil function")
 	}
 	go func() {
 		for {
@@ -142,6 +145,7 @@ func NewScheduler(Executor ExecutorFunc, opts ...treeSchedulerOptFunc) (*TreeSch
 					continue
 				}
 				it := iti.(item)
+				s.sm.startExecution(it.id, time.Since(time.Unix(it.next, 0)))
 				if prom, err := s.executor(context.Background(), it.id, time.Unix(it.next, 0)); err == nil {
 					t, err := it.cron.Next(s.time.Unix(it.next, 0))
 					it.next = t.Unix()
@@ -176,6 +180,12 @@ func NewScheduler(Executor ExecutorFunc, opts ...treeSchedulerOptFunc) (*TreeSch
 						s.running.Delete(runningItem{cancel: prom.Cancel, runID: ID(prom.ID()), taskID: ID(it.id)})
 						s.Unlock()
 
+						s.sm.finishExecution(it.id, res.Err() == nil, time.Since(time.Unix(it.next, 0)))
+
+						if err = res.Err(); err != nil {
+							s.onErr(context.TODO(), it.id, time.Unix(it.next, 0), err)
+							return
+						}
 						// TODO(docmerlin); handle statistics on the run
 					}(it)
 				} else if err != nil {
@@ -212,6 +222,7 @@ func (s *TreeScheduler) When() time.Time {
 // Release also cancels the running task.
 // Task deletion would be faster if the tree supported deleting ranges.
 func (s *TreeScheduler) Release(taskID ID) error {
+	s.sm.release(taskID)
 	s.Lock()
 	defer s.Unlock()
 	nextTime, ok := s.nextTime[taskID]
@@ -231,6 +242,7 @@ func (s *TreeScheduler) Release(taskID ID) error {
 
 // put puts an Item on the TreeScheduler.
 func (s *TreeScheduler) Schedule(id ID, cronString string, offset time.Duration, since time.Time) error {
+	s.sm.schedule(taskID)
 	crSch, err := cron.ParseUTC(cronString)
 	if err != nil {
 		return err
