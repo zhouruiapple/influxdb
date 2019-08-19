@@ -93,4 +93,6 @@ var FluxEndToEndSkipList = map[string]string{
 
 	"to_int":  "dateTime conversion issue: https://github.com/influxdata/influxdb/issues/14575",
 	"to_uint": "dateTime conversion issue: https://github.com/influxdata/influxdb/issues/14575",
+
+	"check": "option scoping issue: https://github.com/influxdata/flux/issues/1720",
 }
