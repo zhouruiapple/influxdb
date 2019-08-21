@@ -1473,8 +1473,9 @@ func (is IndexSet) measurementNamesByTagFilter(auth query.Authorizer, op influxq
 			continue
 		}
 		tagMatch = false
+
 		// Authorization must be explicitly granted when an authorizer is present.
-		authorized = query.AuthorizerIsOpen(auth)
+		authorized = AuthIsOpenOrDBLevel(auth, influxql.ReadPrivilege, is.Database())
 
 		vitr, err := is.tagValueIterator(me, []byte(key))
 		if err != nil {
@@ -1495,7 +1496,7 @@ func (is IndexSet) measurementNamesByTagFilter(auth query.Authorizer, op influxq
 				}
 
 				tagMatch = true
-				if query.AuthorizerIsOpen(auth) {
+				if authorized {
 					break
 				}
 
@@ -1568,7 +1569,7 @@ func (is IndexSet) measurementNamesByTagFilter(auth query.Authorizer, op influxq
 // measurementAuthorizedSeries determines if the measurement contains a series
 // that is authorized to be read.
 func (is IndexSet) measurementAuthorizedSeries(auth query.Authorizer, name []byte) bool {
-	if query.AuthorizerIsOpen(auth) {
+	if AuthIsOpenOrDBLevel(auth, influxql.ReadPrivilege, is.Database()) {
 		return true
 	}
 
@@ -1694,8 +1695,10 @@ func (is IndexSet) tagValueIterator(name, key []byte) (TagValueIterator, error) 
 // TagKeyHasAuthorizedSeries determines if there exists an authorized series for
 // the provided measurement name and tag key.
 func (is IndexSet) TagKeyHasAuthorizedSeries(auth query.Authorizer, name, tagKey []byte) (bool, error) {
-	if !is.HasInmemIndex() && query.AuthorizerIsOpen(auth) {
-		return true, nil
+	if !is.HasInmemIndex() {
+		if AuthIsOpenOrDBLevel(auth, influxql.ReadPrivilege, is.Database()) {
+			return true, nil
+		}
 	}
 
 	release := is.SeriesFile.Retain()
@@ -1720,7 +1723,7 @@ func (is IndexSet) TagKeyHasAuthorizedSeries(auth query.Authorizer, name, tagKey
 			return false, nil
 		}
 
-		if query.AuthorizerIsOpen(auth) {
+		if AuthIsOpenOrDBLevel(auth, influxql.ReadPrivilege, is.Database()) {
 			return true, nil
 		}
 
@@ -2459,8 +2462,7 @@ func (is IndexSet) MeasurementTagKeyValuesByExpr(auth query.Authorizer, name []b
 			}
 			defer vitr.Close()
 
-			// If no authorizer present then return all values.
-			if query.AuthorizerIsOpen(auth) {
+			if AuthIsOpenOrDBLevel(auth, influxql.ReadPrivilege, is.Database()) {
 				for {
 					val, err := vitr.Next()
 					if err != nil {
@@ -2733,3 +2735,9 @@ type byTagKey []*query.TagSet
 func (t byTagKey) Len() int           { return len(t) }
 func (t byTagKey) Less(i, j int) bool { return bytes.Compare(t[i].Key, t[j].Key) < 0 }
 func (t byTagKey) Swap(i, j int)      { t[i], t[j] = t[j], t[i] }
+
+// AuthIsOpenOrDBLevel returns true if the authorizer is open OR
+// if the authorizer doesn't support series level auth AND auth is successful at the DB level
+func AuthIsOpenOrDBLevel(a query.Authorizer, p influxql.Privilege, dbname string) bool {
+	return query.AuthorizerIsOpen(a) || (!a.CanAuthorizeSeries() && a.AuthorizeDatabase(influxql.ReadPrivilege, dbname))
+}

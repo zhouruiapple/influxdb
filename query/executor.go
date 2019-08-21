@@ -76,6 +76,9 @@ type Authorizer interface {
 	// AuthorizeQuery returns an error if the query cannot be executed
 	AuthorizeQuery(database string, query *influxql.Query) error
 
+	// CanAuthorizeSeries returns true if the authorizor can authorize with series level granularity.
+	CanAuthorizeSeries() bool
+
 	// AuthorizeSeriesRead determines if a series is authorized for reading
 	AuthorizeSeriesRead(database string, measurement []byte, tags models.Tags) bool
 
@@ -92,6 +95,9 @@ var OpenAuthorizer = openAuthorizer{}
 
 // AuthorizeDatabase returns true to allow any operation on a database.
 func (a openAuthorizer) AuthorizeDatabase(influxql.Privilege, string) bool { return true }
+
+// CanAuthorizeSeries returns false because openAuthorizer can't auth with series granularity.
+func (a openAuthorizer) CanAuthorizeSeries() bool { return false }
 
 // AuthorizeSeriesRead allows accesss to any series.
 func (a openAuthorizer) AuthorizeSeriesRead(database string, measurement []byte, tags models.Tags) bool {

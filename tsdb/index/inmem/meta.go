@@ -102,7 +102,8 @@ func (m *measurement) Authorized(auth query.Authorizer) bool {
 			continue
 		}
 
-		if query.AuthorizerIsOpen(auth) || auth.AuthorizeSeriesRead(m.Database, m.NameBytes, s.Tags) {
+		if tsdb.AuthIsOpenOrDBLevel(auth, influxql.ReadPrivilege, m.Database) ||
+			auth.AuthorizeSeriesRead(m.Database, m.NameBytes, s.Tags) {
 			return true
 		}
 	}
@@ -1429,7 +1430,7 @@ func (m *measurement) TagValues(auth query.Authorizer, key string) []string {
 	values := make([]string, 0, m.seriesByTagKeyValue[key].Cardinality())
 
 	m.seriesByTagKeyValue[key].RangeAll(func(k string, a seriesIDs) {
-		if query.AuthorizerIsOpen(auth) {
+		if tsdb.AuthIsOpenOrDBLevel(auth, influxql.ReadPrivilege, m.Database) {
 			values = append(values, k)
 		} else {
 			for _, sid := range a {

@@ -1595,6 +1595,13 @@ func (ui *UserInfo) AuthorizeDatabase(privilege influxql.Privilege, database str
 	return ok && (p == privilege || p == influxql.AllPrivileges)
 }
 
+// CanAuthorizeSeries returns false bacause this authorizer doesn't have the capability of
+// authorizing at the series level (i.e., attempting to do so will always result in authorization
+// being given).
+func (u *UserInfo) CanAuthorizeSeries() bool {
+	return false
+}
+
 // AuthorizeSeriesRead is used to limit access per-series (enterprise only)
 func (u *UserInfo) AuthorizeSeriesRead(database string, measurement []byte, tags models.Tags) bool {
 	return true

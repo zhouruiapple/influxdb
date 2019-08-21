@@ -391,7 +391,7 @@ func (i *Index) TagKeyHasAuthorizedSeries(auth query.Authorizer, name []byte, ke
 	// and tag key.
 	var authorized bool
 	mm.SeriesByTagKeyValue(key).Range(func(_ string, sIDs seriesIDs) bool {
-		if query.AuthorizerIsOpen(auth) {
+		if tsdb.AuthIsOpenOrDBLevel(auth, influxql.ReadPrivilege, mm.Database) {
 			authorized = true
 			return false
 		}
@@ -666,7 +666,7 @@ func (i *Index) measurementNamesByTagFilters(auth query.Authorizer, filter *TagF
 
 		tagMatch = false
 		// Authorization must be explicitly granted when an authorizer is present.
-		authorized = query.AuthorizerIsOpen(auth)
+		authorized = tsdb.AuthIsOpenOrDBLevel(auth, influxql.ReadPrivilege, i.Database())
 
 		// Check the tag values belonging to the tag key for equivalence to the
 		// tag value being filtered on.
@@ -676,7 +676,7 @@ func (i *Index) measurementNamesByTagFilters(auth query.Authorizer, filter *TagF
 			}
 
 			tagMatch = true
-			if query.AuthorizerIsOpen(auth) {
+			if authorized {
 				return false // No need to continue checking series, there is a match.
 			}
 
