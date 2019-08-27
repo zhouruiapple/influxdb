@@ -155,7 +155,7 @@ func TestPipeline_QueryMemoryLimits(t *testing.T) {
 	}
 }
 
-func TestPipeline_Query_Buckets(t *testing.T) {
+func TestPipeline_Query_Auth_Buckets(t *testing.T) {
 	l := launcher.RunTestLauncherOrFail(t, ctx)
 	l.SetupOrFail(t)
 	defer l.ShutdownOrFail(t, ctx)
@@ -280,6 +280,231 @@ buckets()
 		if err := l.QueryAndNopConsume(ctx, req); err == nil {
 			t.Error("expected error")
 		} else if got, want := influxdb.ErrorCode(err), influxdb.ENotFound; got != want {
+			t.Errorf("unexpected error code -want/+got:\n\t- %v\n\t+ %v", got, want)
+		}
+	})
+}
+
+func TestPipeline_Query_Auth_From(t *testing.T) {
+	l := launcher.RunTestLauncherOrFail(t, ctx)
+	l.SetupOrFail(t)
+	defer l.ShutdownOrFail(t, ctx)
+
+	// write one point so we can read something.
+	l.WritePointsOrFail(t, fmt.Sprintf(`m,k=v1 f=%di %d`, 0, time.Now().UnixNano()))
+
+	t.Run("Success_Bucket", func(t *testing.T) {
+		// read from the bucket.
+		req := &query.Request{
+			Authorization:  l.Auth,
+			OrganizationID: l.Org.ID,
+			Compiler: lang.FluxCompiler{
+				Query: fmt.Sprintf(`
+from(bucket: "%s")
+	|> range(start: -5m)
+`, l.Bucket.Name),
+			},
+		}
+
+		if err := l.QueryAndNopConsume(ctx, req); err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+	})
+
+	t.Run("Success_BucketID", func(t *testing.T) {
+		// read from the bucket.
+		req := &query.Request{
+			Authorization:  l.Auth,
+			OrganizationID: l.Org.ID,
+			Compiler: lang.FluxCompiler{
+				Query: fmt.Sprintf(`
+from(bucketID: "%s")
+	|> range(start: -5m)
+`, l.Bucket.ID),
+			},
+		}
+
+		if err := l.QueryAndNopConsume(ctx, req); err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+	})
+
+	auth := &influxdb.Authorization{
+		OrgID:  l.Org.ID,
+		UserID: l.User.ID,
+		Permissions: []influxdb.Permission{
+			{
+				Action: influxdb.WriteAction,
+				Resource: influxdb.Resource{
+					Type:  influxdb.BucketsResourceType,
+					ID:    &l.Bucket.ID,
+					OrgID: &l.Org.ID,
+				},
+			},
+		},
+	}
+	if err := l.AuthorizationService().CreateAuthorization(ctx, auth); err != nil {
+		t.Fatalf("unexpected error creating authorization: %s", err)
+	}
+	l.Auth = auth
+
+	t.Run("Forbidden_Bucket", func(t *testing.T) {
+		l := *l
+
+		// read from the bucket.
+		req := &query.Request{
+			Authorization:  l.Auth,
+			OrganizationID: l.Org.ID,
+			Compiler: lang.FluxCompiler{
+				Query: fmt.Sprintf(`
+from(bucket: "%s")
+	|> range(start: -5m)
+`, l.Bucket.Name),
+			},
+		}
+
+		if err := l.QueryAndNopConsume(ctx, req); err == nil {
+			t.Fatal("expected error")
+		} else if got, want := influxdb.ErrorCode(err), influxdb.ENotFound; got != want {
+			t.Errorf("unexpected error code -want/+got:\n\t- %v\n\t+ %v", got, want)
+		}
+	})
+
+	t.Run("Forbidden_BucketID", func(t *testing.T) {
+		l := *l
+
+		// read from the bucket.
+		req := &query.Request{
+			Authorization:  l.Auth,
+			OrganizationID: l.Org.ID,
+			Compiler: lang.FluxCompiler{
+				Query: fmt.Sprintf(`
+from(bucketID: "%s")
+	|> range(start: -5m)
+`, l.Bucket.ID),
+			},
+		}
+
+		if err := l.QueryAndNopConsume(ctx, req); err == nil {
+			t.Fatal("expected error")
+		} else if got, want := influxdb.ErrorCode(err), influxdb.ENotFound; got != want {
+			t.Errorf("unexpected error code -want/+got:\n\t- %v\n\t+ %v", got, want)
+		}
+	})
+}
+
+func TestPipeline_Query_Auth_WritePoints(t *testing.T) {
+	l := launcher.RunTestLauncherOrFail(t, ctx)
+	l.SetupOrFail(t)
+	defer l.ShutdownOrFail(t, ctx)
+
+	// write one point so we can read something.
+	l.WritePointsOrFail(t, fmt.Sprintf(`m,k=v1 f=%di %d`, 5, time.Now().UnixNano()))
+
+	t.Run("Success_Bucket", func(t *testing.T) {
+		req := &query.Request{
+			Authorization:  l.Auth,
+			OrganizationID: l.Org.ID,
+			Compiler: lang.FluxCompiler{
+				Query: fmt.Sprintf(`
+from(bucket: "%s")
+	|> range(start: -5m)
+	|> filter(fn: (r) => r._measurement == "m" and r._field == "f")
+	|> map(fn: (r) => ({r with _measurement: "w", _value: r._value * 2}))
+	|> to(bucket: "%s")
+`, l.Bucket.Name, l.Bucket.Name),
+			},
+		}
+
+		if err := l.QueryAndNopConsume(ctx, req); err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+	})
+
+	t.Run("Success_BucketID", func(t *testing.T) {
+		req := &query.Request{
+			Authorization:  l.Auth,
+			OrganizationID: l.Org.ID,
+			Compiler: lang.FluxCompiler{
+				Query: fmt.Sprintf(`
+from(bucket: "%s")
+	|> range(start: -5m)
+	|> filter(fn: (r) => r._measurement == "m" and r._field == "f")
+	|> map(fn: (r) => ({r with _measurement: "w", _value: r._value * 2}))
+	|> to(bucketID: "%s")
+`, l.Bucket.Name, l.Bucket.ID),
+			},
+		}
+
+		if err := l.QueryAndNopConsume(ctx, req); err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+	})
+
+	auth := &influxdb.Authorization{
+		OrgID:  l.Org.ID,
+		UserID: l.User.ID,
+		Permissions: []influxdb.Permission{
+			{
+				// No write permission on the bucket.
+				Action: influxdb.ReadAction,
+				Resource: influxdb.Resource{
+					Type:  influxdb.BucketsResourceType,
+					ID:    &l.Bucket.ID,
+					OrgID: &l.Org.ID,
+				},
+			},
+		},
+	}
+	if err := l.AuthorizationService().CreateAuthorization(ctx, auth); err != nil {
+		t.Fatalf("unexpected error creating authorization: %s", err)
+	}
+	l.Auth = auth
+
+	t.Run("Forbidden_Bucket", func(t *testing.T) {
+		l := *l
+
+		req := &query.Request{
+			Authorization:  l.Auth,
+			OrganizationID: l.Org.ID,
+			Compiler: lang.FluxCompiler{
+				Query: fmt.Sprintf(`
+from(bucket: "%s")
+	|> range(start: -5m)
+	|> filter(fn: (r) => r._measurement == "m" and r._field == "f")
+	|> map(fn: (r) => ({r with _measurement: "forbidden", _value: r._value * 2}))
+	|> to(bucket: "%s")
+`, l.Bucket.Name, l.Bucket.Name),
+			},
+		}
+
+		if err := l.QueryAndNopConsume(ctx, req); err == nil {
+			t.Fatal("expected error")
+		} else if got, want := influxdb.ErrorCode(err), influxdb.EUnauthorized; got != want {
+			t.Errorf("unexpected error code -want/+got:\n\t- %v\n\t+ %v", got, want)
+		}
+	})
+
+	t.Run("Forbidden_BucketID", func(t *testing.T) {
+		l := *l
+
+		req := &query.Request{
+			Authorization:  l.Auth,
+			OrganizationID: l.Org.ID,
+			Compiler: lang.FluxCompiler{
+				Query: fmt.Sprintf(`
+from(bucket: "%s")
+	|> range(start: -5m)
+	|> filter(fn: (r) => r._measurement == "m" and r._field == "f")
+	|> map(fn: (r) => ({r with _measurement: "forbidden", _value: r._value * 2}))
+	|> to(bucketID: "%s")
+`, l.Bucket.Name, l.Bucket.ID),
+			},
+		}
+
+		if err := l.QueryAndNopConsume(ctx, req); err == nil {
+			t.Fatal("expected error")
+		} else if got, want := influxdb.ErrorCode(err), influxdb.EUnauthorized; got != want {
 			t.Errorf("unexpected error code -want/+got:\n\t- %v\n\t+ %v", got, want)
 		}
 	})
