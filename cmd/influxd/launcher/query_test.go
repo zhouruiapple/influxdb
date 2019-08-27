@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"io"
 	nethttp "net/http"
+	"sort"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/influxdata/flux"
 	"github.com/influxdata/flux/execute"
 	"github.com/influxdata/flux/lang"
@@ -19,6 +21,7 @@ import (
 	"github.com/influxdata/influxdb/cmd/influxd/launcher"
 	phttp "github.com/influxdata/influxdb/http"
 	"github.com/influxdata/influxdb/query"
+	_ "github.com/influxdata/influxdb/query/builtin"
 )
 
 func TestPipeline_Write_Query_FieldKey(t *testing.T) {
@@ -150,6 +153,136 @@ func TestPipeline_QueryMemoryLimits(t *testing.T) {
 	} else {
 		t.Fatal("expected error, got successful query execution")
 	}
+}
+
+func TestPipeline_Query_Buckets(t *testing.T) {
+	l := launcher.RunTestLauncherOrFail(t, ctx)
+	l.SetupOrFail(t)
+	defer l.ShutdownOrFail(t, ctx)
+
+	// create a few buckets.
+	want := []string{l.Bucket.Name}
+	for i := 0; i < 3; i++ {
+		b := &influxdb.Bucket{
+			OrgID: l.Org.ID,
+			Name:  fmt.Sprintf("testbucket%d", i),
+		}
+		if err := l.BucketService().CreateBucket(ctx, b); err != nil {
+			t.Fatalf("unexpected create bucket error: %s", err)
+		}
+		want = append(want, b.Name)
+	}
+	sort.Strings(want)
+
+	// construct the request we will continue to use for the tests.
+	req := &query.Request{
+		Authorization:  l.Auth,
+		OrganizationID: l.Org.ID,
+		Compiler: lang.FluxCompiler{
+			Query: `
+buckets()
+`,
+		},
+	}
+
+	getBucketNames := func(buckets *[]string) func(res flux.Result) error {
+		return func(res flux.Result) error {
+			start := len(*buckets)
+			if err := res.Tables().Do(func(tbl flux.Table) error {
+				return tbl.Do(func(cr flux.ColReader) error {
+					j := execute.ColIdx("name", cr.Cols())
+					if j == -1 {
+						return errors.New("no column named \"name\"")
+					}
+
+					vs := cr.Strings(j)
+					for i := 0; i < vs.Len(); i++ {
+						*buckets = append(*buckets, vs.ValueString(i))
+					}
+					return nil
+				})
+			}); err != nil {
+				return err
+			}
+			sort.Strings((*buckets)[start:])
+			return nil
+		}
+	}
+
+	// All permissions.
+	t.Run("All", func(t *testing.T) {
+		var got []string
+		if err := l.QueryAndConsume(ctx, req, getBucketNames(&got)); err != nil {
+			t.Errorf("unexpected error: %s", err)
+		}
+
+		if !cmp.Equal(want, got) {
+			t.Errorf("unexpected bucket names -want/+got:\n%s", cmp.Diff(want, got))
+		}
+	})
+
+	t.Run("Partial", func(t *testing.T) {
+		l := *l
+
+		auth := &influxdb.Authorization{
+			OrgID:  l.Org.ID,
+			UserID: l.User.ID,
+			Permissions: []influxdb.Permission{
+				{
+					Action: influxdb.ReadAction,
+					Resource: influxdb.Resource{
+						Type:  influxdb.BucketsResourceType,
+						ID:    &l.Bucket.ID,
+						OrgID: &l.Org.ID,
+					},
+				},
+			},
+		}
+		if err := l.AuthorizationService().CreateAuthorization(ctx, auth); err != nil {
+			t.Fatalf("unexpected error creating authorization: %s", err)
+		}
+		l.Auth = auth
+
+		var got []string
+		if err := l.QueryAndConsume(ctx, req, getBucketNames(&got)); err != nil {
+			t.Errorf("unexpected error: %s", err)
+		}
+
+		want := []string{l.Bucket.Name}
+		if !cmp.Equal(want, got) {
+			t.Errorf("unexpected bucket names -want/+got:\n%s", cmp.Diff(want, got))
+		}
+	})
+
+	t.Run("None", func(t *testing.T) {
+		l := *l
+
+		auth := &influxdb.Authorization{
+			OrgID:  l.Org.ID,
+			UserID: l.User.ID,
+			Permissions: []influxdb.Permission{
+				{
+					// No read permission on any bucket.
+					Action: influxdb.WriteAction,
+					Resource: influxdb.Resource{
+						Type:  influxdb.BucketsResourceType,
+						ID:    &l.Bucket.ID,
+						OrgID: &l.Org.ID,
+					},
+				},
+			},
+		}
+		if err := l.AuthorizationService().CreateAuthorization(ctx, auth); err != nil {
+			t.Fatalf("unexpected error creating authorization: %s", err)
+		}
+		l.Auth = auth
+
+		if err := l.QueryAndNopConsume(ctx, req); err == nil {
+			t.Error("expected error")
+		} else if got, want := influxdb.ErrorCode(err), influxdb.ENotFound; got != want {
+			t.Errorf("unexpected error code -want/+got:\n\t- %v\n\t+ %v", got, want)
+		}
+	})
 }
 
 func TestPipeline_Query_LoadSecret_Success(t *testing.T) {
