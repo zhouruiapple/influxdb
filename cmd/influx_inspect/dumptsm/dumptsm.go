@@ -121,6 +121,9 @@ func (cmd *Command) dump() error {
 				if cmd.filterKey != "" && !strings.Contains(string(key), cmd.filterKey) {
 					continue
 				}
+
+				measurement = fmt.Sprintf("%x%s", measurement[:16], measurement[16:])
+
 				fmt.Fprintln(tw, "  "+strings.Join([]string{
 					strconv.FormatInt(int64(pos), 10),
 					time.Unix(0, e.MinTime).UTC().Format(time.RFC3339Nano),
