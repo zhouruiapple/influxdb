@@ -10,6 +10,7 @@ import (
 	_ "net/http/pprof" // needed to add pprof to our binary.
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"time"
 
@@ -130,6 +131,18 @@ func buildLauncherCommand(l *Launcher, cmd *cobra.Command) {
 			Desc:    fmt.Sprintf("supported tracing types are %s, %s", LogTracing, JaegerTracing),
 		},
 		{
+			DestP:   &l.blockProfileRate,
+			Flag:    "block-profile-rate",
+			Default: 100 * time.Millisecond,
+			Desc:    "block profile sample rate",
+		},
+		{
+			DestP:   &l.mutexProfileFraction,
+			Flag:    "mutex-profile-fraction",
+			Default: 1,
+			Desc:    "mutex profile fraction",
+		},
+		{
 			DestP:   &l.httpBindAddress,
 			Flag:    "http-bind-address",
 			Default: ":9999",
@@ -207,9 +220,11 @@ type Launcher struct {
 	sessionLength        int // in minutes
 	sessionRenewDisabled bool
 
-	logLevel          string
-	tracingType       string
-	reportingDisabled bool
+	logLevel             string
+	tracingType          string
+	blockProfileRate     time.Duration
+	mutexProfileFraction int
+	reportingDisabled    bool
 
 	httpBindAddress string
 	boltPath        string
@@ -365,6 +380,14 @@ func (m *Launcher) run(ctx context.Context) (err error) {
 		zap.String("commit", info.Commit),
 		zap.String("build_date", info.Date),
 	)
+
+	// If mutex/block profiles enabled then switch them on.
+	if m.mutexProfileFraction > 0 {
+		runtime.SetMutexProfileFraction(m.mutexProfileFraction)
+	}
+	if m.blockProfileRate > 0 {
+		runtime.SetBlockProfileRate(int(m.blockProfileRate))
+	}
 
 	switch m.tracingType {
 	case LogTracing:
