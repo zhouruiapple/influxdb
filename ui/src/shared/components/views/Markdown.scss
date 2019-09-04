@@ -7,6 +7,9 @@
   position: absolute !important;
   top: 0;
   left: 0;
+  background-color: $g2-kevlar;
+  border-radius: $ix-radius;
+  border-top: 26px solid $g2-kevlar;
 }
 
 .markdown-cell--contents {
@@ -72,6 +75,7 @@
   }
 
   code {
+    background-color: $g1-raven;
     border-radius: 3px;
     margin: 0;
     padding: 2px 6px;
@@ -81,6 +85,7 @@
   }
 
   pre {
+    background-color: $g1-raven;
     border-radius: 3px;
     padding: 6px;
 

@@ -10,6 +10,7 @@ import ViewComponent from 'src/shared/components/cells/View'
 import {ErrorHandling} from 'src/shared/decorators/errors'
 import {SpinnerContainer} from '@influxdata/clockface'
 import EmptyGraphMessage from 'src/shared/components/EmptyGraphMessage'
+import GradientBorder from 'src/shared/components/cells/GradientBorder'
 
 // Utils
 import {getView, getCheckForView, getViewStatus} from 'src/dashboards/selectors'
@@ -75,6 +76,7 @@ class CellComponent extends Component<Props, State> {
         <div className="cell--view" data-testid="cell--view-empty">
           {this.view}
         </div>
+        <GradientBorder />
       </>
     )
   }
@@ -86,7 +88,7 @@ class CellComponent extends Component<Props, State> {
       return view.name
     }
 
-    return ''
+    return 'Note'
   }
 
   private get viewNote(): string {

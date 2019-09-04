@@ -3,6 +3,7 @@
   ------------------------------------------------------
 */
 
+$gradient-border--radius: $ix-radius;
 $gradient-border--start: $c-pool;
 $gradient-border--stop: $c-comet;
 $gradient-border--mid: mix($gradient-border--start, $gradient-border--stop);
@@ -39,21 +40,21 @@ $gradient-border--mid: mix($gradient-border--start, $gradient-border--stop);
   z-index: 2;
   top: 0;
   left: 0;
-  border-top-left-radius: $ix-radius;
+  border-top-left-radius: $gradient-border--radius;
   border-top: $ix-border solid $gradient-border--start;
   border-left: $ix-border solid $gradient-border--start;
 
   &:before {
     top: -$ix-border;
     height: $ix-border;
-    left: $ix-radius;
-    width: calc(200% - #{$ix-radius * 2});
+    left: $gradient-border--radius;
+    width: calc(200% - #{$gradient-border--radius * 2});
     @include gradient-h($gradient-border--start, $gradient-border--mid);
   }
 
   &:after {
-    top: $ix-radius;
-    height: calc(200% - #{$ix-radius * 2});
+    top: $gradient-border--radius;
+    height: calc(200% - #{$gradient-border--radius * 2});
     left: -$ix-border;
     width: $ix-border;
     @include gradient-v($gradient-border--start, $gradient-border--mid);
@@ -63,7 +64,7 @@ $gradient-border--mid: mix($gradient-border--start, $gradient-border--stop);
 .gradient-border--top-right {
   top: 0;
   right: 0;
-  border-top-right-radius: $ix-radius;
+  border-top-right-radius: $gradient-border--radius;
   border-top: $ix-border solid $gradient-border--mid;
   border-right: $ix-border solid $gradient-border--mid;
 }
@@ -71,7 +72,7 @@ $gradient-border--mid: mix($gradient-border--start, $gradient-border--stop);
 .gradient-border--bottom-left {
   bottom: 0;
   left: 0;
-  border-bottom-left-radius: $ix-radius;
+  border-bottom-left-radius: $gradient-border--radius;
   border-bottom: $ix-border solid $gradient-border--mid;
   border-left: $ix-border solid $gradient-border--mid;
 }
@@ -80,21 +81,21 @@ $gradient-border--mid: mix($gradient-border--start, $gradient-border--stop);
   z-index: 2;
   bottom: 0;
   right: 0;
-  border-bottom-right-radius: $ix-radius;
+  border-bottom-right-radius: $gradient-border--radius;
   border-bottom: $ix-border solid $gradient-border--stop;
   border-right: $ix-border solid $gradient-border--stop;
 
   &:before {
     bottom: -$ix-border;
     height: $ix-border;
-    right: $ix-radius;
-    width: calc(200% - #{$ix-radius * 2});
+    right: $gradient-border--radius;
+    width: calc(200% - #{$gradient-border--radius * 2});
     @include gradient-h($gradient-border--mid, $gradient-border--stop);
   }
 
   &:after {
-    bottom: $ix-radius;
-    height: calc(200% - #{$ix-radius * 2});
+    bottom: $gradient-border--radius;
+    height: calc(200% - #{$gradient-border--radius * 2});
     right: -$ix-border;
     width: $ix-border;
     @include gradient-v($gradient-border--mid, $gradient-border--stop);
