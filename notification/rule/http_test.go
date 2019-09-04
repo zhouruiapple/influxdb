@@ -63,7 +63,8 @@ all_statuses
 			},
 			StatusRules: []notification.StatusRule{
 				{
-					CurrentLevel: notification.Critical,
+					CurrentLevel:  notification.Critical,
+					PreviousLevel: notification.Any,
 				},
 			},
 		},

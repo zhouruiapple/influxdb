@@ -191,10 +191,7 @@ func (b *Base) generateAllStateChanges() []ast.Statement {
 }
 
 func (b *Base) generateStateChanges(r notification.StatusRule) (ast.Statement, *ast.Identifier) {
-	fromLevel := "any"
-	if r.PreviousLevel != nil {
-		fromLevel = strings.ToLower(r.PreviousLevel.String())
-	}
+	fromLevel := strings.ToLower(r.PreviousLevel.String())
 	toLevel := strings.ToLower(r.CurrentLevel.String())
 
 	pipe := flux.Pipe(

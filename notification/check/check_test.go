@@ -215,8 +215,8 @@ func TestJSON(t *testing.T) {
 					},
 				},
 				Thresholds: []check.ThresholdConfig{
-					&check.Greater{ThresholdConfigBase: check.ThresholdConfigBase{AllValues: true}, Value: -1.36},
-					&check.Range{Min: -10000, Max: 500},
+					&check.Greater{ThresholdConfigBase: check.ThresholdConfigBase{AllValues: true, Level: notification.Any}, Value: -1.36},
+					&check.Range{Min: -10000, Max: 500, ThresholdConfigBase: check.ThresholdConfigBase{Level: notification.Any}},
 					&check.Lesser{ThresholdConfigBase: check.ThresholdConfigBase{Level: notification.Critical}},
 				},
 			},

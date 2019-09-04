@@ -19,10 +19,6 @@ func mustDuration(d string) *notification.Duration {
 	return (*notification.Duration)(dur)
 }
 
-func statusRulePtr(r notification.CheckLevel) *notification.CheckLevel {
-	return &r
-}
-
 func TestSlack_GenerateFlux(t *testing.T) {
 	want := `package main
 // foo
@@ -82,11 +78,12 @@ all_statuses
 			},
 			StatusRules: []notification.StatusRule{
 				{
-					CurrentLevel: notification.Critical,
+					CurrentLevel:  notification.Critical,
+					PreviousLevel: notification.Any,
 				},
 				{
 					CurrentLevel:  notification.Warn,
-					PreviousLevel: statusRulePtr(notification.Info),
+					PreviousLevel: notification.Info,
 				},
 			},
 		},

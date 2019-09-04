@@ -7,8 +7,8 @@ import (
 
 // StatusRule includes parametes of status rules.
 type StatusRule struct {
-	CurrentLevel  CheckLevel  `json:"currentLevel"`
-	PreviousLevel *CheckLevel `json:"previousLevel"`
+	CurrentLevel  CheckLevel `json:"currentLevel"`
+	PreviousLevel CheckLevel `json:"previousLevel"`
 }
 
 // CheckLevel is the enum value of status levels.
@@ -16,30 +16,33 @@ type CheckLevel int
 
 // consts of CheckStatusLevel
 const (
-	Unknown CheckLevel = iota
+	_ CheckLevel = iota
+	Any
+	Unknown
 	Ok
 	Info
 	Warn
 	Critical
-	Any
 )
 
 var checkLevels = []string{
+	"", // zero valued check
+	"ANY",
 	"UNKNOWN",
 	"OK",
 	"INFO",
 	"WARN",
 	"CRIT",
-	"ANY",
 }
 
 var checkLevelMaps = map[string]CheckLevel{
+	"":        Any,
+	"ANY":     Any,
 	"UNKNOWN": Unknown,
 	"OK":      Ok,
 	"INFO":    Info,
 	"WARN":    Warn,
 	"CRIT":    Critical,
-	"ANY":     Any,
 }
 
 // MarshalJSON implements json.Marshaller.
@@ -59,7 +62,7 @@ func (cl *CheckLevel) UnmarshalJSON(b []byte) error {
 
 // String returns the string value, invalid CheckLevel will return Unknown.
 func (cl CheckLevel) String() string {
-	if cl < Unknown || cl > Critical {
+	if cl < Any || cl > Critical {
 		cl = Unknown
 	}
 	return checkLevels[cl]

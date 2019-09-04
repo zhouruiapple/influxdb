@@ -7,10 +7,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-func checkLvlPtr(l CheckLevel) *CheckLevel {
-	return &l
-}
-
 func TestStatusJSON(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -21,17 +17,20 @@ func TestStatusJSON(t *testing.T) {
 			name: "regular status rule",
 			src: StatusRule{
 				CurrentLevel:  Warn,
-				PreviousLevel: checkLvlPtr(Critical),
+				PreviousLevel: Critical,
 			},
 			target: StatusRule{
 				CurrentLevel:  Warn,
-				PreviousLevel: checkLvlPtr(Critical),
+				PreviousLevel: Critical,
 			},
 		},
 		{
-			name:   "empty",
-			src:    StatusRule{},
-			target: StatusRule{},
+			name: "empty",
+			src:  StatusRule{},
+			target: StatusRule{
+				CurrentLevel:  Unknown,
+				PreviousLevel: Unknown,
+			},
 		},
 		{
 			name: "invalid status",
@@ -39,22 +38,25 @@ func TestStatusJSON(t *testing.T) {
 				CurrentLevel: CheckLevel(-10),
 			},
 			target: StatusRule{
-				CurrentLevel: Unknown,
+				CurrentLevel:  Unknown,
+				PreviousLevel: Unknown,
 			},
 		},
 	}
 	for _, c := range cases {
-		serialized, err := json.Marshal(c.src)
-		if err != nil {
-			t.Errorf("%s marshal failed, err: %s", c.name, err)
-		}
-		var got StatusRule
-		err = json.Unmarshal(serialized, &got)
-		if err != nil {
-			t.Errorf("%s unmarshal failed, err: %s", c.name, err)
-		}
-		if diff := cmp.Diff(got, c.target); diff != "" {
-			t.Errorf("status rules are different -got/+want\ndiff %s", diff)
-		}
+		t.Run(c.name, func(t *testing.T) {
+			serialized, err := json.Marshal(c.src)
+			if err != nil {
+				t.Errorf("%s marshal failed, err: %s", c.name, err)
+			}
+			var got StatusRule
+			err = json.Unmarshal(serialized, &got)
+			if err != nil {
+				t.Errorf("%s unmarshal failed, err: %s", c.name, err)
+			}
+			if diff := cmp.Diff(got, c.target); diff != "" {
+				t.Errorf("status rules are different -got/+want\ndiff %s", diff)
+			}
+		})
 	}
 }

@@ -60,10 +60,12 @@ func Test_newNotificationRuleResponses(t *testing.T) {
 							},
 							StatusRules: []notification.StatusRule{
 								{
-									CurrentLevel: notification.Critical,
+									CurrentLevel:  notification.Critical,
+									PreviousLevel: notification.Any,
 								},
 								{
-									CurrentLevel: notification.Warn,
+									CurrentLevel:  notification.Warn,
+									PreviousLevel: notification.Any,
 								},
 							},
 						},
@@ -112,11 +114,11 @@ func Test_newNotificationRuleResponses(t *testing.T) {
       "statusRules": [
         {
           "currentLevel": "CRIT",
-          "previousLevel": null
+          "previousLevel": "ANY"
         },
         {
           "currentLevel": "WARN",
-          "previousLevel": null
+          "previousLevel": "ANY"
         }
       ],
       "tagRules": [
@@ -212,61 +214,62 @@ func Test_newNotificationRuleResponse(t *testing.T) {
 						},
 						StatusRules: []notification.StatusRule{
 							{
-								CurrentLevel: notification.Critical,
+								CurrentLevel:  notification.Critical,
+								PreviousLevel: notification.Any,
 							},
 							{
-								CurrentLevel: notification.Warn,
+								CurrentLevel:  notification.Warn,
+								PreviousLevel: notification.Any,
 							},
 						},
 					},
 				},
 			},
 			want: `{
- "channel": "ch1",
- "createdAt": "0001-01-01T00:00:00Z",
- "description": "desc1",
- "endpointID": "0000000000000004",
- "every": "5m",
- "id": "0000000000000001",
- "labels": [
- ],
- "links": {
-   "labels": "/api/v2/notificationRules/0000000000000001/labels",
-   "members": "/api/v2/notificationRules/0000000000000001/members",
-   "owners": "/api/v2/notificationRules/0000000000000001/owners",
-   "self": "/api/v2/notificationRules/0000000000000001"
- },
- "messageTemplate": "message 1{var1}",
- "name": "name1",
- "offset": "15s",
- "orgID": "0000000000000002",
- "ownerID": "0000000000000003",
- "runbookLink": "",
- "status": "active",
- "statusRules": [
-   {
-     "currentLevel": "CRIT",
-     "previousLevel": null
-   },
-   {
-     "currentLevel": "WARN",
-     "previousLevel": null
-   }
- ],
- "tagRules": [
-   {
-     "key": "k1",
-     "operator": "equal",
-     "value": "v1"
-   },
-   {
-     "key": "k2",
-     "operator": "notequalregex",
-     "value": "v2"
-   }
- ],
- "type": "slack",
- "updatedAt": "0001-01-01T00:00:00Z"
+  "id": "0000000000000001",
+  "name": "name1",
+  "description": "desc1",
+  "endpointID": "0000000000000004",
+  "orgID": "0000000000000002",
+  "ownerID": "0000000000000003",
+  "status": "active",
+  "every": "5m",
+  "offset": "15s",
+  "runbookLink": "",
+  "tagRules": [
+    {
+      "key": "k1",
+      "value": "v1",
+      "operator": "equal"
+    },
+    {
+      "key": "k2",
+      "value": "v2",
+      "operator": "notequalregex"
+    }
+  ],
+  "statusRules": [
+    {
+      "currentLevel": "CRIT",
+      "previousLevel": "ANY"
+    },
+    {
+      "currentLevel": "WARN",
+      "previousLevel": "ANY"
+    }
+  ],
+  "createdAt": "0001-01-01T00:00:00Z",
+  "updatedAt": "0001-01-01T00:00:00Z",
+  "channel": "ch1",
+  "messageTemplate": "message 1{var1}",
+  "type": "slack",
+  "labels": [],
+  "links": {
+    "self": "/api/v2/notificationRules/0000000000000001",
+    "labels": "/api/v2/notificationRules/0000000000000001/labels",
+    "members": "/api/v2/notificationRules/0000000000000001/members",
+    "owners": "/api/v2/notificationRules/0000000000000001/owners"
+  }
 }`,
 		},
 	}
