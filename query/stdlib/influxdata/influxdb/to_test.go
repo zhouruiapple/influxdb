@@ -8,7 +8,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/influxdata/flux"
 	"github.com/influxdata/flux/ast"
-	"github.com/influxdata/flux/dependencies/dependenciestest"
 	"github.com/influxdata/flux/execute"
 	"github.com/influxdata/flux/execute/executetest"
 	"github.com/influxdata/flux/interpreter"
@@ -744,7 +743,7 @@ c _hello=4 41`),
 				tc.want.tables,
 				nil,
 				func(d execute.Dataset, c execute.TableBuilderCache) execute.Transformation {
-					newT, err := influxdb.NewToTransformation(context.Background(), d, c, tc.spec, deps, dependenciestest.Default())
+					newT, err := influxdb.NewToTransformation(context.Background(), d, c, tc.spec, deps)
 					if err != nil {
 						t.Error(err)
 					}
@@ -766,8 +765,8 @@ c _hello=4 41`),
 	}
 }
 
-func mockDependencies() influxdb.ToDependencies {
-	return influxdb.ToDependencies{
+func mockDependencies() influxdb.Dependencies {
+	return influxdb.Dependencies{
 		BucketLookup:       mock.BucketLookup{},
 		OrganizationLookup: mock.OrganizationLookup{},
 		PointsWriter:       new(mock.PointsWriter),

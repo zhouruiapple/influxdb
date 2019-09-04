@@ -9,6 +9,10 @@ import (
 // BucketLookup implements the BucketLookup interface needed by flux "from" and "to".
 type BucketLookup struct{}
 
+func (BucketLookup) FindAllBuckets(ctx context.Context, orgID platform.ID) ([]*platform.Bucket, int) {
+	panic("implement me")
+}
+
 func (BucketLookup) Lookup(_ context.Context, orgID platform.ID, name string) (platform.ID, bool) {
 	if name == "my-bucket" {
 		return platform.ID(1), true

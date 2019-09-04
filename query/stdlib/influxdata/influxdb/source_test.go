@@ -2,14 +2,15 @@ package influxdb_test
 
 import (
 	"context"
+	"github.com/influxdata/influxdb/kit/prom"
 	"testing"
 	"time"
 
 	"github.com/influxdata/flux"
+	"github.com/influxdata/flux/dependencies"
 	"github.com/influxdata/flux/execute"
 	"github.com/influxdata/flux/memory"
 	platform "github.com/influxdata/influxdb"
-	"github.com/influxdata/influxdb/kit/prom"
 	"github.com/influxdata/influxdb/kit/prom/promtest"
 	"github.com/influxdata/influxdb/mock"
 	"github.com/influxdata/influxdb/query/stdlib/influxdata/influxdb"
@@ -52,7 +53,7 @@ func (mockReader) Close() {
 }
 
 type mockAdministration struct {
-	DependenciesFn func() execute.Dependencies
+	DependenciesFn func() dependencies.Interface
 }
 
 func (mockAdministration) Context() context.Context {
@@ -75,7 +76,7 @@ func (mockAdministration) Parents() []execute.DatasetID {
 	return nil
 }
 
-func (a mockAdministration) Dependencies() execute.Dependencies {
+func (a mockAdministration) Dependencies() dependencies.Interface {
 	return a.DependenciesFn()
 }
 
@@ -102,17 +103,14 @@ func TestMetrics(t *testing.T) {
 			Metrics:            influxdb.NewMetrics([]string{labelKey}),
 		}
 		a = &mockAdministration{
-			DependenciesFn: func() execute.Dependencies {
-				deps := make(map[string]interface{})
-				deps[influxdb.FromKind] = fromDeps
-				return deps
+			DependenciesFn: func() dependencies.Interface {
+				return fromDeps
 			},
 		}
-	}
-
-	for _, v := range a.Dependencies() {
-		if pc, ok := v.(prom.PrometheusCollector); ok {
-			reg.MustRegister(pc.PrometheusCollectors()...)
+		for _, v := range []interface{}{fromDeps.Reader, fromDeps.BucketLookup, fromDeps.OrganizationLookup, fromDeps.Metrics} {
+			if pc, ok := v.(prom.PrometheusCollector); ok {
+				reg.MustRegister(pc.PrometheusCollectors()...)
+			}
 		}
 	}
 

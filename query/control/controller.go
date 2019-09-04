@@ -20,6 +20,7 @@ package control
 import (
 	"context"
 	"fmt"
+	"github.com/influxdata/flux/dependencies"
 	"runtime/debug"
 	"sync"
 	"sync/atomic"
@@ -27,16 +28,16 @@ import (
 
 	"github.com/influxdata/flux"
 	"github.com/influxdata/flux/codes"
-	"github.com/influxdata/flux/execute"
-	"github.com/influxdata/flux/lang"
 	"github.com/influxdata/flux/memory"
 	"github.com/influxdata/influxdb"
 	"github.com/influxdata/influxdb/kit/errors"
 	"github.com/influxdata/influxdb/kit/prom"
 	"github.com/influxdata/influxdb/kit/tracing"
 	"github.com/influxdata/influxdb/query"
-	opentracing "github.com/opentracing/opentracing-go"
+	qinfluxdb "github.com/influxdata/influxdb/query/stdlib/influxdata/influxdb"
+	"github.com/opentracing/opentracing-go"
 	"github.com/prometheus/client_golang/prometheus"
+
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -64,7 +65,7 @@ type Controller struct {
 
 	logger *zap.Logger
 
-	dependencies execute.Dependencies
+	dependencies qinfluxdb.Dependencies
 }
 
 type Config struct {
@@ -85,7 +86,7 @@ type Config struct {
 	// The context value must be a string or an implementation of the Stringer interface.
 	MetricLabelKeys []string
 
-	ExecutorDependencies execute.Dependencies
+	ExecutorDependencies qinfluxdb.Dependencies
 }
 
 func (c *Config) Validate() error {
@@ -275,7 +276,6 @@ func (c *Controller) compileQuery(q *Query, compiler flux.Compiler) (err error) 
 			Msg:  "failed to transition query to compiling state",
 		}
 	}
-
 	prog, err := compiler.Compile(ctx)
 	if err != nil {
 		return &flux.Error{
@@ -283,12 +283,6 @@ func (c *Controller) compileQuery(q *Query, compiler flux.Compiler) (err error) 
 			Err: err,
 		}
 	}
-
-	if p, ok := prog.(lang.DependenciesAwareProgram); ok {
-		p.SetExecutorDependencies(c.dependencies)
-		p.SetLogger(c.logger)
-	}
-
 	q.program = prog
 	return nil
 }
@@ -355,13 +349,38 @@ func (c *Controller) executeQuery(q *Query) {
 
 	q.alloc = new(memory.Allocator)
 	q.alloc.Limit = func(v int64) *int64 { return &v }(c.memoryBytesQuotaPerQuery)
-	exec, err := q.program.Start(ctx, q.alloc)
+	deps := copyDeps(c.dependencies)
+	deps.SetAllocator(q.alloc)
+	deps.SetLogger(c.logger)
+	exec, err := q.program.Start(ctx, deps)
 	if err != nil {
 		q.setErr(err)
 		return
 	}
 	q.exec = exec
 	q.pump(exec, ctx.Done())
+}
+
+func copyDeps(deps qinfluxdb.Dependencies) qinfluxdb.Dependencies {
+	newDeps := qinfluxdb.Dependencies{
+		Reader:             deps.Reader,
+		PointsWriter:       deps.PointsWriter,
+		BucketLookup:       deps.BucketLookup,
+		OrganizationLookup: deps.OrganizationLookup,
+		Metrics:            deps.Metrics,
+	}
+	httpc, _ := deps.HTTPClient()
+	ss, _ := deps.SecretService()
+	urlv, _ := deps.URLValidator()
+	fluxDeps := &dependencies.Dependencies{
+		Deps: dependencies.Deps{
+			HTTPClient:    httpc,
+			SecretService: ss,
+			URLValidator:  urlv,
+		},
+	}
+	newDeps.Interface = fluxDeps
+	return newDeps
 }
 
 func (c *Controller) finish(q *Query) {
@@ -425,7 +444,13 @@ func (c *Controller) Shutdown(ctx context.Context) error {
 // PrometheusCollectors satisfies the prom.PrometheusCollector interface.
 func (c *Controller) PrometheusCollectors() []prometheus.Collector {
 	collectors := c.metrics.PrometheusCollectors()
-	for _, v := range c.dependencies {
+	deps := []interface{}{
+		c.dependencies.OrganizationLookup,
+		c.dependencies.BucketLookup,
+		c.dependencies.Reader,
+		c.dependencies.Metrics,
+	}
+	for _, v := range deps {
 		if pc, ok := v.(prom.PrometheusCollector); ok {
 			collectors = append(collectors, pc.PrometheusCollectors()...)
 		}

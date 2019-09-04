@@ -3,6 +3,7 @@ package influxdb
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/influxdata/flux"
@@ -158,7 +159,11 @@ func createReadFilterSource(s plan.ProcedureSpec, id execute.DatasetID, a execut
 		}
 	}
 
-	deps := a.Dependencies()[FromKind].(Dependencies)
+	//deps := a.Dependencies()[FromKind].(Dependencies)
+	deps, ok := a.Dependencies().(Dependencies)
+	if !ok {
+		return nil, fmt.Errorf("dependencies for InfluxDB not set")
+	}
 
 	req := query.RequestFromContext(a.Context())
 	if req == nil {
@@ -238,7 +243,11 @@ func createReadGroupSource(s plan.ProcedureSpec, id execute.DatasetID, a execute
 		return nil, errors.New("nil bounds passed to from")
 	}
 
-	deps := a.Dependencies()[FromKind].(Dependencies)
+	//deps := a.Dependencies()[FromKind].(Dependencies)
+	deps, ok := a.Dependencies().(Dependencies)
+	if !ok {
+		return nil, fmt.Errorf("dependencies for InfluxDB not set")
+	}
 
 	req := query.RequestFromContext(a.Context())
 	if req == nil {
@@ -278,7 +287,11 @@ func createReadTagKeysSource(prSpec plan.ProcedureSpec, dsid execute.DatasetID, 
 	defer span.Finish()
 
 	spec := prSpec.(*ReadTagKeysPhysSpec)
-	deps := a.Dependencies()[FromKind].(Dependencies)
+	//deps := a.Dependencies()[FromKind].(Dependencies)
+	deps, ok := a.Dependencies().(Dependencies)
+	if !ok {
+		return nil, fmt.Errorf("dependencies for InfluxDB not set")
+	}
 	req := query.RequestFromContext(a.Context())
 	if req == nil {
 		return nil, errors.New("missing request on context")
@@ -347,7 +360,11 @@ func createReadTagValuesSource(prSpec plan.ProcedureSpec, dsid execute.DatasetID
 	defer span.Finish()
 
 	spec := prSpec.(*ReadTagValuesPhysSpec)
-	deps := a.Dependencies()[FromKind].(Dependencies)
+	//deps := a.Dependencies()[FromKind].(Dependencies)
+	deps, ok := a.Dependencies().(Dependencies)
+	if !ok {
+		return nil, fmt.Errorf("dependencies for InfluxDB not set")
+	}
 	req := query.RequestFromContext(a.Context())
 	if req == nil {
 		return nil, errors.New("missing request on context")

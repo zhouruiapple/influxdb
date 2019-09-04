@@ -3,6 +3,7 @@ package launcher
 import (
 	"context"
 	"fmt"
+	"github.com/influxdata/influxdb/query/stdlib/influxdata/influxdb"
 	"io"
 	"math"
 	"net"
@@ -13,7 +14,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/influxdata/flux/execute"
 	platform "github.com/influxdata/influxdb"
 	"github.com/influxdata/influxdb/authorizer"
 	"github.com/influxdata/influxdb/bolt"
@@ -46,7 +46,7 @@ import (
 	_ "github.com/influxdata/influxdb/tsdb/tsm1" // needed for tsm1
 	"github.com/influxdata/influxdb/vault"
 	pzap "github.com/influxdata/influxdb/zap"
-	opentracing "github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cobra"
 	jaegerconfig "github.com/uber/jaeger-client-go/config"
@@ -509,7 +509,7 @@ func (m *Launcher) run(ctx context.Context) (err error) {
 		)
 
 		cc := control.Config{
-			ExecutorDependencies:     make(execute.Dependencies),
+			ExecutorDependencies:     influxdb.Dependencies{},
 			ConcurrencyQuota:         concurrencyQuota,
 			MemoryBytesQuotaPerQuery: int64(memoryBytesQuotaPerQuery),
 			QueueSize:                QueueSize,

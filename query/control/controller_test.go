@@ -8,22 +8,24 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/zap/zaptest"
+
 	"github.com/influxdata/flux"
 	_ "github.com/influxdata/flux/builtin"
 	"github.com/influxdata/flux/codes"
+	"github.com/influxdata/flux/dependencies"
 	"github.com/influxdata/flux/execute"
 	"github.com/influxdata/flux/execute/executetest"
 	"github.com/influxdata/flux/lang"
-	"github.com/influxdata/flux/memory"
 	"github.com/influxdata/flux/mock"
 	"github.com/influxdata/flux/plan"
 	"github.com/influxdata/flux/plan/plantest"
 	"github.com/influxdata/flux/stdlib/universe"
 	"github.com/influxdata/influxdb/query"
 	"github.com/influxdata/influxdb/query/control"
+	"github.com/influxdata/influxdb/query/stdlib/influxdata/influxdb"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
-	"go.uber.org/zap/zaptest"
 )
 
 func init() {
@@ -34,7 +36,7 @@ var (
 	mockCompiler = &mock.Compiler{
 		CompileFn: func(ctx context.Context) (flux.Program, error) {
 			return &mock.Program{
-				ExecuteFn: func(ctx context.Context, q *mock.Query, alloc *memory.Allocator) {
+				ExecuteFn: func(ctx context.Context, q *mock.Query, deps dependencies.Interface) {
 					q.ResultsCh <- &executetest.Result{}
 				},
 			}, nil
@@ -44,7 +46,7 @@ var (
 		ConcurrencyQuota:         1,
 		MemoryBytesQuotaPerQuery: 1024,
 		QueueSize:                1,
-		ExecutorDependencies:     executetest.NewTestExecuteDependencies(),
+		ExecutorDependencies:     influxdb.Dependencies{Interface: dependencies.NewDefaults()},
 	}
 )
 
@@ -165,7 +167,7 @@ func TestController_QueryRuntimeError(t *testing.T) {
 	q, err := ctrl.Query(context.Background(), makeRequest(&mock.Compiler{
 		CompileFn: func(ctx context.Context) (flux.Program, error) {
 			return &mock.Program{
-				ExecuteFn: func(ctx context.Context, q *mock.Query, alloc *memory.Allocator) {
+				ExecuteFn: func(ctx context.Context, q *mock.Query, deps dependencies.Interface) {
 					q.SetErr(errors.New("runtime error"))
 				},
 			}, nil
@@ -222,7 +224,7 @@ func TestController_QueryQueueError(t *testing.T) {
 		q, err := ctrl.Query(context.Background(), makeRequest(&mock.Compiler{
 			CompileFn: func(ctx context.Context) (flux.Program, error) {
 				return &mock.Program{
-					ExecuteFn: func(ctx context.Context, q *mock.Query, alloc *memory.Allocator) {
+					ExecuteFn: func(ctx context.Context, q *mock.Query, deps dependencies.Interface) {
 						// Block until test is finished
 						<-done
 					},
@@ -360,7 +362,7 @@ func TestController_ExecuteError(t *testing.T) {
 	compiler := &mock.Compiler{
 		CompileFn: func(ctx context.Context) (flux.Program, error) {
 			return &mock.Program{
-				StartFn: func(ctx context.Context, alloc *memory.Allocator) (*mock.Query, error) {
+				StartFn: func(ctx context.Context, deps dependencies.Interface) (*mock.Query, error) {
 					return nil, errors.New("expected error")
 				},
 			}, nil
@@ -394,6 +396,7 @@ func TestController_LimitExceededError(t *testing.T) {
 	const memoryBytesQuotaPerQuery = 64
 	config := config
 	config.MemoryBytesQuotaPerQuery = memoryBytesQuotaPerQuery
+	config.Logger = zaptest.NewLogger(t)
 	ctrl, err := control.New(config)
 	if err != nil {
 		t.Fatal(err)
@@ -420,7 +423,6 @@ func TestController_LimitExceededError(t *testing.T) {
 
 			ps := plantest.CreatePlanSpec(&pts)
 			prog := &lang.Program{
-				Logger:   zaptest.NewLogger(t),
 				PlanSpec: ps,
 			}
 
@@ -495,7 +497,7 @@ func TestController_StartPanic(t *testing.T) {
 	compiler := &mock.Compiler{
 		CompileFn: func(ctx context.Context) (flux.Program, error) {
 			return &mock.Program{
-				StartFn: func(ctx context.Context, alloc *memory.Allocator) (i *mock.Query, e error) {
+				StartFn: func(ctx context.Context, deps dependencies.Interface) (i *mock.Query, e error) {
 					panic("panic during start step")
 				},
 			}, nil
@@ -529,7 +531,7 @@ func TestController_ShutdownWithRunningQuery(t *testing.T) {
 	compiler := &mock.Compiler{
 		CompileFn: func(ctx context.Context) (flux.Program, error) {
 			return &mock.Program{
-				ExecuteFn: func(ctx context.Context, q *mock.Query, alloc *memory.Allocator) {
+				ExecuteFn: func(ctx context.Context, q *mock.Query, deps dependencies.Interface) {
 					close(executing)
 					<-ctx.Done()
 
@@ -580,7 +582,7 @@ func TestController_ShutdownWithTimeout(t *testing.T) {
 	compiler := &mock.Compiler{
 		CompileFn: func(ctx context.Context) (flux.Program, error) {
 			return &mock.Program{
-				ExecuteFn: func(ctx context.Context, q *mock.Query, alloc *memory.Allocator) {
+				ExecuteFn: func(ctx context.Context, q *mock.Query, deps dependencies.Interface) {
 					// This should just block until the end of the test
 					// when we perform cleanup.
 					close(executing)
@@ -625,8 +627,9 @@ func TestController_PerQueryMemoryLimit(t *testing.T) {
 	compiler := &mock.Compiler{
 		CompileFn: func(ctx context.Context) (flux.Program, error) {
 			return &mock.Program{
-				ExecuteFn: func(ctx context.Context, q *mock.Query, alloc *memory.Allocator) {
+				ExecuteFn: func(ctx context.Context, q *mock.Query, deps dependencies.Interface) {
 					// This is emulating the behavior of exceeding the memory limit at runtime
+					alloc, _ := deps.Allocator()
 					if err := alloc.Allocate(int(config.MemoryBytesQuotaPerQuery + 1)); err != nil {
 						q.SetErr(err)
 					}
@@ -669,7 +672,7 @@ func TestController_ConcurrencyQuota(t *testing.T) {
 	compiler := &mock.Compiler{
 		CompileFn: func(ctx context.Context) (flux.Program, error) {
 			return &mock.Program{
-				ExecuteFn: func(ctx context.Context, q *mock.Query, alloc *memory.Allocator) {
+				ExecuteFn: func(ctx context.Context, q *mock.Query, deps dependencies.Interface) {
 					select {
 					case <-q.Canceled:
 					default:
@@ -740,7 +743,7 @@ func TestController_QueueSize(t *testing.T) {
 	compiler := &mock.Compiler{
 		CompileFn: func(ctx context.Context) (flux.Program, error) {
 			return &mock.Program{
-				ExecuteFn: func(ctx context.Context, q *mock.Query, alloc *memory.Allocator) {
+				ExecuteFn: func(ctx context.Context, q *mock.Query, deps dependencies.Interface) {
 					executing <- struct{}{}
 					// Block until test is finished
 					<-done
@@ -802,7 +805,7 @@ func TestController_CancelDone(t *testing.T) {
 	compiler := &mock.Compiler{
 		CompileFn: func(ctx context.Context) (flux.Program, error) {
 			return &mock.Program{
-				ExecuteFn: func(ctx context.Context, q *mock.Query, alloc *memory.Allocator) {
+				ExecuteFn: func(ctx context.Context, q *mock.Query, deps dependencies.Interface) {
 					// Ensure the query takes a little bit of time so the cancel actually cancels something.
 					t := time.NewTimer(time.Second)
 					defer t.Stop()
@@ -849,7 +852,7 @@ func TestController_DoneWithoutRead(t *testing.T) {
 	compiler := &mock.Compiler{
 		CompileFn: func(ctx context.Context) (flux.Program, error) {
 			return &mock.Program{
-				ExecuteFn: func(ctx context.Context, q *mock.Query, alloc *memory.Allocator) {
+				ExecuteFn: func(ctx context.Context, q *mock.Query, deps dependencies.Interface) {
 					// Ensure the query takes a little bit of time so the cancel actually cancels something.
 					t := time.NewTimer(time.Second)
 					defer t.Stop()

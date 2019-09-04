@@ -3,9 +3,9 @@ package influxdb
 import (
 	"context"
 	"fmt"
+	"github.com/influxdata/flux/dependencies"
 	"time"
 
-	"github.com/influxdata/flux/execute"
 	platform "github.com/influxdata/influxdb"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -83,6 +83,6 @@ func (m *metrics) recordMetrics(labelValues []string, start time.Time) {
 	m.requestDur.WithLabelValues(labelValues...).Observe(time.Since(start).Seconds())
 }
 
-func getMetricsFromDependencies(depsMap execute.Dependencies) *metrics {
-	return depsMap[FromKind].(Dependencies).Metrics
+func getMetricsFromDependencies(deps dependencies.Interface) *metrics {
+	return deps.(Dependencies).Metrics
 }

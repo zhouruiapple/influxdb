@@ -5,10 +5,12 @@ import (
 	"fmt"
 
 	"github.com/influxdata/flux"
+	"github.com/influxdata/flux/dependencies"
 	"github.com/influxdata/flux/execute"
 	"github.com/influxdata/flux/memory"
 	"github.com/influxdata/flux/semantic"
 	platform "github.com/influxdata/influxdb"
+	"github.com/influxdata/influxdb/storage"
 	"github.com/influxdata/influxdb/tsdb/cursors"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -22,6 +24,7 @@ type HostLookup interface {
 type BucketLookup interface {
 	Lookup(ctx context.Context, orgID platform.ID, name string) (platform.ID, bool)
 	LookupName(ctx context.Context, orgID platform.ID, id platform.ID) string
+	AllBucketLookup
 }
 
 type OrganizationLookup interface {
@@ -30,9 +33,11 @@ type OrganizationLookup interface {
 }
 
 type Dependencies struct {
+	dependencies.Interface
 	Reader             Reader
 	BucketLookup       BucketLookup
 	OrganizationLookup OrganizationLookup
+	PointsWriter       storage.PointsWriter
 	Metrics            *metrics
 }
 
@@ -45,6 +50,9 @@ func (d Dependencies) Validate() error {
 	}
 	if d.OrganizationLookup == nil {
 		return errors.New("missing organization lookup dependency")
+	}
+	if d.PointsWriter == nil {
+		return errors.New("missing points writer dependency")
 	}
 	return nil
 }

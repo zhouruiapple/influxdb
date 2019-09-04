@@ -12,6 +12,7 @@ import (
 	"github.com/influxdata/flux/values"
 	platform "github.com/influxdata/influxdb"
 	"github.com/influxdata/influxdb/query"
+	"github.com/influxdata/influxdb/query/stdlib/influxdata/influxdb"
 	"github.com/pkg/errors"
 )
 
@@ -163,14 +164,20 @@ func createDatabasesSource(prSpec plan.ProcedureSpec, dsid execute.DatasetID, a 
 
 	// the dependencies used for FromKind are adequate for what we need here
 	// so there's no need to inject custom dependencies for databases()
-	deps := a.Dependencies()[DatabasesKind].(DatabasesDependencies)
+	//deps := a.Dependencies()[DatabasesKind].(DatabasesDependencies)
+	_, ok = a.Dependencies().(influxdb.Dependencies)
+	if !ok {
+		return nil, fmt.Errorf("dependencies for InfluxDB not set")
+	}
 	req := query.RequestFromContext(a.Context())
 	if req == nil {
 		return nil, errors.New("missing request on context")
 	}
 	orgID := req.OrganizationID
 
-	bd := &DatabasesDecoder{orgID: orgID, deps: &deps, alloc: a.Allocator()}
+	// TODO(affo): fix dependencies for 'databases'.
+	//  Use the ignored result above.
+	bd := &DatabasesDecoder{orgID: orgID, deps: &DatabasesDependencies{}, alloc: a.Allocator()}
 
 	return execute.CreateSourceFromDecoder(bd, dsid, a)
 }
@@ -178,17 +185,4 @@ func createDatabasesSource(prSpec plan.ProcedureSpec, dsid execute.DatasetID, a 
 type DatabasesDependencies struct {
 	DBRP         platform.DBRPMappingService
 	BucketLookup platform.BucketService
-}
-
-func InjectDatabasesDependencies(depsMap execute.Dependencies, deps DatabasesDependencies) error {
-	if deps.DBRP == nil {
-		return errors.New("missing all databases lookup dependency")
-	}
-
-	if deps.BucketLookup == nil {
-		return errors.New("missing buckets lookup dependency")
-	}
-
-	depsMap[DatabasesKind] = deps
-	return nil
 }

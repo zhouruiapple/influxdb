@@ -200,7 +200,7 @@ func (s constantSecretService) LoadSecret(ctx context.Context, k string) (string
 	return "", nil
 }
 
-func newDeps() dependencies.Dependencies {
+func newDeps() *dependencies.Dependencies {
 	deps := dependencies.NewDefaults()
 	deps.Deps.HTTPClient = nil
 	deps.Deps.URLValidator = nil

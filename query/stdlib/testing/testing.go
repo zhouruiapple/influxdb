@@ -85,7 +85,7 @@ var FluxEndToEndSkipList = map[string]string{
 	"window_group_mean_ungroup": "window trigger optimization modifies sort order of its output tables (https://github.com/influxdata/flux/issues/1067)",
 
 	"median_column": "failing in different ways (https://github.com/influxdata/influxdb/issues/13909)",
-	"dynamic_query": "panic when executing",
+	"dynamic_query": "no table found, this is because we perform the query while storing input",
 
 	"regexp_replaceAllString":        "Reason TBD",
 	"extract_regexp_findStringIndex": "pandas. map does not correctly handled returned arrays (https://github.com/influxdata/flux/issues/1387)",

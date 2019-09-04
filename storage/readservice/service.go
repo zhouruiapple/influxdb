@@ -27,13 +27,26 @@ func AddControllerConfigDependencies(
 	orgSvc platform.OrganizationService,
 	ss platform.SecretService,
 ) error {
-	deps := dependencies.NewDefaults()
-	deps.Deps.SecretService = query.FromSecretService(ss)
-	cc.ExecutorDependencies[dependencies.InterpreterDepsKey] = deps
+	fluxDeps := dependencies.NewDefaults()
+	fluxDeps.Deps.SecretService = query.FromSecretService(ss)
+	//cc.ExecutorDependencies[dependencies.InterpreterDepsKey] = fluxDeps
 
 	bucketLookupSvc := query.FromBucketService(bucketSvc)
 	orgLookupSvc := query.FromOrganizationService(orgSvc)
 	metrics := influxdb.NewMetrics(cc.MetricLabelKeys)
+	deps := influxdb.Dependencies{
+		Interface:          fluxDeps,
+		Reader:             reads.NewReader(newStore(engine)),
+		BucketLookup:       bucketLookupSvc,
+		OrganizationLookup: orgLookupSvc,
+		PointsWriter:       engine,
+		Metrics:            metrics,
+	}
+
+	cc.ExecutorDependencies = deps
+	return nil
+
+	/*
 	if err := influxdb.InjectFromDependencies(cc.ExecutorDependencies, influxdb.Dependencies{
 		Reader:             reads.NewReader(newStore(engine)),
 		BucketLookup:       bucketLookupSvc,
@@ -52,4 +65,5 @@ func AddControllerConfigDependencies(
 		OrganizationLookup: orgLookupSvc,
 		PointsWriter:       engine,
 	})
+	*/
 }

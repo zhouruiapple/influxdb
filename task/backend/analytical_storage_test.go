@@ -6,7 +6,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/influxdata/flux/execute"
 	"github.com/influxdata/influxdb"
 	icontext "github.com/influxdata/influxdb/context"
 	"github.com/influxdata/influxdb/inmem"
@@ -15,6 +14,7 @@ import (
 	"github.com/influxdata/influxdb/query"
 	_ "github.com/influxdata/influxdb/query/builtin"
 	"github.com/influxdata/influxdb/query/control"
+	qinfluxdb "github.com/influxdata/influxdb/query/stdlib/influxdata/influxdb"
 	"github.com/influxdata/influxdb/storage"
 	"github.com/influxdata/influxdb/storage/readservice"
 	"github.com/influxdata/influxdb/task/backend"
@@ -157,7 +157,7 @@ func newAnalyticalBackend(t *testing.T, orgSvc influxdb.OrganizationService, buc
 	)
 
 	cc := control.Config{
-		ExecutorDependencies:     make(execute.Dependencies),
+		ExecutorDependencies:     qinfluxdb.Dependencies{},
 		ConcurrencyQuota:         concurrencyQuota,
 		MemoryBytesQuotaPerQuery: int64(memoryBytesQuotaPerQuery),
 		QueueSize:                queueSize,
