@@ -125,7 +125,10 @@ const ThresholdCondition: FC<Props> = ({
       {threshold.type === 'range' ? (
         <ThresholdRangeInput threshold={threshold} changeRange={changeRange} />
       ) : (
-        <ThresholdValueInput threshold={threshold} changeValue={changeValue} />
+        <ThresholdValueInput
+          value={threshold.value}
+          changeValue={changeValue}
+        />
       )}
     </ThresholdStatement>
   )
