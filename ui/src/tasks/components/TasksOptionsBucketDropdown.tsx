@@ -6,9 +6,6 @@ import {connect} from 'react-redux'
 // Components
 import {Dropdown, ComponentStatus} from '@influxdata/clockface'
 
-// Utils
-import {isSystemBucket} from 'src/buckets/constants/index'
-
 // Types
 import {RemoteDataState, AppState, Bucket} from 'src/types'
 
@@ -69,9 +66,7 @@ class TaskOptionsBucketDropdown extends PureComponent<Props> {
       ]
     }
 
-    const nonSystemBuckets = buckets.filter(
-      bucket => !isSystemBucket(bucket.name)
-    )
+    const nonSystemBuckets = buckets.filter(bucket => bucket.type === 'user')
 
     return nonSystemBuckets.map(bucket => {
       return (

@@ -15,9 +15,6 @@ import BucketContextMenu from 'src/buckets/components/BucketContextMenu'
 import BucketAddDataButton from 'src/buckets/components/BucketAddDataButton'
 import {FeatureFlag} from 'src/shared/utils/featureFlag'
 
-// Constants
-import {isSystemBucket} from 'src/buckets/constants/index'
-
 // Types
 import {Bucket} from 'src/types'
 import {DataLoaderType} from 'src/types/dataLoaders'
@@ -43,7 +40,7 @@ class BucketRow extends PureComponent<Props & WithRouterProps> {
       <ResourceCard
         testID="bucket--card"
         contextMenu={
-          !isSystemBucket(bucket.name) && (
+          bucket.type === 'user' && (
             <BucketContextMenu
               bucket={bucket}
               onDeleteBucket={onDeleteBucket}

@@ -4,9 +4,6 @@ import React, {PureComponent} from 'react'
 // Components
 import {Dropdown, ComponentStatus} from '@influxdata/clockface'
 
-// Utils
-import {isSystemBucket} from 'src/buckets/constants/index'
-
 // Types
 import {Bucket} from 'src/types'
 
@@ -71,7 +68,7 @@ class BucketsDropdown extends PureComponent<Props> {
     }
 
     const nonSystemBuckets = buckets.filter(bucket => {
-      if (!isSystemBucket(bucket.name)) {
+      if (bucket.type === 'user') {
         return bucket
       }
     })

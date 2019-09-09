@@ -28,7 +28,6 @@ import {
   allBucketsPermissions,
   BucketTab,
 } from 'src/authorizations/utils/permissions'
-import {isSystemBucket} from 'src/buckets/constants/index'
 
 // Actions
 import {createAuthorization} from 'src/authorizations/actions'
@@ -267,7 +266,7 @@ class BucketsTokenOverlay extends PureComponent<Props, State> {
   private get nonSystemBuckets(): Bucket[] {
     const {buckets} = this.props
 
-    return buckets.filter(bucket => !isSystemBucket(bucket.name))
+    return buckets.filter(bucket => bucket.type === 'user')
   }
 
   private handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
