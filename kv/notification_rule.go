@@ -128,13 +128,16 @@ func (s *Service) createNotificationTask(ctx context.Context, tx Tx, r influxdb.
 }
 
 func (s *Service) updateNotificationTask(ctx context.Context, tx Tx, r influxdb.NotificationRule) (*influxdb.Task, error) {
+	println("debug here 1==========")
 	ep, _, _, err := s.findNotificationEndpointByID(ctx, tx, r.GetEndpointID())
 	if err != nil {
+		println("debug here 2==========")
 		return nil, err
 	}
 
 	script, err := r.GenerateFlux(ep)
 	if err != nil {
+		println("debug here 3==========")
 		return nil, err
 	}
 
@@ -146,8 +149,10 @@ func (s *Service) updateNotificationTask(ctx context.Context, tx Tx, r influxdb.
 
 	t, err := s.updateTask(ctx, tx, r.GetTaskID(), tu)
 	if err != nil {
+		println("debug here 4==========")
 		return nil, err
 	}
+	println("debug here 5==========")
 
 	return t, nil
 }
