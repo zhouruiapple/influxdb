@@ -55,15 +55,16 @@ type CheckHandler struct {
 }
 
 const (
-	checksPath            = "/api/v2/checks"
-	checksIDPath          = "/api/v2/checks/:id"
-	checksIDQueryPath     = "/api/v2/checks/:id/query"
-	checksIDMembersPath   = "/api/v2/checks/:id/members"
-	checksIDMembersIDPath = "/api/v2/checks/:id/members/:userID"
-	checksIDOwnersPath    = "/api/v2/checks/:id/owners"
-	checksIDOwnersIDPath  = "/api/v2/checks/:id/owners/:userID"
-	checksIDLabelsPath    = "/api/v2/checks/:id/labels"
-	checksIDLabelsIDPath  = "/api/v2/checks/:id/labels/:lid"
+	checksPath             = "/api/v2/checks"
+	checksQueryPreviewPath = "/api/v2/checks/query/preview"
+	checksIDPath           = "/api/v2/checks/:id"
+	checksIDQueryPath      = "/api/v2/checks/:id/query"
+	checksIDMembersPath    = "/api/v2/checks/:id/members"
+	checksIDMembersIDPath  = "/api/v2/checks/:id/members/:userID"
+	checksIDOwnersPath     = "/api/v2/checks/:id/owners"
+	checksIDOwnersIDPath   = "/api/v2/checks/:id/owners/:userID"
+	checksIDLabelsPath     = "/api/v2/checks/:id/labels"
+	checksIDLabelsIDPath   = "/api/v2/checks/:id/labels/:lid"
 )
 
 // NewCheckHandler returns a new instance of CheckHandler.
@@ -83,6 +84,7 @@ func NewCheckHandler(b *CheckBackend) *CheckHandler {
 	h.HandlerFunc("GET", checksPath, h.handleGetChecks)
 	h.HandlerFunc("GET", checksIDPath, h.handleGetCheck)
 	h.HandlerFunc("GET", checksIDQueryPath, h.handleGetCheckQuery)
+	h.HandlerFunc("POST", checksQueryPreviewPath, h.handlePreviewCheckQuery)
 	h.HandlerFunc("DELETE", checksIDPath, h.handleDeleteCheck)
 	h.HandlerFunc("PUT", checksIDPath, h.handlePutCheck)
 	h.HandlerFunc("PATCH", checksIDPath, h.handlePatchCheck)
@@ -229,6 +231,31 @@ func (h *CheckHandler) handleGetChecks(w http.ResponseWriter, r *http.Request) {
 	h.Logger.Debug("checks retrieved", zap.String("checks", fmt.Sprint(chks)))
 
 	if err := encodeResponse(ctx, w, http.StatusOK, newChecksResponse(ctx, chks, h.LabelService, filter, *opts)); err != nil {
+		logEncodingError(h.Logger, r, err)
+		return
+	}
+}
+
+func (h *CheckHandler) handlePreviewCheckQuery(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	chk, err := decodePostCheckRequest(ctx, r)
+	if err != nil {
+		h.Logger.Debug("failed to decode request", zap.Error(err))
+		h.HandleHTTPError(ctx, err, w)
+		return
+	}
+	if err = chk.Valid(); err != nil {
+		h.Logger.Debug("invalid preview request", zap.Error(err))
+		h.HandleHTTPError(ctx, err, w)
+		return
+	}
+	flux, err := chk.GenerateFlux()
+	if err != nil {
+		h.HandleHTTPError(ctx, err, w)
+		return
+	}
+	h.Logger.Debug("check query preview generated", zap.String("check query", flux))
+	if err := encodeResponse(ctx, w, http.StatusOK, newFluxResponse(flux)); err != nil {
 		logEncodingError(h.Logger, r, err)
 		return
 	}
