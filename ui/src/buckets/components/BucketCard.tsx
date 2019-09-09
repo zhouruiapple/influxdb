@@ -57,12 +57,7 @@ class BucketRow extends PureComponent<Props & WithRouterProps> {
             name={bucket.name}
           />
         }
-        metaData={[
-          isSystemBucket(bucket.name) && (
-            <span className="system-bucket">System Bucket</span>
-          ),
-          <>Retention: {bucket.ruleString}</>,
-        ]}
+        metaData={this.cardMeta}
       >
         <FlexBox
           direction={FlexDirection.Row}
@@ -86,6 +81,21 @@ class BucketRow extends PureComponent<Props & WithRouterProps> {
         </FlexBox>
       </ResourceCard>
     )
+  }
+
+  private get cardMeta(): JSX.Element[] {
+    const {bucket} = this.props
+
+    if (bucket.type === 'user') {
+      return [
+        <span className="system-bucket" key={`system-indicator-${bucket.id}`}>
+          System Bucket
+        </span>,
+        <>Retention: {bucket.ruleString}</>,
+      ]
+    }
+
+    return [<>Retention: {bucket.ruleString}</>]
   }
 
   private get renameButton() {
