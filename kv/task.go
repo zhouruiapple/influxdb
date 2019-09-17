@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 	"time"
+	"errors"
 
 	"github.com/influxdata/influxdb"
 	icontext "github.com/influxdata/influxdb/context"
@@ -70,8 +71,13 @@ func (s *Service) FindTaskByID(ctx context.Context, id influxdb.ID) (*influxdb.T
 // This is to be used when we want to satisfy the FindTaskByID method
 // But is more taxing on the system then if we want to find the task alone.
 func (s *Service) findTaskByIDWithAuth(ctx context.Context, tx Tx, id influxdb.ID) (*influxdb.Task, error) {
-	t, err := s.findTaskByID(ctx, tx, id)
-	if err != nil {
+	var t *influxdb.Task
+	err := s.kv.View(ctx, func(tx Tx) error {
+		var err error
+		t, err = s.findTaskByID(ctx, tx, id)
+		return err
+	})
+	if err!=nil{
 		return nil, err
 	}
 
@@ -539,8 +545,13 @@ func filterByName(ts []*influxdb.Task, taskName string) []*influxdb.Task {
 // The owner of the task is inferred from the authorizer associated with ctx.
 func (s *Service) CreateTask(ctx context.Context, tc influxdb.TaskCreate) (*influxdb.Task, error) {
 	var t *influxdb.Task
-	err := s.kv.Update(ctx, func(tx Tx) error {
-		task, err := s.createTask(ctx, tx, tc)
+
+	opt, err := options.FromScript(tc.Flux)
+	if err != nil {
+		return nil, influxdb.ErrTaskOptionParse(err)
+	}
+	err = s.kv.Update(ctx, func(tx Tx) error {
+		task, err := s.createTask(ctx, tx, tc, &opt)
 		if err != nil {
 			return err
 		}
@@ -554,7 +565,9 @@ func (s *Service) CreateTask(ctx context.Context, tc influxdb.TaskCreate) (*infl
 	return t, nil
 }
 
-func (s *Service) createTask(ctx context.Context, tx Tx, tc influxdb.TaskCreate) (*influxdb.Task, error) {
+
+// if you call createTasks you must first call options.FromScript to clean up the options.
+func (s *Service) createTask(ctx context.Context, tx Tx, tc influxdb.TaskCreate, opt *options.Options) (*influxdb.Task, error) {
 	var err error
 	var org *influxdb.Organization
 	if tc.OrganizationID.Valid() {
@@ -578,10 +591,6 @@ func (s *Service) createTask(ctx context.Context, tx Tx, tc influxdb.TaskCreate)
 	// 	return nil, influxdb.ErrInvalidOwnerID
 	// }
 
-	opt, err := options.FromScript(tc.Flux)
-	if err != nil {
-		return nil, influxdb.ErrTaskOptionParse(err)
-	}
 
 	if tc.Status == "" {
 		tc.Status = string(backend.TaskActive)
@@ -603,10 +612,11 @@ func (s *Service) createTask(ctx context.Context, tx Tx, tc influxdb.TaskCreate)
 		CreatedAt:       createdAt,
 		LatestCompleted: createdAt,
 	}
-	if opt.Offset != nil {
-		task.Offset = opt.Offset.String()
+	if opt!=nil {
+		task.Every = opt.Every.String()
+		task.Cron = opt.Cron
+		task.Name = opt.Name
 	}
-
 	taskBucket, err := tx.Bucket(taskBucket)
 	if err != nil {
 		return nil, influxdb.ErrUnexpectedTaskBucketErr(err)
@@ -674,11 +684,77 @@ func (s *Service) createTaskURM(ctx context.Context, tx Tx, t *influxdb.Task) er
 	})
 }
 
+// preprocessUpdateTaskOptions mutates the given task with the given influxdb.TaskUpdate
+func (s *Service) preprocessUpdateTaskOptions(upd influxdb.TaskUpdate, t *influxdb.Task ) error {
+
+	if t==nil{
+		return errors.New("task must not be nil")
+	}
+
+	updatedAt := time.Now().UTC().Format(time.RFC3339)
+
+	if !upd.Options.IsZero() || upd.Flux != nil {
+		if err := upd.UpdateFlux(t.Flux); err != nil {
+			return  err
+		}
+		t.Flux = *upd.Flux
+
+		options, err := options.FromScript(*upd.Flux)
+		if err != nil {
+			return  influxdb.ErrTaskOptionParse(err)
+		}
+		t.Name = options.Name
+		t.Every = options.Every.String()
+		t.Cron = options.Cron
+		if options.Offset == nil {
+			t.Offset = ""
+		} else {
+			t.Offset = options.Offset.String()
+		}
+		t.UpdatedAt = updatedAt
+	}
+
+	if upd.Description != nil {
+		t.Description = *upd.Description
+		t.UpdatedAt = updatedAt
+
+	}
+
+	if upd.Status != nil {
+		t.Status = *upd.Status
+		t.UpdatedAt = updatedAt
+
+	}
+
+	if upd.LatestCompleted != nil {
+		// make sure we only update latest completed one way
+		tlc, _ := time.Parse(time.RFC3339, t.LatestCompleted)
+		ulc, _ := time.Parse(time.RFC3339, *upd.LatestCompleted)
+
+		if !ulc.IsZero() && ulc.After(tlc) {
+			t.LatestCompleted = *upd.LatestCompleted
+		}
+	}
+	return nil
+}
+
 // UpdateTask updates a single task with changeset.
 func (s *Service) UpdateTask(ctx context.Context, id influxdb.ID, upd influxdb.TaskUpdate) (*influxdb.Task, error) {
 	var t *influxdb.Task
-	err := s.kv.Update(ctx, func(tx Tx) error {
-		task, err := s.updateTask(ctx, tx, id, upd)
+	var err error
+	if err = s.kv.View(ctx, func(tx Tx)error{
+		t, err = s.findTaskByID(ctx,tx, id)
+		return err
+	});err!=nil{
+		return nil, err
+	}
+
+	if err=s.preprocessUpdateTaskOptions( upd, t); err!=nil{
+		return nil, err
+	}
+
+	err = s.kv.Update(ctx, func(tx Tx) error {
+		task, err := s.updateTask(ctx, tx, id, t)
 		if err != nil {
 			return err
 		}
@@ -692,59 +768,9 @@ func (s *Service) UpdateTask(ctx context.Context, id influxdb.ID, upd influxdb.T
 	return t, nil
 }
 
-func (s *Service) updateTask(ctx context.Context, tx Tx, id influxdb.ID, upd influxdb.TaskUpdate) (*influxdb.Task, error) {
-	// retrieve the task
-	task, err := s.findTaskByID(ctx, tx, id)
-	if err != nil {
-		return nil, err
-	}
 
-	updatedAt := time.Now().UTC().Format(time.RFC3339)
-
-	// update the flux script
-	if !upd.Options.IsZero() || upd.Flux != nil {
-		if err = upd.UpdateFlux(task.Flux); err != nil {
-			return nil, err
-		}
-		task.Flux = *upd.Flux
-
-		options, err := options.FromScript(*upd.Flux)
-		if err != nil {
-			return nil, influxdb.ErrTaskOptionParse(err)
-		}
-		task.Name = options.Name
-		task.Every = options.Every.String()
-		task.Cron = options.Cron
-		if options.Offset == nil {
-			task.Offset = ""
-		} else {
-			task.Offset = options.Offset.String()
-		}
-		task.UpdatedAt = updatedAt
-	}
-
-	if upd.Description != nil {
-		task.Description = *upd.Description
-		task.UpdatedAt = updatedAt
-
-	}
-
-	if upd.Status != nil {
-		task.Status = *upd.Status
-		task.UpdatedAt = updatedAt
-
-	}
-
-	if upd.LatestCompleted != nil {
-		// make sure we only update latest completed one way
-		tlc, _ := time.Parse(time.RFC3339, task.LatestCompleted)
-		ulc, _ := time.Parse(time.RFC3339, *upd.LatestCompleted)
-
-		if !ulc.IsZero() && ulc.After(tlc) {
-			task.LatestCompleted = *upd.LatestCompleted
-		}
-	}
-
+// updateTask updates a current task with a given task
+func (s *Service) updateTask(ctx context.Context, tx Tx, id influxdb.ID, task *influxdb.Task) (*influxdb.Task, error) {
 	// save the updated task
 	bucket, err := tx.Bucket(taskBucket)
 	if err != nil {
@@ -762,6 +788,30 @@ func (s *Service) updateTask(ctx context.Context, tx Tx, id influxdb.ID, upd inf
 
 	return task, bucket.Put(key, taskBytes)
 }
+
+//// updateTaskLastUpdated is a helper method for updating a task's LastUpdated, as we use it, but don't want to deal with
+//// the flux parsing that is required when options or flux updates are required
+//func (s *Service) updateTaskUpdated(ctx context.Context, tx Tx, id influxdb.ID, time.Time) error{
+//	t, err := s.findTaskByID(ctx,tx, id)
+//	t.UpdatedAt
+//
+//	// save the updated task
+//	bucket, err := tx.Bucket(taskBucket)
+//	if err != nil {
+//		return nil, influxdb.ErrUnexpectedTaskBucketErr(err)
+//	}
+//	key, err := taskKey(id)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	taskBytes, err := json.Marshal(task)
+//	if err != nil {
+//		return nil, influxdb.ErrInternalTaskServiceError(err)
+//	}
+//
+//	return task, bucket.Put(key, taskBytes)
+//}
 
 // DeleteTask removes a task by ID and purges all associated data and scheduled runs.
 func (s *Service) DeleteTask(ctx context.Context, id influxdb.ID) error {
@@ -1566,8 +1616,11 @@ func (s *Service) finishRun(ctx context.Context, tx Tx, taskID, runID influxdb.I
 		return nil, err
 	}
 
+	task, err:=s.findTaskByID(ctx, tx, taskID)
+	task.LatestCompleted = r.ScheduledFor
+	// we aren't modifying anything that touches flux code (just the non-flux metadata so we don't need to use preprocessUpdateTaskOptions.
 	// tell task to update latest completed
-	_, err = s.updateTask(ctx, tx, taskID, influxdb.TaskUpdate{LatestCompleted: &r.ScheduledFor})
+	_, err = s.updateTask(ctx, tx, taskID, task)
 	if err != nil {
 		return nil, err
 	}

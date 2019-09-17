@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/influxdata/influxdb/task/options"
 
 	"github.com/influxdata/influxdb"
 	"github.com/influxdata/influxdb/kit/tracing"
@@ -355,7 +356,13 @@ func (s *Service) createCheckTask(ctx context.Context, tx Tx, c influxdb.Check) 
 		Status:         string(c.GetStatus()),
 	}
 
-	t, err := s.createTask(ctx, tx, tc)
+
+	opt, err := options.FromScript(tc.Flux)
+	if err != nil {
+		return nil, influxdb.ErrTaskOptionParse(err)
+	}
+
+	t, err := s.createTask(ctx, tx, tc, &opt)
 	if err != nil {
 		return nil, err
 	}
@@ -529,71 +536,96 @@ func (s *Service) PatchCheck(ctx context.Context, id influxdb.ID, upd influxdb.C
 func (s *Service) UpdateCheck(ctx context.Context, id influxdb.ID, chk influxdb.Check) (influxdb.Check, error) {
 	span, ctx := tracing.StartSpanFromContext(ctx)
 	defer span.Finish()
+	var t *influxdb.Task
+	var err error
+	var current influxdb.Check
+	if err = s.kv.View(ctx, func(tx Tx)error{
+		t, current, err = s.preprocessUpdateCheck(ctx, tx, id, chk)
+		return err
+	});err!=nil{
+			return chk, err
+	}
+
+
+	t, err = s.processTaskFromCheck(chk,t)
+	if err!=nil{
+		return nil, err
+	}
 
 	var c influxdb.Check
-	err := s.kv.Update(ctx, func(tx Tx) error {
-		chk, err := s.updateCheck(ctx, tx, id, chk)
-		if err != nil {
-			return err
-		}
-		c = chk
-		return nil
+	err = s.kv.Update(ctx, func(tx Tx) error {
+		c, err = s.updateCheck(ctx, tx, id, chk,t)
+		return err
 	})
 
 	return c, err
 }
 
-func (s *Service) updateCheck(ctx context.Context, tx Tx, id influxdb.ID, chk influxdb.Check) (influxdb.Check, error) {
-	span, ctx := tracing.StartSpanFromContext(ctx)
-	defer span.Finish()
+
+func (s *Service) preprocessUpdateCheck(ctx context.Context, tx Tx, id influxdb.ID, chk influxdb.Check) (*influxdb.Task, influxdb.Check, error) {
+	t, err := s.findTaskByID(ctx, tx, chk.GetTaskID())
+	if err!=nil {
+		return nil, nil, err
+	}
 
 	current, err := s.findCheckByID(ctx, tx, id)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if chk.GetName() != current.GetName() {
 		c0, err := s.findCheckByName(ctx, tx, current.GetOrgID(), chk.GetName())
 		if err == nil && c0.GetID() != id {
-			return nil, &influxdb.Error{
+			return nil, nil, &influxdb.Error{
 				Code: influxdb.EConflict,
 				Msg:  "check name is not unique",
 			}
 		}
 		key, err := checkIndexKey(current.GetOrgID(), current.GetName())
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		idx, err := s.checksIndexBucket(tx)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if err := idx.Delete(key); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
-
-	chk.SetTaskID(current.GetTaskID())
-	flux, err := chk.GenerateFlux()
-	if err != nil {
-		return nil, err
-	}
-	if _, err := s.updateTask(ctx, tx, chk.GetTaskID(),
-		influxdb.TaskUpdate{
-			Flux:        &flux,
-			Status:      strPtr(string(chk.GetStatus())),
-			Description: strPtr(chk.GetDescription()),
-		},
-	); err != nil {
-		return nil, err
-	}
-
 	// ID and OrganizationID can not be updated
 	chk.SetID(current.GetID())
 	chk.SetOrgID(current.GetOrgID())
 	chk.SetOwnerID(current.GetOwnerID())
 	chk.SetCreatedAt(current.GetCRUDLog().CreatedAt)
 	chk.SetUpdatedAt(s.Now())
+	chk.SetTaskID(current.GetTaskID())
+	return t, chk, err
+}
+
+func(s *Service)processTaskFromCheck(chk influxdb.Check, t *influxdb.Task)(*influxdb.Task, error){
+
+	flux, err := chk.GenerateFlux()
+	if err!=nil{
+		return nil, err
+	}
+	tu:=		influxdb.TaskUpdate{
+		Flux:        &flux,
+		Status:      strPtr(string(chk.GetStatus())),
+		Description: strPtr(chk.GetDescription()),
+	}
+	err = s.preprocessUpdateTaskOptions(tu, t)
+	return t, err
+
+}
+
+func (s *Service) updateCheck(ctx context.Context, tx Tx, id influxdb.ID, chk influxdb.Check, t *influxdb.Task) (influxdb.Check, error) {
+	span, ctx := tracing.StartSpanFromContext(ctx)
+	defer span.Finish()
+
+	if _, err := s.updateTask(ctx, tx, chk.GetTaskID(), t); err != nil {
+		return nil, err
+	}
 
 	if err := s.putCheck(ctx, tx, chk); err != nil {
 		return nil, err
@@ -649,12 +681,14 @@ func (s *Service) patchCheck(ctx context.Context, tx Tx, id influxdb.ID, upd inf
 
 	c.SetUpdatedAt(s.Now())
 
-	if _, err := s.updateTask(ctx, tx, c.GetTaskID(),
-		influxdb.TaskUpdate{
-			Status:      strPtr(string(c.GetStatus())),
-			Description: strPtr(c.GetDescription()),
-		},
-	); err != nil {
+	tu, err:=s.findTaskByID(ctx, tx, c.GetTaskID())
+	if err!=nil{
+		return nil, err
+	}
+	tu.Status = string(c.GetStatus())
+	tu.Description = string(c.GetDescription())
+
+	if _, err := s.updateTask(ctx, tx, c.GetTaskID(),tu); err != nil {
 		return nil, err
 	}
 

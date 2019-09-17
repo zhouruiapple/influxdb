@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	//"github.com/influxdata/influxdb/task/options"
 
 	"github.com/influxdata/influxdb/notification/rule"
 	"go.uber.org/zap"
@@ -100,6 +101,51 @@ func (s *Service) createNotificationRule(ctx context.Context, tx Tx, nr influxdb
 	return s.createUserResourceMapping(ctx, tx, urm)
 }
 
+func (s *Service) preprocessUpdateNotificationRule(ctx context.Context, tx Tx, id influxdb.ID, nr influxdb.NotificationRule) (*influxdb.Task, influxdb.NotificationRule, error) {
+	t, err := s.findTaskByID(ctx, tx, nr.GetTaskID())
+	if err!=nil {
+		return nil, nil, err
+	}
+
+	current, err := s.findNotificationRuleByID(ctx, tx, id)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if nr.GetName() != current.GetName() {
+		c0, err := s.findCheckByName(ctx, tx, current.GetOrgID(), nr.GetName())
+		if err == nil && c0.GetID() != id {
+			return nil, nil, &influxdb.Error{
+				Code: influxdb.EConflict,
+				Msg:  "check name is not unique",
+			}
+		}
+		key, err := checkIndexKey(current.GetOrgID(), current.GetName())
+		if err != nil {
+			return nil, nil, err
+		}
+		idx, err := s.checksIndexBucket(tx)
+		if err != nil {
+			return nil, nil, err
+		}
+		if err := idx.Delete(key); err != nil {
+			return nil, nil, err
+		}
+	}
+	// ID and OrganizationID can not be updated
+	nr.SetID(current.GetID())
+	nr.SetOrgID(current.GetOrgID())
+	nr.SetOwnerID(current.GetOwnerID())
+	nr.SetCreatedAt(current.GetCRUDLog().CreatedAt)
+	nr.SetUpdatedAt(s.Now())
+	nr.SetTaskID(current.GetTaskID())
+	return t, nr, err
+}
+func(s *Service) processUpdateNotificationRule(ctx context.Context, nr influxdb.NotificationRule)(*influxdb.Task, influxdb.NotificationRule, error){
+
+	return nil, nil, nil
+}
+
 func (s *Service) createNotificationTask(ctx context.Context, tx Tx, r influxdb.NotificationRule) (*influxdb.Task, error) {
 	ep, _, _, err := s.findNotificationEndpointByID(ctx, tx, r.GetEndpointID())
 	if err != nil {
@@ -119,7 +165,7 @@ func (s *Service) createNotificationTask(ctx context.Context, tx Tx, r influxdb.
 		Status:         string(r.GetStatus()),
 	}
 
-	t, err := s.createTask(ctx, tx, tc)
+	t, err := s.createTask(ctx, tx, tc, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +173,7 @@ func (s *Service) createNotificationTask(ctx context.Context, tx Tx, r influxdb.
 	return t, nil
 }
 
-func (s *Service) updateNotificationTask(ctx context.Context, tx Tx, r influxdb.NotificationRule) (*influxdb.Task, error) {
+func (s *Service) updateNotificationTask(ctx context.Context, tx Tx, , r influxdb.NotificationRule) (*influxdb.Task, error) {
 	ep, _, _, err := s.findNotificationEndpointByID(ctx, tx, r.GetEndpointID())
 	if err != nil {
 		return nil, err
