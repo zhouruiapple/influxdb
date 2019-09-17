@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
 	//"github.com/influxdata/influxdb/task/options"
 
 	"github.com/influxdata/influxdb/notification/rule"
@@ -103,7 +104,7 @@ func (s *Service) createNotificationRule(ctx context.Context, tx Tx, nr influxdb
 
 func (s *Service) preprocessUpdateNotificationRule(ctx context.Context, tx Tx, id influxdb.ID, nr influxdb.NotificationRule) (*influxdb.Task, influxdb.NotificationRule, error) {
 	t, err := s.findTaskByID(ctx, tx, nr.GetTaskID())
-	if err!=nil {
+	if err != nil {
 		return nil, nil, err
 	}
 
@@ -141,9 +142,24 @@ func (s *Service) preprocessUpdateNotificationRule(ctx context.Context, tx Tx, i
 	nr.SetTaskID(current.GetTaskID())
 	return t, nr, err
 }
-func(s *Service) processUpdateNotificationRule(ctx context.Context, nr influxdb.NotificationRule)(*influxdb.Task, influxdb.NotificationRule, error){
+func (s *Service) processUpdateNotificationRule(ctx context.Context, r influxdb.NotificationRule) (*influxdb.Task, influxdb.NotificationRule, error) {
 
 	return nil, nil, nil
+}
+
+func (s *Service) processTaskFromNotificationRule(r influxdb.NotificationRule, ep influxdb.NotificationEndpoint, t *influxdb.Task) (*influxdb.Task, error) {
+	flux, err := r.GenerateFlux(ep)
+	if err != nil {
+		return nil, err
+	}
+	tu := influxdb.TaskUpdate{
+		Flux:        &flux,
+		Status:      strPtr(string(r.GetStatus())),
+		Description: strPtr(r.GetDescription()),
+	}
+	err = s.preprocessUpdateTaskOptions(tu, t)
+	return t, err
+
 }
 
 func (s *Service) createNotificationTask(ctx context.Context, tx Tx, r influxdb.NotificationRule) (*influxdb.Task, error) {
@@ -173,7 +189,7 @@ func (s *Service) createNotificationTask(ctx context.Context, tx Tx, r influxdb.
 	return t, nil
 }
 
-func (s *Service) updateNotificationTask(ctx context.Context, tx Tx, , r influxdb.NotificationRule) (*influxdb.Task, error) {
+func (s *Service) updateNotificationTask(ctx context.Context, tx Tx, r influxdb.NotificationRule) (*influxdb.Task, error) {
 	ep, _, _, err := s.findNotificationEndpointByID(ctx, tx, r.GetEndpointID())
 	if err != nil {
 		return nil, err
@@ -202,6 +218,13 @@ func (s *Service) updateNotificationTask(ctx context.Context, tx Tx, , r influxd
 // Returns the new notification rule after update.
 func (s *Service) UpdateNotificationRule(ctx context.Context, id influxdb.ID, nr influxdb.NotificationRule, userID influxdb.ID) (influxdb.NotificationRule, error) {
 	var err error
+	var t *influxdb.Task
+
+	t, err = s.processTaskFromNotificationRule(nr, , ep, t)
+	if err != nil {
+		return nil, err
+	}
+
 	err = s.kv.Update(ctx, func(tx Tx) error {
 		nr, err = s.updateNotificationRule(ctx, tx, id, nr, userID)
 		return err
