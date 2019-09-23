@@ -77,7 +77,7 @@ export default class DashboardHeader extends Component<Props> {
       <Page.Header fullWidth={true}>
         <Page.Header.Left>
           <RenamablePageTitle
-            prefix={_.get(org, 'name', '')}
+            subTitle={_.get(org, 'name', '')}
             maxLength={DASHBOARD_NAME_MAX_LENGTH}
             onRename={onRenameDashboard}
             name={activeDashboard}

@@ -6,20 +6,26 @@
 $rename-dash-title-padding: 4px;
 
 .renamable-page-title {
-  height: $form-sm-height;
   width: 100%;
   min-width: 29vw;
   max-width: 42vw;
   display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.renamable-page-title__subtitle {
+  position: relative;
+  top: -2px;
 }
 
 .renamable-page-title--title,
-.renamable-page-title--input-prefix,
 .cf-input.renamable-page-title--input > input {
   font-size: $page-title-size;
   font-weight: $page-title-weight;
   font-family: $ix-text-font;
-  padding: 0 $rename-dash-title-padding;
+  padding: 0;
+  padding-right: $rename-dash-title-padding;
 }
 
 .renamable-page-title--title,
@@ -54,10 +60,14 @@ $rename-dash-title-padding: 4px;
   }
 
   &:hover {
-    cursor: text;
+    cursor: text !important;
     color: $g20-white;
     background-color: $g3-castle;
     border-color: $g3-castle;
+  }
+
+  .cf-page--title {
+    cursor: text !important;
   }
 
   &:hover .cf-icon {
@@ -68,18 +78,6 @@ $rename-dash-title-padding: 4px;
     color: $g9-mountain;
     font-style: italic;
   }
-}
-
-.renamable-page-title--input-prefix {
-  border-radius: $radius;
-  position: relative;
-  white-space: nowrap;
-  @include no-user-select();
-  color: $g17-whisper;
-  transition: color 0.25s ease, background-color 0.25s ease, border-color 0.25s ease;
-  border: $ix-border solid transparent;
-  height: $form-sm-height;
-  line-height: $form-sm-height - ($ix-border * 2);
 }
 
 /* Ensure placeholder text matches font weight of title */

@@ -8,7 +8,7 @@ import React, {
 import classnames from 'classnames'
 
 // Components
-import {Input, PageTitle, Icon, IconFont} from '@influxdata/clockface'
+import {Input, Page, Icon, IconFont} from '@influxdata/clockface'
 import {ClickOutside} from 'src/shared/components/ClickOutside'
 
 // Decorators
@@ -20,7 +20,7 @@ interface Props {
   name: string
   placeholder: string
   maxLength: number
-  prefix: string
+  subTitle?: string
 }
 
 interface State {
@@ -30,10 +30,6 @@ interface State {
 
 @ErrorHandling
 class RenamablePageTitle extends PureComponent<Props, State> {
-  public static defaultProps = {
-    prefix: '',
-  }
-
   constructor(props: Props) {
     super(props)
 
@@ -49,32 +45,38 @@ class RenamablePageTitle extends PureComponent<Props, State> {
 
     if (isEditing) {
       return (
-        <div className="renamable-page-title">
-          {this.prefix}
+        <div className={this.className}>
           <ClickOutside onClickOutside={this.handleStopEditing}>
             {this.input}
           </ClickOutside>
+          {this.subTitle}
         </div>
       )
     }
 
     return (
-      <div className="renamable-page-title">
-        {this.prefix}
+      <div className={this.className}>
         <div className={this.titleClassName} onClick={this.handleStartEditing}>
-          <PageTitle title={name || placeholder} />
+          <Page.Title title={name || placeholder} />
           <Icon glyph={IconFont.Pencil} />
         </div>
+        {this.subTitle}
       </div>
     )
   }
 
-  private get prefix(): JSX.Element {
-    const {prefix} = this.props
-    if (prefix) {
-      return (
-        <div className="renamable-page-title--input-prefix">{`${prefix} /`}</div>
-      )
+  private get className(): string {
+    const {subTitle} = this.props
+
+    return classnames('renamable-page-title', {
+      'renamable-page-title__subtitle': subTitle,
+    })
+  }
+
+  private get subTitle(): JSX.Element {
+    const {subTitle} = this.props
+    if (subTitle) {
+      return <Page.SubTitle title={subTitle} />
     }
   }
 
