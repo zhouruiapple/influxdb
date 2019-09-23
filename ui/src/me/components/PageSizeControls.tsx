@@ -3,7 +3,15 @@ import React, {PureComponent} from 'react'
 import {connect} from 'react-redux'
 
 // Components
-import {Panel, ComponentSize, Radio, ButtonShape} from '@influxdata/clockface'
+import {
+  Panel,
+  ComponentSize,
+  Radio,
+  ButtonShape,
+  FlexBox,
+  FlexDirection,
+  JustifyContent,
+} from '@influxdata/clockface'
 
 // Types
 import {AppState} from 'src/types'
@@ -26,46 +34,54 @@ class PageSizeControls extends PureComponent<Props> {
     return (
       <Panel>
         <Panel.Header>
-          <Panel.Title>Page Size</Panel.Title>
-          <Radio shape={ButtonShape.Square} className="page-size-controls">
-            <Radio.Button
-              titleText="Change page size to extra-small"
-              value={ComponentSize.ExtraSmall}
-              id="xs"
-              active={pageSize === ComponentSize.ExtraSmall}
-              onClick={this.handleRadioClick}
-            >
-              <div className="page-size-controls--icon__xs" />
-            </Radio.Button>
-            <Radio.Button
-              titleText="Change page size to small"
-              value={ComponentSize.Small}
-              id="sm"
-              active={pageSize === ComponentSize.Small}
-              onClick={this.handleRadioClick}
-            >
-              <div className="page-size-controls--icon__sm" />
-            </Radio.Button>
-            <Radio.Button
-              titleText="Change page size to medium"
-              value={ComponentSize.Medium}
-              id="md"
-              active={pageSize === ComponentSize.Medium}
-              onClick={this.handleRadioClick}
-            >
-              <div className="page-size-controls--icon__md" />
-            </Radio.Button>
-            <Radio.Button
-              titleText="Change page size to large"
-              value={ComponentSize.Large}
-              id="lg"
-              active={pageSize === ComponentSize.Large}
-              onClick={this.handleRadioClick}
-            >
-              <div className="page-size-controls--icon__lg" />
-            </Radio.Button>
-          </Radio>
+          <Panel.Title>Options</Panel.Title>
         </Panel.Header>
+        <Panel.Body>
+          <FlexBox
+            direction={FlexDirection.Row}
+            justifyContent={JustifyContent.SpaceBetween}
+          >
+            <p>Page Size</p>
+            <Radio shape={ButtonShape.Square} className="page-size-controls">
+              <Radio.Button
+                titleText="Change page size to extra-small"
+                value={ComponentSize.ExtraSmall}
+                id="xs"
+                active={pageSize === ComponentSize.ExtraSmall}
+                onClick={this.handleRadioClick}
+              >
+                <div className="page-size-controls--icon__xs" />
+              </Radio.Button>
+              <Radio.Button
+                titleText="Change page size to small"
+                value={ComponentSize.Small}
+                id="sm"
+                active={pageSize === ComponentSize.Small}
+                onClick={this.handleRadioClick}
+              >
+                <div className="page-size-controls--icon__sm" />
+              </Radio.Button>
+              <Radio.Button
+                titleText="Change page size to medium"
+                value={ComponentSize.Medium}
+                id="md"
+                active={pageSize === ComponentSize.Medium}
+                onClick={this.handleRadioClick}
+              >
+                <div className="page-size-controls--icon__md" />
+              </Radio.Button>
+              <Radio.Button
+                titleText="Change page size to large"
+                value={ComponentSize.Large}
+                id="lg"
+                active={pageSize === ComponentSize.Large}
+                onClick={this.handleRadioClick}
+              >
+                <div className="page-size-controls--icon__lg" />
+              </Radio.Button>
+            </Radio>
+          </FlexBox>
+        </Panel.Body>
       </Panel>
     )
   }

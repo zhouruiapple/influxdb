@@ -38,7 +38,6 @@ class ResourceLists extends PureComponent<Props> {
             <LogoutButton />
           </Panel.Header>
         </Panel>
-        <PageSizeControls />
         <Panel>
           <Panel.Header>
             <Panel.Title>Dashboards</Panel.Title>
@@ -49,6 +48,7 @@ class ResourceLists extends PureComponent<Props> {
             </GetResources>
           </Panel.Body>
         </Panel>
+        <PageSizeControls />
         <Panel>
           <Panel.Header>
             <Panel.Title>Useful Links</Panel.Title>

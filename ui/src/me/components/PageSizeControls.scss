@@ -22,9 +22,9 @@ $page-size-control-radius: 2px;
   &:after {
     content: '';
     position: absolute;
-    bottom: 0;
+    top: 0;
     left: 0;
-    width: $page-size-control-icon;
+    height: $page-size-control-icon;
     border-radius: $page-size-control-radius;
     z-index: 2;
     background-color: $g8-storm;
@@ -50,25 +50,25 @@ $page-size-control-radius: 2px;
   &__xs {
     @extend .page-size-controls--icon;
     &:after {
-      height: ($page-size-control-icon / 4) * 1;
+      width: ($page-size-control-icon / 4) * 1;
     }
   }
   &__sm {
     @extend .page-size-controls--icon;
     &:after {
-      height: ($page-size-control-icon / 4) * 2;
+      width: ($page-size-control-icon / 4) * 2;
     }
   }
   &__md {
     @extend .page-size-controls--icon;
     &:after {
-      height: ($page-size-control-icon / 4) * 3;
+      width: ($page-size-control-icon / 4) * 3;
     }
   }
   &__lg {
     @extend .page-size-controls--icon;
     &:after {
-      height: ($page-size-control-icon / 4) * 4;
+      width: ($page-size-control-icon / 4) * 4;
     }
   }
 }
