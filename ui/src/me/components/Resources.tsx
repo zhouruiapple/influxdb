@@ -13,6 +13,7 @@ import {
   AlignItems,
 } from '@influxdata/clockface'
 import VersionInfo from 'src/shared/components/VersionInfo'
+import PageSizeControls from 'src/me/components/PageSizeControls'
 
 // Types
 import {AppState} from 'src/types'
@@ -37,6 +38,7 @@ class ResourceLists extends PureComponent<Props> {
             <LogoutButton />
           </Panel.Header>
         </Panel>
+        <PageSizeControls />
         <Panel>
           <Panel.Header>
             <Panel.Title>Dashboards</Panel.Title>

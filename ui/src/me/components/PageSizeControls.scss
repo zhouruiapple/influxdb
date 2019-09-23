@@ -1,0 +1,75 @@
+.page-size-controls.cf-radio-buttons.cf-radio-buttons--square.cf-radio-buttons--sm {
+  .cf-radio-button {
+    width: 22px;
+    position: relative;
+  }
+}
+
+$page-size-control-icon: 12px;
+$page-size-control-radius: 2px;
+
+.page-size-controls--icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: $page-size-control-icon;
+  height: $page-size-control-icon;
+  background-color: $g2-kevlar;
+  border-radius: $page-size-control-radius;
+  transition: background-color 0.25s ease;
+
+  &:after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: $page-size-control-icon;
+    border-radius: $page-size-control-radius;
+    z-index: 2;
+    background-color: $g8-storm;
+    transition: background-color 0.25s ease;
+  }
+
+  .cf-radio-button:hover & {
+    background-color: $g3-castle;
+
+    &:after {
+      background-color: $g13-mist;
+    }
+  }
+
+  .cf-radio-button.active & {
+    background-color: $c-sapphire;
+
+    &:after {
+      background-color: $g20-white;
+    }
+  }
+
+  &__xs {
+    @extend .page-size-controls--icon;
+    &:after {
+      height: ($page-size-control-icon / 4) * 1;
+    }
+  }
+  &__sm {
+    @extend .page-size-controls--icon;
+    &:after {
+      height: ($page-size-control-icon / 4) * 2;
+    }
+  }
+  &__md {
+    @extend .page-size-controls--icon;
+    &:after {
+      height: ($page-size-control-icon / 4) * 3;
+    }
+  }
+  &__lg {
+    @extend .page-size-controls--icon;
+    &:after {
+      height: ($page-size-control-icon / 4) * 4;
+    }
+  }
+}
+
