@@ -42,6 +42,12 @@ const (
 	ManifestFileName = "MANIFEST"
 )
 
+// runnable is a function that lets the caller know if they can proceed with their
+// task. Calling a runnable returns a channel, which will block until the caller
+// can proceed. The function received on the channel must be called to signal
+// the caller finished their task.
+type runnable func() (done <-chan func())
+
 // Partition represents a collection of layered index files and WAL.
 type Partition struct {
 	// The rule to ensure no deadlocks, no resource leaks, and no use after close
@@ -75,6 +81,8 @@ type Partition struct {
 	levelCompacting     []bool            // level compaction status
 	compactionsDisabled int               // counter of disables
 	currentCompactionN  int               // counter of in-progress compactions
+	compactionLimiter   runnable          // allow external source to limit compactions.
+	isCompacting        func()            // the function response from compactionLimiter.
 
 	// Directory of the Partition's index files.
 	path string
@@ -97,10 +105,9 @@ type Partition struct {
 // NewPartition returns a new instance of Partition.
 func NewPartition(sfile *tsdb.SeriesFile, path string) *Partition {
 	partition := &Partition{
-		path:        path,
-		sfile:       sfile,
-		seriesIDSet: tsdb.NewSeriesIDSet(),
-
+		path:           path,
+		sfile:          sfile,
+		seriesIDSet:    tsdb.NewSeriesIDSet(),
 		MaxLogFileSize: DefaultMaxIndexLogFileSize,
 
 		logger:  zap.NewNop(),
