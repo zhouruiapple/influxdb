@@ -10,6 +10,7 @@ import {NoteEditorState} from 'src/dashboards/reducers/notes'
 import {DataLoadingState} from 'src/dataLoaders/reducers'
 import {OnboardingState} from 'src/onboarding/reducers'
 import {VariablesState} from 'src/variables/reducers'
+import {GlobalSearchState} from 'src/globalSearch/reducers'
 import {LabelsState} from 'src/labels/reducers'
 import {BucketsState} from 'src/buckets/reducers'
 import {TelegrafsState} from 'src/telegrafs/reducers'
@@ -38,6 +39,7 @@ export interface AppState {
   ranges: RangeState
   autoRefresh: AutoRefreshState
   views: ViewsState
+  globalSearch: GlobalSearchState
   dashboards: DashboardsState
   notifications: Notification[]
   timeMachines: TimeMachinesState

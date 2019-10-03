@@ -65,6 +65,7 @@ class SideNav extends PureComponent<Props, State> {
     const dashboardsLink = `${orgPrefix}/dashboards`
     const tasksLink = `${orgPrefix}/tasks`
     const alertingLink = `${orgPrefix}/alerting`
+    const searchLink = `${orgPrefix}/search`
     const alertHistoryLink = `${orgPrefix}/alert-history`
     // Load data
     const loadDataLink = `${orgPrefix}/load-data/buckets`
@@ -296,6 +297,19 @@ class SideNav extends PureComponent<Props, State> {
             key="profile"
           />
         </NavMenu.Item>
+        <NavMenu.Item
+          titleLink={className => (
+            <Link className={className} to={searchLink}>
+              Resource Search
+            </Link>
+          )}
+          iconLink={className => (
+            <Link to={searchLink} className={className}>
+              <Icon glyph={IconFont.Search} />
+            </Link>
+          )}
+          active={getNavItemActivation(['search'], location.pathname)}
+        />
         <CloudNav />
         <NavMenu.Item
           titleLink={className => (

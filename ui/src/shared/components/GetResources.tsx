@@ -4,6 +4,7 @@ import {connect} from 'react-redux'
 import _ from 'lodash'
 
 // Actions
+import {getGlobalSearch} from 'src/globalSearch/actions'
 import {getLabels} from 'src/labels/actions'
 import {getBuckets} from 'src/buckets/actions'
 import {getTelegrafs} from 'src/telegrafs/actions'
@@ -20,6 +21,7 @@ import {getEndpoints} from 'src/alerting/actions/notifications/endpoints'
 
 // Types
 import {AppState} from 'src/types'
+import {GlobalSearchState} from 'src/globalSearch/reducers'
 import {LabelsState} from 'src/labels/reducers'
 import {BucketsState} from 'src/buckets/reducers'
 import {TelegrafsState} from 'src/telegrafs/reducers'
@@ -43,6 +45,7 @@ import {
 } from '@influxdata/clockface'
 
 interface StateProps {
+  globalSearch: GlobalSearchState
   labels: LabelsState
   buckets: BucketsState
   telegrafs: TelegrafsState
@@ -60,6 +63,7 @@ interface StateProps {
 }
 
 interface DispatchProps {
+  getGlobalSearch: typeof getGlobalSearch
   getLabels: typeof getLabels
   getBuckets: typeof getBuckets
   getTelegrafs: typeof getTelegrafs
@@ -83,6 +87,7 @@ interface PassedProps {
 type Props = StateProps & DispatchProps & PassedProps
 
 export enum ResourceType {
+  GlobalSearch = 'global',
   Labels = 'labels',
   Buckets = 'buckets',
   Telegrafs = 'telegrafs',
@@ -103,6 +108,10 @@ export enum ResourceType {
 class GetResources extends PureComponent<Props, StateProps> {
   public async componentDidMount() {
     switch (this.props.resource) {
+      case ResourceType.GlobalSearch: {
+        return await this.props.getGlobalSearch()
+      }
+
       case ResourceType.Dashboards: {
         return await this.props.getDashboards()
       }
@@ -180,6 +189,7 @@ class GetResources extends PureComponent<Props, StateProps> {
 }
 
 const mstp = ({
+  globalSearch,
   labels,
   buckets,
   telegrafs,
@@ -195,6 +205,7 @@ const mstp = ({
   endpoints,
 }: AppState): StateProps => {
   return {
+    globalSearch,
     labels,
     buckets,
     telegrafs,
@@ -213,6 +224,7 @@ const mstp = ({
 }
 
 const mdtp = {
+  getGlobalSearch: getGlobalSearch,
   getLabels: getLabels,
   getBuckets: getBuckets,
   getTelegrafs: getTelegrafs,

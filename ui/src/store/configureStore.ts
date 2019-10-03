@@ -21,6 +21,7 @@ import onboardingReducer from 'src/onboarding/reducers'
 import noteEditorReducer from 'src/dashboards/reducers/notes'
 import dataLoadingReducer from 'src/dataLoaders/reducers'
 import {variablesReducer} from 'src/variables/reducers'
+import {globalSearchReducer} from 'src/globalSearch/reducers'
 import {labelsReducer} from 'src/labels/reducers'
 import {bucketsReducer} from 'src/buckets/reducers'
 import {telegrafsReducer} from 'src/telegrafs/reducers'
@@ -56,6 +57,7 @@ export const rootReducer = combineReducers<ReducerState>({
   noteEditor: noteEditorReducer,
   dataLoading: dataLoadingReducer,
   variables: variablesReducer,
+  globalSearch: globalSearchReducer,
   labels: labelsReducer,
   buckets: bucketsReducer,
   telegrafs: telegrafsReducer,

@@ -1,4 +1,5 @@
 export enum ResourceType {
+  GlobalSearch = 'global',
   Labels = 'labels',
   Buckets = 'buckets',
   Telegrafs = 'telegrafs',

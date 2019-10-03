@@ -92,6 +92,7 @@ import NewRuleOverlay from 'src/alerting/components/notifications/NewRuleOverlay
 import EditRuleOverlay from 'src/alerting/components/notifications/EditRuleOverlay'
 import NewEndpointOverlay from 'src/alerting/components/endpoints/NewEndpointOverlay'
 import EditEndpointOverlay from 'src/alerting/components/endpoints/EditEndpointOverlay'
+import SearchOverlay from 'src/globalSearch/components/SearchOverlay'
 
 import {FeatureFlag} from 'src/shared/utils/featureFlag'
 
@@ -160,6 +161,7 @@ class Root extends PureComponent {
                         <Route path="new" component={CreateOrgOverlay} />
                         <Route path=":orgID" component={SetOrg}>
                           <IndexRoute component={MePage} />
+                          <Route path="search" component={SearchOverlay} />
                           <Route path="tasks" component={TasksPage}>
                             <Route
                               path=":id/export"

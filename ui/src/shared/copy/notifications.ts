@@ -413,6 +413,12 @@ export const deleteLabelFailed = (): Notification => ({
   message: 'Failed to delete label',
 })
 
+// Global Search
+export const getGlobalSearchFailed = (): Notification => ({
+  ...defaultErrorNotification,
+  message: 'Failed to fetch search results',
+})
+
 // Buckets
 export const getBucketsFailed = (): Notification => ({
   ...defaultErrorNotification,
