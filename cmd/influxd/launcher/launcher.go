@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/blevesearch/bleve"
 	"github.com/influxdata/flux"
 	platform "github.com/influxdata/influxdb"
 	"github.com/influxdata/influxdb/authorizer"
@@ -35,6 +36,7 @@ import (
 	"github.com/influxdata/influxdb/query"
 	"github.com/influxdata/influxdb/query/control"
 	"github.com/influxdata/influxdb/query/stdlib/influxdata/influxdb"
+	"github.com/influxdata/influxdb/search"
 	"github.com/influxdata/influxdb/snowflake"
 	"github.com/influxdata/influxdb/source"
 	"github.com/influxdata/influxdb/storage"
@@ -49,7 +51,7 @@ import (
 	_ "github.com/influxdata/influxdb/tsdb/tsm1" // needed for tsm1
 	"github.com/influxdata/influxdb/vault"
 	pzap "github.com/influxdata/influxdb/zap"
-	"github.com/opentracing/opentracing-go"
+	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cobra"
 	jaegerconfig "github.com/uber/jaeger-client-go/config"
@@ -191,6 +193,18 @@ func buildLauncherCommand(l *Launcher, cmd *cobra.Command) {
 			Default: false,
 			Desc:    "disables automatically extending session ttl on request",
 		},
+		{
+			DestP:   &l.fullTextPath,
+			Flag:    "fulltext-path",
+			Default: filepath.Join(dir, "fulltextIndex"),
+			Desc:    "path to fulltext search engine",
+		},
+		{
+			DestP:   &l.fulltextSearchReindex,
+			Flag:    "fulltext-reindex",
+			Default: false,
+			Desc:    "enable reindex of fulltext search",
+		},
 	}
 
 	cli.BindOptions(cmd, opts)
@@ -210,17 +224,21 @@ type Launcher struct {
 	sessionLength        int // in minutes
 	sessionRenewDisabled bool
 
+	fulltextSearchReindex bool
+
 	logLevel          string
 	tracingType       string
 	reportingDisabled bool
 
 	httpBindAddress string
 	boltPath        string
+	fullTextPath    string
 	enginePath      string
 	secretStore     string
 
 	boltClient    *bolt.Client
 	kvService     *kv.Service
+	findService   search.FindService
 	engine        *storage.Engine
 	StorageConfig storage.Config
 
@@ -402,6 +420,17 @@ func (m *Launcher) run(ctx context.Context) (err error) {
 	m.boltClient = bolt.NewClient()
 	m.boltClient.Path = m.boltPath
 	m.boltClient.WithLogger(m.logger.With(zap.String("service", "bolt")))
+
+	mapping := bleve.NewIndexMapping()
+	fulltextIndex, err := bleve.NewMemOnly(mapping)
+	if err != nil {
+		m.logger.Error("failed opening fulltextIndex", zap.Error(err))
+		return err
+	}
+	m.findService = search.NewService(
+		fulltextIndex,
+		m.logger.With(zap.String("findService", "fulltext")),
+	)
 
 	if err := m.boltClient.Open(ctx); err != nil {
 		m.logger.Error("failed opening bolt", zap.Error(err))
@@ -658,6 +687,17 @@ func (m *Launcher) run(ctx context.Context) (err error) {
 		logger.Info("Stopping")
 	}(m.logger)
 
+	// reindex fulltext search
+	if m.fulltextSearchReindex {
+		sc := &search.Scanner{
+			Service:       m.findService,
+			BucketService: bucketSvc,
+		}
+		if err := sc.Scan(context.Background()); err != nil {
+			return err
+		}
+	}
+
 	m.httpServer = &nethttp.Server{
 		Addr: m.httpBindAddress,
 	}
@@ -701,6 +741,7 @@ func (m *Launcher) run(ctx context.Context) (err error) {
 		LookupService:                   lookupSvc,
 		DocumentService:                 m.kvService,
 		OrgLookupService:                m.kvService,
+		FindService:                     m.findService,
 		WriteEventRecorder:              infprom.NewEventRecorder("write"),
 		QueryEventRecorder:              infprom.NewEventRecorder("query"),
 	}

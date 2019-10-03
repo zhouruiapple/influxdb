@@ -10,6 +10,7 @@ import (
 	"github.com/influxdata/influxdb/http/metric"
 	"github.com/influxdata/influxdb/kit/prom"
 	"github.com/influxdata/influxdb/query"
+	"github.com/influxdata/influxdb/search"
 	"github.com/influxdata/influxdb/storage"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
@@ -34,6 +35,7 @@ type APIHandler struct {
 	TelegrafHandler             *TelegrafHandler
 	QueryHandler                *FluxHandler
 	WriteHandler                *WriteHandler
+	SearchHandler               *SearchHandler
 	DeleteHandler               *DeleteHandler
 	DocumentHandler             *DocumentHandler
 	SetupHandler                *SetupHandler
@@ -57,6 +59,7 @@ type APIBackend struct {
 	WriteEventRecorder metric.EventRecorder
 	QueryEventRecorder metric.EventRecorder
 
+	FindService                     search.FindService
 	PointsWriter                    storage.PointsWriter
 	DeleteService                   influxdb.DeleteService
 	AuthorizationService            influxdb.AuthorizationService
@@ -190,6 +193,9 @@ func NewAPIHandler(b *APIBackend) *APIHandler {
 	fluxBackend := NewFluxBackend(b)
 	h.QueryHandler = NewFluxHandler(fluxBackend)
 
+	searchBackend := NewSearchBackend(b)
+	h.SearchHandler = NewSearchHandler(searchBackend)
+
 	h.ChronografHandler = NewChronografHandler(b.ChronografService, b.HTTPErrorHandler)
 	h.SwaggerHandler = newSwaggerLoader(b.Logger.With(zap.String("service", "swagger-loader")), b.HTTPErrorHandler)
 	h.LabelHandler = NewLabelHandler(authorizer.NewLabelService(b.LabelService), b.HTTPErrorHandler)
@@ -229,6 +235,7 @@ var apiLinks = map[string]interface{}{
 		"debug":   "/debug/pprof",
 		"health":  "/health",
 	},
+	"search":    "/api/v2/search",
 	"tasks":     "/api/v2/tasks",
 	"checks":    "/api/v2/checks",
 	"telegrafs": "/api/v2/telegrafs",
@@ -284,6 +291,11 @@ func (h *APIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if strings.HasPrefix(r.URL.Path, "/api/v2/buckets") {
 		h.BucketHandler.ServeHTTP(w, r)
+		return
+	}
+
+	if strings.HasPrefix(r.URL.Path, "/api/v2/search") {
+		h.SearchHandler.ServeHTTP(w, r)
 		return
 	}
 

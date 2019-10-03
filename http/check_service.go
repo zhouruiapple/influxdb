@@ -121,7 +121,7 @@ func NewCheckHandler(b *CheckBackend) *CheckHandler {
 		LabelService:     b.LabelService,
 		ResourceType:     influxdb.TelegrafsResourceType,
 	}
-	h.HandlerFunc("GET", checksIDLabelsIDPath, newGetLabelsHandler(labelBackend))
+	h.HandlerFunc("GET", checksIDLabelsPath, newGetLabelsHandler(labelBackend))
 	h.HandlerFunc("POST", checksIDLabelsPath, newPostLabelHandler(labelBackend))
 	h.HandlerFunc("DELETE", checksIDLabelsIDPath, newDeleteLabelHandler(labelBackend))
 
@@ -170,6 +170,12 @@ type checksResponse struct {
 }
 
 func (h *CheckHandler) newCheckResponse(ctx context.Context, chk influxdb.Check, labels []*influxdb.Label) (*checkResponse, error) {
+	// TODO(desa): this should be handled in the check and not exposed in http land, but is currently blocking the FE. https://github.com/influxdata/influxdb/issues/15259
+	task, err := h.TaskService.FindTaskByID(ctx, chk.GetTaskID())
+	if err != nil {
+		return nil, err
+	}
+
 	// Ensure that we don't expose that this creates a task behind the scene
 	chk.ClearPrivateData()
 
@@ -186,11 +192,6 @@ func (h *CheckHandler) newCheckResponse(ctx context.Context, chk influxdb.Check,
 
 	for _, l := range labels {
 		res.Labels = append(res.Labels, *l)
-	}
-
-	task, err := h.TaskService.FindTaskByID(ctx, chk.GetTaskID())
-	if err != nil {
-		return nil, err
 	}
 
 	res.Status = task.Status
@@ -234,7 +235,6 @@ func decodeGetCheckRequest(ctx context.Context, r *http.Request) (i influxdb.ID,
 
 func (h *CheckHandler) handleGetChecks(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	h.Logger.Debug("checks retrieve request", zap.String("r", fmt.Sprint(r)))
 	filter, opts, err := decodeCheckFilter(ctx, r)
 	if err != nil {
 		h.Logger.Debug("failed to decode request", zap.Error(err))
@@ -290,7 +290,6 @@ func newFluxResponse(flux string) fluxResp {
 
 func (h *CheckHandler) handleGetCheck(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	h.Logger.Debug("check retrieve request", zap.String("r", fmt.Sprint(r)))
 	id, err := decodeGetCheckRequest(ctx, r)
 	if err != nil {
 		h.HandleHTTPError(ctx, err, w)
@@ -486,7 +485,6 @@ func decodePatchCheckRequest(ctx context.Context, r *http.Request) (*patchCheckR
 // handlePostCheck is the HTTP handler for the POST /api/v2/checks route.
 func (h *CheckHandler) handlePostCheck(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	h.Logger.Debug("check create request", zap.String("r", fmt.Sprint(r)))
 	chk, err := decodePostCheckRequest(ctx, r)
 	if err != nil {
 		h.Logger.Debug("failed to decode request", zap.Error(err))
@@ -509,6 +507,7 @@ func (h *CheckHandler) handlePostCheck(w http.ResponseWriter, r *http.Request) {
 	cr, err := h.newCheckResponse(ctx, chk, []*influxdb.Label{})
 	if err != nil {
 		h.HandleHTTPError(ctx, err, w)
+		return
 	}
 
 	if err := encodeResponse(ctx, w, http.StatusCreated, cr); err != nil {
@@ -520,7 +519,6 @@ func (h *CheckHandler) handlePostCheck(w http.ResponseWriter, r *http.Request) {
 // handlePutCheck is the HTTP handler for the PUT /api/v2/checks route.
 func (h *CheckHandler) handlePutCheck(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	h.Logger.Debug("check replace request", zap.String("r", fmt.Sprint(r)))
 	chk, err := decodePutCheckRequest(ctx, r)
 	if err != nil {
 		h.Logger.Debug("failed to decode request", zap.Error(err))
@@ -556,7 +554,6 @@ func (h *CheckHandler) handlePutCheck(w http.ResponseWriter, r *http.Request) {
 // handlePatchCheck is the HTTP handler for the PATCH /api/v2/checks/:id route.
 func (h *CheckHandler) handlePatchCheck(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	h.Logger.Debug("check patch request", zap.String("r", fmt.Sprint(r)))
 	req, err := decodePatchCheckRequest(ctx, r)
 	if err != nil {
 		h.Logger.Debug("failed to decode request", zap.Error(err))
@@ -591,7 +588,6 @@ func (h *CheckHandler) handlePatchCheck(w http.ResponseWriter, r *http.Request) 
 
 func (h *CheckHandler) handleDeleteCheck(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	h.Logger.Debug("check delete request", zap.String("r", fmt.Sprint(r)))
 	i, err := decodeGetCheckRequest(ctx, r)
 	if err != nil {
 		h.HandleHTTPError(ctx, err, w)
