@@ -5,22 +5,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/blevesearch/bleve/search/query"
-	"go.uber.org/zap"
-
-	"github.com/blevesearch/bleve/document"
-
 	"github.com/blevesearch/bleve"
-
+	"github.com/blevesearch/bleve/document"
+	"github.com/blevesearch/bleve/search/query"
 	"github.com/influxdata/influxdb"
+	"go.uber.org/zap"
 )
-
-/*
-	way to import the index
-	way to search the created index
-		*
-	way to update the index on every req
-*/
 
 // Doc the document for search.
 type Doc interface {
@@ -73,10 +63,10 @@ func (s *service) SimpleQuery(q string, dt DocType) ([]Doc, error) {
 		switch docuType {
 		case DocTypeBucket:
 			docs = append(docs, newBucket(doc))
+		case DocTypeOrg:
+			docs = append(docs, newOrganization(doc))
 		case DocTypeUser:
 			docs = append(docs, newUser(doc))
-		default:
-			continue
 		}
 	}
 
@@ -139,15 +129,13 @@ func newBucket(d *document.Document) (b Bucket) {
 	for _, f := range d.Fields {
 		switch f.Name() {
 		case "createdAt":
-			tf := document.NewDateTimeFieldFromBytes(f.Name(), f.ArrayPositions(), f.Value())
-			tm, err := tf.DateTime()
-			if err == nil {
+			tm, ok := getDateTime(f)
+			if ok {
 				b.CreatedAt = tm
 			}
 		case "updatedAt":
-			tf := document.NewDateTimeFieldFromBytes(f.Name(), f.ArrayPositions(), f.Value())
-			tm, err := tf.DateTime()
-			if err == nil {
+			tm, ok := getDateTime(f)
+			if ok {
 				b.UpdatedAt = tm
 			}
 		default:
@@ -159,6 +147,12 @@ func newBucket(d *document.Document) (b Bucket) {
 	}
 
 	return b
+}
+
+func getDateTime(f document.Field) (time.Time, bool) {
+	tf := document.NewDateTimeFieldFromBytes(f.Name(), f.ArrayPositions(), f.Value())
+	tm, err := tf.DateTime()
+	return tm, err == nil
 }
 
 // Bucket implements Doc interface.

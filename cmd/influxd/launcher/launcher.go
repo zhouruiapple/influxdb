@@ -690,9 +690,10 @@ func (m *Launcher) run(ctx context.Context) (err error) {
 	// reindex fulltext search
 	if m.fulltextSearchReindex {
 		sc := &search.Scanner{
-			Service:       m.findService,
-			BucketService: bucketSvc,
-			UserService:   userSvc,
+			Service:             m.findService,
+			BucketService:       bucketSvc,
+			OrganizationService: orgSvc,
+			UserService:         userSvc,
 		}
 		if err := sc.Scan(context.Background()); err != nil {
 			return err
