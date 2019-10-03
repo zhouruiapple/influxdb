@@ -7,7 +7,6 @@ import (
 
 	"github.com/blevesearch/bleve"
 	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/search/query"
 	"github.com/influxdata/influxdb"
 	"go.uber.org/zap"
 )
@@ -39,14 +38,20 @@ func NewService(core bleve.Index, logger *zap.Logger) FindService {
 
 // SimpleQuery search for a simple text.
 func (s *service) SimpleQuery(q string, dt DocType) ([]Doc, error) {
-	queries := []query.Query{
-		bleve.NewFuzzyQuery(q),
-	}
+	bq := bleve.NewBooleanQuery()
 	if dt != DocTypeUnknown {
-		queries = append(queries, bleve.NewMatchQuery(fmt.Sprintf(`+DocType:%q`, dt)))
+		bq.AddMust(bleve.NewMatchQuery(fmt.Sprintf(`+DocType:%q`, dt)))
 	}
 
-	req := bleve.NewSearchRequest(bleve.NewConjunctionQuery(queries...))
+	nested := bleve.NewBooleanQuery()
+	nested.AddShould(
+		bleve.NewFuzzyQuery(q),
+		bleve.NewPrefixQuery(q),
+	)
+
+	bq.AddMust(nested)
+
+	req := bleve.NewSearchRequest(bq)
 	results, err := s.Core.Search(req)
 	if err != nil {
 		return nil, err
