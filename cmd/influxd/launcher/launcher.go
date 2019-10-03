@@ -692,6 +692,7 @@ func (m *Launcher) run(ctx context.Context) (err error) {
 		sc := &search.Scanner{
 			Service:       m.findService,
 			BucketService: bucketSvc,
+			UserService:   userSvc,
 		}
 		if err := sc.Scan(context.Background()); err != nil {
 			return err

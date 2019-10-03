@@ -10,11 +10,15 @@ import (
 type Scanner struct {
 	Service FindService
 	influxdb.BucketService
+	influxdb.UserService
 }
 
 // Scan different resources in search index.
 func (sc Scanner) Scan(ctx context.Context) error {
 	if err := sc.scanBuckets(ctx); err != nil {
+		return err
+	}
+	if err := sc.scanUsers(ctx); err != nil {
 		return err
 	}
 	return nil
@@ -29,6 +33,26 @@ func (sc Scanner) scanBuckets(ctx context.Context) error {
 		b := ConvertBucket(*bkt)
 		if err := sc.Service.Index(ctx, b); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+func (sc Scanner) scanUsers(ctx context.Context) error {
+	usrs, _, err := sc.UserService.FindUsers(ctx, influxdb.UserFilter{})
+	if err != nil {
+		return &influxdb.Error{
+			Msg: "err scanning user",
+			Err: err,
+		}
+	}
+	for _, usr := range usrs {
+		u := ConvertUser(*usr)
+		if err := sc.Service.Index(ctx, u); err != nil {
+			return &influxdb.Error{
+				Msg: "err converting user",
+				Err: err,
+			}
 		}
 	}
 	return nil

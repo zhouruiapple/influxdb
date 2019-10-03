@@ -73,6 +73,8 @@ func (s *service) SimpleQuery(q string, dt DocType) ([]Doc, error) {
 		switch docuType {
 		case DocTypeBucket:
 			docs = append(docs, newBucket(doc))
+		case DocTypeUser:
+			docs = append(docs, newUser(doc))
 		default:
 			continue
 		}
@@ -103,6 +105,7 @@ const (
 	DocTypeUnknown DocType = ""
 	DocTypeBucket  DocType = "bucket"
 	DocTypeOrg     DocType = "org"
+	DocTypeUser    DocType = "user"
 )
 
 // ConvertBucket will convert a domain bucket to a search.Bucket.
