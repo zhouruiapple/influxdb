@@ -5,26 +5,28 @@ go 1.12
 require (
 	github.com/BurntSushi/toml v0.3.1
 	github.com/NYTimes/gziphandler v1.0.1
-	github.com/RoaringBitmap/roaring v0.4.16
+	github.com/RoaringBitmap/roaring v0.4.21
 	github.com/andreyvit/diff v0.0.0-20170406064948-c7f18ee00883
 	github.com/apache/arrow/go/arrow v0.0.0-20190809133625-b98a560fc561
 	github.com/aws/aws-sdk-go v1.16.15 // indirect
 	github.com/benbjohnson/tmpl v1.0.0
+	github.com/blevesearch/bleve v0.8.1
+	github.com/blevesearch/segment v0.0.0-20160915185041-762005e7a34f // indirect
 	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/bouk/httprouter v0.0.0-20160817010721-ee8b3818a7f5
 	github.com/cespare/xxhash v1.1.0
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
 	github.com/coreos/bbolt v1.3.1-coreos.6
+	github.com/couchbase/vellum v0.0.0-20190829182332-ef2e028c01fd // indirect
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/dgryski/go-bitstream v0.0.0-20180413035011-3522498ce2c8
 	github.com/docker/docker v1.13.1 // indirect
 	github.com/editorconfig-checker/editorconfig-checker v0.0.0-20190819115812-1474bdeaf2a2
 	github.com/elazarl/go-bindata-assetfs v1.0.0
+	github.com/etcd-io/bbolt v1.3.3 // indirect
 	github.com/getkin/kin-openapi v0.2.0
 	github.com/ghodss/yaml v1.0.0
-	github.com/glycerine/go-unsnap-stream v0.0.0-20181221182339-f9677308dec2 // indirect
-	github.com/glycerine/goconvey v0.0.0-20180728074245-46e3a41ad493 // indirect
 	github.com/gogo/protobuf v1.2.1
 	github.com/golang/gddo v0.0.0-20181116215533-9bd4a3295021
 	github.com/golang/protobuf v1.3.2
@@ -36,6 +38,7 @@ require (
 	github.com/hashicorp/go-msgpack v0.0.0-20150518234257-fa3f63826f7c // indirect
 	github.com/hashicorp/raft v1.0.0 // indirect
 	github.com/hashicorp/vault/api v1.0.2
+	github.com/influxdata/bleve v0.8.2-0.20191003212554-6e6e8ac1d61b
 	github.com/influxdata/flux v0.49.0
 	github.com/influxdata/influxql v0.0.0-20180925231337-1cbfca8e56b6
 	github.com/influxdata/usage-client v0.0.0-20160829180054-6d3895376368
@@ -49,35 +52,30 @@ require (
 	github.com/mattn/go-zglob v0.0.1 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1
 	github.com/mna/pigeon v1.0.1-0.20180808201053-bb0192cfc2ae
-	github.com/mschoch/smat v0.0.0-20160514031455-90eadee771ae // indirect
 	github.com/nats-io/gnatsd v1.3.0
 	github.com/nats-io/go-nats v1.7.0 // indirect
 	github.com/nats-io/go-nats-streaming v0.4.0
 	github.com/nats-io/nats-streaming-server v0.11.2
 	github.com/nats-io/nkeys v0.0.2 // indirect
 	github.com/nats-io/nuid v1.0.0 // indirect
-	github.com/onsi/ginkgo v1.7.0 // indirect
-	github.com/onsi/gomega v1.4.3 // indirect
 	github.com/opentracing/opentracing-go v1.1.0
-	github.com/philhofer/fwd v1.0.0 // indirect
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v1.0.0
 	github.com/prometheus/client_model v0.0.0-20190129233127-fd36f4220a90
 	github.com/prometheus/common v0.6.0
 	github.com/prometheus/procfs v0.0.3 // indirect
 	github.com/satori/go.uuid v1.2.0
-	github.com/spf13/cast v1.2.0
-	github.com/spf13/cobra v0.0.3
+	github.com/spf13/cast v1.3.0
+	github.com/spf13/cobra v0.0.5
 	github.com/spf13/pflag v1.0.3
-	github.com/spf13/viper v1.2.1
+	github.com/spf13/viper v1.3.2
+	github.com/syndtr/goleveldb v1.0.0 // indirect
 	github.com/tcnksm/go-input v0.0.0-20180404061846-548a7d7a8ee8
 	github.com/testcontainers/testcontainers-go v0.0.0-20190108154635-47c0da630f72
-	github.com/tinylib/msgp v1.1.0 // indirect
 	github.com/tylerb/graceful v1.2.15
 	github.com/uber-go/atomic v1.3.2 // indirect
 	github.com/uber/jaeger-client-go v2.15.0+incompatible
 	github.com/uber/jaeger-lib v1.5.0+incompatible // indirect
-	github.com/willf/bitset v1.1.9 // indirect
 	github.com/yudai/gojsondiff v1.0.0
 	github.com/yudai/golcs v0.0.0-20170316035057-ecda9a501e82 // indirect
 	github.com/yudai/pp v2.0.1+incompatible // indirect
@@ -87,7 +85,7 @@ require (
 	golang.org/x/net v0.0.0-20190620200207-3b0461eec859
 	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
 	golang.org/x/sync v0.0.0-20190423024810-112230192c58
-	golang.org/x/sys v0.0.0-20190624142023-c5567b49c5d0
+	golang.org/x/sys v0.0.0-20191002091554-b397fe3ad8ed
 	golang.org/x/time v0.0.0-20190308202827-9d24e82272b4
 	golang.org/x/tools v0.0.0-20190628153133-6cdbf07be9d0
 	google.golang.org/api v0.7.0
