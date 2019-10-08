@@ -13,6 +13,7 @@ const TerserJSPlugin = require('terser-webpack-plugin')
 
 module.exports = merge(common, {
   mode: 'production',
+  devtool: 'source-map',
   output: {
     filename: '[name].[hash].js',
   },
@@ -30,6 +31,15 @@ module.exports = merge(common, {
               hmr: true,
             },
           },
+        ],
+      },
+      {
+        test: /\.js$/,
+        enforce: 'pre', // this forces this rule to run first.
+        use: ['source-map-loader'],
+        include: [
+          path.resolve(__dirname, 'node_modules/@influxdata/giraffe'),
+          path.resolve(__dirname, 'node_modules/@influxdata/clockface'),
         ],
       },
     ],
