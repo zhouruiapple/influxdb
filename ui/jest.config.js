@@ -41,5 +41,24 @@ module.exports = {
     'ts-jest': {
       tsConfig: 'tsconfig.test.json'
     }
+  },
+  collectCoverage: true,
+  collectCoverageFrom: [
+    './src/**/*.{js,jsx,ts,tsx}',
+    '!./src/**/*.test.{js,jsx,ts,tsx}'
+  ],
+  coverageDirectory: './coverage',
+  coverageReporters: [
+    'text',
+    'html',
+    'cobertura'
+  ],
+  coverageThreshold: {
+    global: {
+      statements: 27,
+      branches: 18.3,
+      functions: 18.7,
+      lines: 27.4
+    }
   }
 }
