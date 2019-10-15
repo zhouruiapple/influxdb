@@ -136,6 +136,7 @@ func WithCompactionPlanner(planner tsm1.CompactionPlanner) Option {
 // engine uses. A typical use-case for this would be if multiple engines should
 // share the same limiter.
 func WithCompactionLimiter(limiter limiter.Fixed) Option {
+	fmt.Printf("WithCompactionLimiter called with limiter %p", limiter)
 	return func(e *Engine) {
 		e.engine.WithCompactionLimiter(limiter)
 	}

@@ -234,7 +234,9 @@ func NewEngine(path string, idx *tsi1.Index, config Config, options ...EngineOpt
 // WithCompactionLimiter sets the compaction limiter, which is used to limit the
 // number of concurrent compactions.
 func (e *Engine) WithCompactionLimiter(limiter limiter.Fixed) {
+	fmt.Printf("old compaction limiter addr%p cap %d avail %d\n", e.compactionLimiter, e.compactionLimiter.Capacity(), e.compactionLimiter.Available())
 	e.compactionLimiter = limiter
+	fmt.Printf("new compaction limiter set addr%p cap %d avail %d\n", e.compactionLimiter, e.compactionLimiter.Capacity(), e.compactionLimiter.Available())
 }
 
 func (e *Engine) WithFormatFileNameFunc(formatFileNameFunc FormatFileNameFunc) {
@@ -1049,14 +1051,32 @@ func (e *Engine) compactHiPriorityLevel(ctx context.Context, grp CompactionGroup
 		return false
 	}
 
+	e.logger.Info("compactHiPriorityLevel pre-ask",
+		zap.String("addr", fmt.Sprintf("%p", e.compactionLimiter)),
+		zap.String("comp level", level.String()),
+		zap.Int("limiter capacity", e.compactionLimiter.Capacity()),
+		zap.Int("limiter available", e.compactionLimiter.Available()),
+	)
 	// Try hi priority limiter, otherwise steal a little from the low priority if we can.
 	if e.compactionLimiter.TryTake() {
+		e.logger.Info("compactHiPriorityLevel GOT",
+			zap.String("addr", fmt.Sprintf("%p", e.compactionLimiter)),
+			zap.String("comp level", level.String()),
+			zap.Int("limiter capacity", e.compactionLimiter.Capacity()),
+			zap.Int("limiter available", e.compactionLimiter.Available()),
+		)
 		e.compactionTracker.IncActive(level)
 
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			defer e.compactionTracker.DecActive(level)
+			defer e.logger.Info("compactHiPriorityLevel RELEASED",
+				zap.String("addr", fmt.Sprintf("%p", e.compactionLimiter)),
+				zap.String("comp level", level.String()),
+				zap.Int("limiter capacity", e.compactionLimiter.Capacity()),
+				zap.Int("limiter available", e.compactionLimiter.Available()),
+			)
 			defer e.compactionLimiter.Release()
 			s.Apply(ctx)
 			// Release the files in the compaction plan
@@ -1064,6 +1084,13 @@ func (e *Engine) compactHiPriorityLevel(ctx context.Context, grp CompactionGroup
 		}()
 		return true
 	}
+
+	e.logger.Info("compactHiPriorityLevel BLOCKED",
+		zap.String("addr", fmt.Sprintf("%p", e.compactionLimiter)),
+		zap.String("comp level", level.String()),
+		zap.Int("limiter capacity", e.compactionLimiter.Capacity()),
+		zap.Int("limiter available", e.compactionLimiter.Available()),
+	)
 
 	// Return the unused plans
 	return false
@@ -1078,12 +1105,30 @@ func (e *Engine) compactLoPriorityLevel(ctx context.Context, grp CompactionGroup
 	}
 
 	// Try the lo priority limiter, otherwise steal a little from the high priority if we can.
+	e.logger.Info("compactLoPriorityLevel pre-ask",
+		zap.String("addr", fmt.Sprintf("%p", e.compactionLimiter)),
+		zap.String("comp level", level.String()),
+		zap.Int("limiter capacity", e.compactionLimiter.Capacity()),
+		zap.Int("limiter available", e.compactionLimiter.Available()),
+	)
 	if e.compactionLimiter.TryTake() {
+		e.logger.Info("compactLoPriorityLevel GOT",
+			zap.String("addr", fmt.Sprintf("%p", e.compactionLimiter)),
+			zap.String("comp level", level.String()),
+			zap.Int("limiter capacity", e.compactionLimiter.Capacity()),
+			zap.Int("limiter available", e.compactionLimiter.Available()),
+		)
 		e.compactionTracker.IncActive(level)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			defer e.compactionTracker.DecActive(level)
+			defer e.logger.Info("compactLoPriorityLevel RELEASED",
+				zap.String("addr", fmt.Sprintf("%p", e.compactionLimiter)),
+				zap.String("comp level", level.String()),
+				zap.Int("limiter capacity", e.compactionLimiter.Capacity()),
+				zap.Int("limiter available", e.compactionLimiter.Available()),
+			)
 			defer e.compactionLimiter.Release()
 			s.Apply(ctx)
 			// Release the files in the compaction plan
@@ -1091,6 +1136,13 @@ func (e *Engine) compactLoPriorityLevel(ctx context.Context, grp CompactionGroup
 		}()
 		return true
 	}
+
+	e.logger.Info("compactLoPriorityLevel BLOCKED",
+		zap.String("addr", fmt.Sprintf("%p", e.compactionLimiter)),
+		zap.String("comp level", level.String()),
+		zap.Int("limiter capacity", e.compactionLimiter.Capacity()),
+		zap.Int("limiter available", e.compactionLimiter.Available()),
+	)
 	return false
 }
 
@@ -1102,13 +1154,31 @@ func (e *Engine) compactFull(ctx context.Context, grp CompactionGroup, wg *sync.
 		return false
 	}
 
+	e.logger.Info("compactFull pre-ask",
+		zap.String("addr", fmt.Sprintf("%p", e.compactionLimiter)),
+		zap.String("comp level", "full"),
+		zap.Int("limiter capacity", e.compactionLimiter.Capacity()),
+		zap.Int("limiter available", e.compactionLimiter.Available()),
+	)
 	// Try the lo priority limiter, otherwise steal a little from the high priority if we can.
 	if e.compactionLimiter.TryTake() {
+		e.logger.Info("compactFull GOT",
+			zap.String("addr", fmt.Sprintf("%p", e.compactionLimiter)),
+			zap.String("comp level", "full"),
+			zap.Int("limiter capacity", e.compactionLimiter.Capacity()),
+			zap.Int("limiter available", e.compactionLimiter.Available()),
+		)
 		e.compactionTracker.IncFullActive()
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			defer e.compactionTracker.DecFullActive()
+			defer e.logger.Info("compactFull RELEASED",
+				zap.String("addr", fmt.Sprintf("%p", e.compactionLimiter)),
+				zap.String("comp level", "full"),
+				zap.Int("limiter capacity", e.compactionLimiter.Capacity()),
+				zap.Int("limiter available", e.compactionLimiter.Available()),
+			)
 			defer e.compactionLimiter.Release()
 			s.Apply(ctx)
 			// Release the files in the compaction plan
@@ -1116,6 +1186,13 @@ func (e *Engine) compactFull(ctx context.Context, grp CompactionGroup, wg *sync.
 		}()
 		return true
 	}
+
+	e.logger.Info("compactFull BLOCKED",
+		zap.String("addr", fmt.Sprintf("%p", e.compactionLimiter)),
+		zap.String("comp level", "full"),
+		zap.Int("limiter capacity", e.compactionLimiter.Capacity()),
+		zap.Int("limiter available", e.compactionLimiter.Available()),
+	)
 	return false
 }
 
