@@ -196,8 +196,13 @@ func buildLauncherCommand(l *Launcher, cmd *cobra.Command) {
 		},
 		{
 			DestP: &vaultConfig.Address,
-			Flag:  "vault-address",
+			Flag:  "vault-addr",
 			Desc:  "address of the Vault server expressed as a URL and port, for example: https://127.0.0.1:8200/.",
+		},
+		{
+			DestP: &vaultConfig.Token,
+			Flag:  "vault-token",
+			Desc:  "authentication token of the vault server.",
 		},
 		{
 			DestP: &vaultConfig.ClientTimeout,

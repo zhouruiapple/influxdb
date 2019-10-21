@@ -22,6 +22,7 @@ type SecretService struct {
 // value, it will be ignored and the default used.
 type Config struct {
 	Address       string
+	Token         string
 	AgentAddress  string
 	ClientTimeout time.Duration
 	MaxRetries    int
@@ -112,6 +113,10 @@ func NewSecretService(cfgOpts ...ConfigOptFn) (*SecretService, error) {
 	c, err := api.NewClient(cfg)
 	if err != nil {
 		return nil, err
+	}
+
+	if explicitConfig.Token != "" {
+		c.SetToken(c.Token())
 	}
 
 	return &SecretService{
