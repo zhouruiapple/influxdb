@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/influxdata/influxdb"
-	"github.com/influxdata/influxdb/cmd/influxd/generate"
 	"github.com/influxdata/influxdb/cmd/influxd/inspect"
+	"github.com/influxdata/influxdb/cmd/influxd/generate"
 	"github.com/influxdata/influxdb/cmd/influxd/launcher"
 	_ "github.com/influxdata/influxdb/query/builtin"
 	_ "github.com/influxdata/influxdb/tsdb/tsi1"
@@ -35,7 +35,7 @@ func init() {
 	rootCmd.InitDefaultHelpCmd()
 
 	rootCmd.AddCommand(launcher.NewCommand())
-	rootCmd.AddCommand(generate.Command)
+	rootCmd.AddCommand(generate.NewCommand())
 	rootCmd.AddCommand(inspect.NewCommand())
 }
 

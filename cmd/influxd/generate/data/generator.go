@@ -1,4 +1,4 @@
-package generate
+package data
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/influxdata/influxdb/cmd/influxd/generate/internal/shard"
+	"github.com/influxdata/influxdb/cmd/influxd/generate/data/internal/shard"
 	"github.com/influxdata/influxdb/kit/errors"
 	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/influxdb/pkg/data/gen"
