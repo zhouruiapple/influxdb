@@ -2,6 +2,7 @@ package generate
 
 import (
 	"github.com/influxdata/influxdb/cmd/influxd/generate/data"
+	"github.com/influxdata/influxdb/cmd/influxd/generate/meta"
 	"github.com/spf13/cobra"
 )
 
@@ -16,6 +17,7 @@ func NewCommand() *cobra.Command {
 	// If a new sub-command is created, it must be added here
 	subCommands := []*cobra.Command{
 		data.Command,
+		meta.Command,
 	}
 
 	base.AddCommand(subCommands...)
