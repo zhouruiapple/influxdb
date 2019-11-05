@@ -21,7 +21,7 @@ var dumpTSIFlags = struct {
 	Stdout io.Writer
 
 	seriesFilePath string
-	dataPath       string
+	tsiPath        string
 
 	showSeries         bool
 	showMeasurements   bool
@@ -41,46 +41,30 @@ func NewDumpTSICommand() *cobra.Command {
 		Short: "Dump low level tsi information",
 		Long: `Dumps low-level details about tsi1 files.
 
-		Usage: influx_inspect dumptsi [flags] path...
-		
-			-series
-					Dump raw series data
-			-measurements
-					Dump raw measurement data
-			-tag-keys
-					Dump raw tag keys
-			-tag-values
-					Dump raw tag values
-			-tag-value-series
-					Dump raw series for each tag value
-			-measurement-filter REGEXP
-					Filters data by measurement regular expression
-			-series-path PATH
-					Path to the "_series" directory under the database data directory.
-			-index-path PATH
-					Path to the "index" directory under the database data directory.
-			-tag-key-filter REGEXP
-					Filters data by tag key regular expression
-			-tag-value-filter REGEXP
-					Filters data by tag value regular expression
+This tool emits low-level details about the TSI index and Series file. If 
+running on a machine being used for production workloads it should be used
+with caution.
+
+This tool lets you output series, measurement names, tag keys and values, and allows
+for regex filters on those. Further, you can limit the output to and org and/or 
+bucket.
 		`,
 		RunE: dumpTsi,
 	}
 	defaultDataDir, _ := fs.InfluxDir()
-	defaultDataDir = filepath.Join(defaultDataDir, "engine")
-	defaultIndexDir := filepath.Join(defaultDataDir, "index")
-	defaultSeriesDir := filepath.Join(defaultDataDir, "_series")
+	defaultIndexDir := filepath.Join(defaultDataDir, "engine", "index")
+	defaultSeriesDir := filepath.Join(defaultDataDir, "engine", "_series")
 
-	cmd.Flags().StringVar(&dumpTSIFlags.seriesFilePath, "series-path", defaultSeriesDir, "Path to series file")
-	cmd.Flags().StringVar(&dumpTSIFlags.dataPath, "index-path", defaultIndexDir, "Path to the index directory of the data engine")
-	cmd.Flags().BoolVar(&dumpTSIFlags.showSeries, "series", false, "Show raw series data")
-	cmd.Flags().BoolVar(&dumpTSIFlags.showMeasurements, "measurements", false, "Show raw measurement data")
-	cmd.Flags().BoolVar(&dumpTSIFlags.showTagKeys, "tag-keys", false, "Show raw tag key data")
-	cmd.Flags().BoolVar(&dumpTSIFlags.showTagValues, "tag-values", false, "Show raw tag value data")
-	cmd.Flags().BoolVar(&dumpTSIFlags.showTagValueSeries, "tag-value-series", false, "Show raw series data for each value")
-	cmd.Flags().StringVar(&measurementFilter, "measurement-filter", "", "Regex measurement filter")
-	cmd.Flags().StringVar(&tagKeyFilter, "tag-key-filter", "", "Regex tag key filter")
-	cmd.Flags().StringVar(&tagValueFilter, "tag-value-filter", "", "Regex tag value filter")
+	cmd.Flags().StringVar(&dumpTSIFlags.seriesFilePath, "series-file", defaultSeriesDir, "path to series file")
+	cmd.Flags().StringVar(&dumpTSIFlags.tsiPath, "tsi-index", defaultIndexDir, "path to the the TSI index")
+	cmd.Flags().BoolVar(&dumpTSIFlags.showSeries, "series", false, "emit raw series data")
+	cmd.Flags().BoolVar(&dumpTSIFlags.showMeasurements, "measurements", false, "emit raw measurement data")
+	cmd.Flags().BoolVar(&dumpTSIFlags.showTagKeys, "tag-keys", false, "emit raw tag key data")
+	cmd.Flags().BoolVar(&dumpTSIFlags.showTagValues, "tag-values", false, "emit raw tag value data")
+	cmd.Flags().BoolVar(&dumpTSIFlags.showTagValueSeries, "tag-value-series", false, "emit raw series for each tag value")
+	cmd.Flags().StringVar(&measurementFilter, "measurement-filter", "", "filter measurements by regex")
+	cmd.Flags().StringVar(&tagKeyFilter, "tag-key-filter", "", "filter tag keys by regex")
+	cmd.Flags().StringVar(&tagValueFilter, "tag-value-filter", "", "filter tag values by regex")
 
 	return cmd
 }
@@ -111,7 +95,7 @@ func dumpTsi(cmd *cobra.Command, args []string) error {
 		dumpTSIFlags.tagValueFilter = re
 	}
 
-	if dumpTSIFlags.dataPath == "" {
+	if dumpTSIFlags.tsiPath == "" {
 		return errors.New("data path must be specified")
 	}
 
@@ -128,7 +112,7 @@ func dumpTsi(cmd *cobra.Command, args []string) error {
 
 	dump := tsi1.NewDumpTSI(logger)
 	dump.SeriesFilePath = dumpTSIFlags.seriesFilePath
-	dump.DataPath = dumpTSIFlags.dataPath
+	dump.DataPath = dumpTSIFlags.tsiPath
 	dump.ShowSeries = dumpTSIFlags.showSeries
 	dump.ShowMeasurements = dumpTSIFlags.showMeasurements
 	dump.ShowTagKeys = dumpTSIFlags.showTagKeys
