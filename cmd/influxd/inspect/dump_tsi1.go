@@ -20,6 +20,9 @@ var dumpTSIFlags = struct {
 	Stderr io.Writer
 	Stdout io.Writer
 
+	orgID    string
+	bucketID string
+
 	seriesFilePath string
 	tsiPath        string
 
@@ -29,9 +32,9 @@ var dumpTSIFlags = struct {
 	showTagValues      bool
 	showTagValueSeries bool
 
-	measurementFilter *regexp.Regexp
-	tagKeyFilter      *regexp.Regexp
-	tagValueFilter    *regexp.Regexp
+	measurementPrefixHex string
+	tagKeyFilter         *regexp.Regexp
+	tagValueFilter       *regexp.Regexp
 }{}
 
 // NewCommand returns a new instance of Command.
@@ -57,14 +60,21 @@ bucket.
 
 	cmd.Flags().StringVar(&dumpTSIFlags.seriesFilePath, "series-file", defaultSeriesDir, "path to series file")
 	cmd.Flags().StringVar(&dumpTSIFlags.tsiPath, "tsi-index", defaultIndexDir, "path to the the TSI index")
+
+	cmd.Flags().StringVar(&dumpTSIFlags.orgID, "org_id", "", "limit results to provided organisation")
+	cmd.Flags().StringVar(&dumpTSIFlags.bucketID, "bucket_id", "", "limit results to provided bucket (org_id required)")
+
 	cmd.Flags().BoolVar(&dumpTSIFlags.showSeries, "series", false, "emit raw series data")
+
 	cmd.Flags().BoolVar(&dumpTSIFlags.showMeasurements, "measurements", false, "emit raw measurement data")
+	cmd.Flags().StringVar(&dumpTSIFlags.measurementPrefixHex, "measurement-prefix", "", "filter measurements by provided base-16 prefix")
+
 	cmd.Flags().BoolVar(&dumpTSIFlags.showTagKeys, "tag-keys", false, "emit raw tag key data")
-	cmd.Flags().BoolVar(&dumpTSIFlags.showTagValues, "tag-values", false, "emit raw tag value data")
-	cmd.Flags().BoolVar(&dumpTSIFlags.showTagValueSeries, "tag-value-series", false, "emit raw series for each tag value")
-	cmd.Flags().StringVar(&measurementFilter, "measurement-filter", "", "filter measurements by regex")
 	cmd.Flags().StringVar(&tagKeyFilter, "tag-key-filter", "", "filter tag keys by regex")
+
+	cmd.Flags().BoolVar(&dumpTSIFlags.showTagValues, "tag-values", false, "emit raw tag value data")
 	cmd.Flags().StringVar(&tagValueFilter, "tag-value-filter", "", "filter tag values by regex")
+	cmd.Flags().BoolVar(&dumpTSIFlags.showTagValueSeries, "tag-value-series", false, "emit raw series for each tag value")
 
 	return cmd
 }
@@ -73,13 +83,6 @@ func dumpTsi(cmd *cobra.Command, args []string) error {
 	logger := zap.NewNop()
 
 	// Parse filters.
-	if measurementFilter != "" {
-		re, err := regexp.Compile(measurementFilter)
-		if err != nil {
-			return err
-		}
-		dumpTSIFlags.measurementFilter = re
-	}
 	if tagKeyFilter != "" {
 		re, err := regexp.Compile(tagKeyFilter)
 		if err != nil {
@@ -112,12 +115,13 @@ func dumpTsi(cmd *cobra.Command, args []string) error {
 
 	dump := tsi1.NewDumpTSI(logger)
 	dump.SeriesFilePath = dumpTSIFlags.seriesFilePath
-	dump.DataPath = dumpTSIFlags.tsiPath
+	dump.IndexPath = dumpTSIFlags.tsiPath
 	dump.ShowSeries = dumpTSIFlags.showSeries
 	dump.ShowMeasurements = dumpTSIFlags.showMeasurements
 	dump.ShowTagKeys = dumpTSIFlags.showTagKeys
+	dump.ShowTagValues = dumpTSIFlags.showTagValues
 	dump.ShowTagValueSeries = dumpTSIFlags.showTagValueSeries
-	dump.MeasurementFilter = dumpTSIFlags.measurementFilter
+	dump.MeasurementPrefix = dumpTSIFlags.measurementPrefixHex
 	dump.TagKeyFilter = dumpTSIFlags.tagKeyFilter
 	dump.TagValueFilter = dumpTSIFlags.tagValueFilter
 

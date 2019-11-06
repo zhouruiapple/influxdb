@@ -1,6 +1,7 @@
 package tsi1
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"regexp"
 	"text/tabwriter"
 
+	"github.com/influxdata/influxdb"
 	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/influxdb/tsdb"
 	"go.uber.org/zap"
@@ -26,7 +28,11 @@ type DumpTSI struct {
 	SeriesFilePath string
 
 	// root dir of the engine
-	DataPath string
+	IndexPath string
+
+	// Optional filters on org and bucket.
+	OrgID    *influxdb.ID
+	BucketID *influxdb.ID
 
 	ShowSeries         bool
 	ShowMeasurements   bool
@@ -34,9 +40,10 @@ type DumpTSI struct {
 	ShowTagValues      bool
 	ShowTagValueSeries bool
 
-	MeasurementFilter *regexp.Regexp
-	TagKeyFilter      *regexp.Regexp
-	TagValueFilter    *regexp.Regexp
+	MeasurementPrefix      string
+	measurementPrefixBytes []byte // reduce allocations. Set when Run called.
+	TagKeyFilter           *regexp.Regexp
+	TagValueFilter         *regexp.Regexp
 }
 
 // NewCommand returns a new instance of Command.
@@ -51,6 +58,9 @@ func NewDumpTSI(logger *zap.Logger) DumpTSI {
 
 // Run executes the command.
 func (cmd *DumpTSI) Run() error {
+	// Used for efficient prefix matching on measurement
+	cmd.measurementPrefixBytes = []byte(cmd.MeasurementPrefix)
+
 	sfile := tsdb.NewSeriesFile(cmd.SeriesFilePath)
 	sfile.Logger = cmd.Logger
 	if err := sfile.Open(context.Background()); err != nil {
@@ -58,41 +68,46 @@ func (cmd *DumpTSI) Run() error {
 	}
 	defer sfile.Close()
 
-	// Build a file set from the paths on the command line.
-	idx, fs, err := cmd.readFileSet(sfile)
-	if err != nil {
+	idx := NewIndex(sfile, NewConfig(), WithPath(cmd.IndexPath), DisableCompactions())
+	if err := idx.Open(context.Background()); err != nil {
 		return err
 	}
 
-	if cmd.ShowSeries {
-		if err := cmd.printSeries(sfile); err != nil {
-			return err
-		}
-	}
+	// Build a file set from the paths on the command line.
+	// idx, fs, err := cmd.readFileSet(sfile)
+	// if err != nil {
+	// 	return err
+	// }
+
+	// if cmd.ShowSeries {
+	// 	if err := cmd.printSeries(sfile); err != nil {
+	// 		return err
+	// 	}
+	// }
 
 	// If this is an ad-hoc fileset then process it and close afterward.
-	if fs != nil {
-		defer fs.Release()
-		if cmd.ShowSeries || cmd.ShowMeasurements {
-			return cmd.printMeasurements(sfile, fs)
-		}
-		return cmd.printFileSummaries(fs)
-	}
+	// if fs != nil {
+	// 	defer fs.Release()
+	// 	if cmd.ShowSeries || cmd.ShowMeasurements {
+	// 		return cmd.printMeasurements(sfile, fs)
+	// 	}
+	// 	return cmd.printFileSummaries(fs)
+	// }
 
 	// Otherwise iterate over each partition in the index.
 	defer idx.Close()
 	for i := 0; i < int(idx.PartitionN); i++ {
 		if err := func() error {
-			fs := idx.PartitionAt(i).fileSet
-			if err != nil {
-				return err
-			}
-			defer fs.Release()
+			partition := idx.PartitionAt(i).fileSet
+			// if err != nil {
+			// 	return err
+			// }
+			defer partition.Release()
 
 			if cmd.ShowSeries || cmd.ShowMeasurements {
-				return cmd.printMeasurements(sfile, fs)
+				return cmd.printMeasurements(sfile, partition)
 			}
-			return cmd.printFileSummaries(fs)
+			return cmd.printFileSummaries(partition)
 		}(); err != nil {
 			return err
 		}
@@ -100,14 +115,10 @@ func (cmd *DumpTSI) Run() error {
 	return nil
 }
 
-func (cmd *DumpTSI) readFileSet(sfile *tsdb.SeriesFile) (*Index, *FileSet, error) {
-	index := NewIndex(sfile, NewConfig(), WithPath(cmd.DataPath), DisableCompactions())
+// func (cmd *DumpTSI) readFileSet(sfile *tsdb.SeriesFile) (*Index, *FileSet, error) {
 
-	if err := index.Open(context.Background()); err != nil {
-		return nil, nil, err
-	}
-	return index, nil, nil
-}
+// 	return index, nil, nil
+// }
 
 func (cmd *DumpTSI) printSeries(sfile *tsdb.SeriesFile) error {
 	if !cmd.ShowSeries {
@@ -129,13 +140,11 @@ func (cmd *DumpTSI) printSeries(sfile *tsdb.SeriesFile) error {
 		}
 		name, tags := tsdb.ParseSeriesKey(sfile.SeriesKey(e.SeriesID))
 
-		if !cmd.matchSeries(name, tags) {
-			continue
+		// The measurement prefix matches (or prefix matching is not enabled) and the series matches.
+		if cmd.matchMeasurement(name) && cmd.matchSeries(name, tags) {
+			deleted := sfile.IsDeleted(e.SeriesID)
+			fmt.Fprintf(tw, "%x%s\t%v\n", name, tags.HashKey(), deletedString(deleted))
 		}
-
-		deleted := sfile.IsDeleted(e.SeriesID)
-
-		fmt.Fprintf(tw, "%s%s\t%v\n", name, tags.HashKey(), deletedString(deleted))
 	}
 
 	// Flush & write footer spacing.
@@ -158,11 +167,11 @@ func (cmd *DumpTSI) printMeasurements(sfile *tsdb.SeriesFile, fs *FileSet) error
 	// Iterate over each series.
 	if itr := fs.MeasurementIterator(); itr != nil {
 		for e := itr.Next(); e != nil; e = itr.Next() {
-			if cmd.MeasurementFilter != nil && !cmd.MeasurementFilter.Match(e.Name()) {
+			if !cmd.matchMeasurement(e.Name()) {
 				continue
 			}
 
-			fmt.Fprintf(tw, "%s\t%v\n", e.Name(), deletedString(e.Deleted()))
+			fmt.Fprintf(tw, "%x\t%v\n", e.Name(), deletedString(e.Deleted()))
 			if err := tw.Flush(); err != nil {
 				return err
 			}
@@ -174,9 +183,11 @@ func (cmd *DumpTSI) printMeasurements(sfile *tsdb.SeriesFile, fs *FileSet) error
 	}
 
 	fmt.Fprint(cmd.Stdout, "\n\n")
-
 	return nil
 }
+
+var measurementTagKey = []byte("_measurement (\\x00)")
+var fieldTagKey = []byte("_field (\\xff)")
 
 func (cmd *DumpTSI) printTagKeys(sfile *tsdb.SeriesFile, fs *FileSet, name []byte) error {
 	if !cmd.ShowTagKeys {
@@ -187,16 +198,23 @@ func (cmd *DumpTSI) printTagKeys(sfile *tsdb.SeriesFile, fs *FileSet, name []byt
 	tw := tabwriter.NewWriter(cmd.Stdout, 8, 8, 1, '\t', 0)
 	itr := fs.TagKeyIterator(name)
 	for e := itr.Next(); e != nil; e = itr.Next() {
-		if cmd.TagKeyFilter != nil && !cmd.TagKeyFilter.Match(e.Key()) {
+		key := e.Key()
+		if bytes.Equal(key, models.MeasurementTagKeyBytes) {
+			key = measurementTagKey
+		} else if bytes.Equal(key, models.FieldKeyTagKeyBytes) {
+			key = fieldTagKey
+		}
+
+		if cmd.TagKeyFilter != nil && !cmd.TagKeyFilter.Match(key) {
 			continue
 		}
 
-		fmt.Fprintf(tw, "    %s\t%v\n", e.Key(), deletedString(e.Deleted()))
+		fmt.Fprintf(tw, "    %s\t%v\n", key, deletedString(e.Deleted()))
 		if err := tw.Flush(); err != nil {
 			return err
 		}
 
-		if err := cmd.printTagValues(sfile, fs, name, e.Key()); err != nil {
+		if err := cmd.printTagValues(sfile, fs, name, key); err != nil {
 			return err
 		}
 	}
@@ -336,13 +354,20 @@ func (cmd *DumpTSI) printIndexFileSummary(f *IndexFile) error {
 	return tw.Flush()
 }
 
-// matchSeries returns true if the command filters matches the series.
-func (cmd *DumpTSI) matchSeries(name []byte, tags models.Tags) bool {
-	// Filter by measurement.
-	if cmd.MeasurementFilter != nil && !cmd.MeasurementFilter.Match(name) {
-		return false
+// matchMeasurement returns true if measurement matching is disabled or if the measurement
+// does match a measurement prefix.
+func (cmd *DumpTSI) matchMeasurement(name []byte) bool {
+	if cmd.MeasurementPrefix == "" {
+		return true
 	}
 
+	// Convert name into base-16.
+	nameHex := []byte(fmt.Sprintf("%x", name))
+	return bytes.HasPrefix(nameHex, cmd.measurementPrefixBytes)
+}
+
+// matchSeries returns true if the command filters matches the series.
+func (cmd *DumpTSI) matchSeries(name []byte, tags models.Tags) bool {
 	// Filter by tag key/value.
 	if cmd.TagKeyFilter != nil || cmd.TagValueFilter != nil {
 		var matched bool
