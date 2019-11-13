@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -18,6 +20,7 @@ import (
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	input "github.com/tcnksm/go-input"
+	"gopkg.in/yaml.v3"
 )
 
 func pkgCmd() *cobra.Command {
@@ -30,14 +33,28 @@ func pkgCmd() *cobra.Command {
 	cmd.MarkFlagFilename("path", "yaml", "yml", "json")
 	cmd.MarkFlagRequired("path")
 
-	orgID := cmd.Flags().String("org-id", "", "The ID of the organization that owns the bucket")
+	applyOrgID := cmd.Flags().String("org-id", "", "The ID of the organization that owns the bucket")
 	cmd.MarkFlagRequired("org-id")
 
 	hasColor := cmd.Flags().Bool("color", true, "Enable color in output, defaults true")
 	hasTableBorders := cmd.Flags().Bool("table-borders", true, "Enable table borders, defaults true")
 
-	cmd.RunE = pkgApply(orgID, path, hasColor, hasTableBorders)
+	cmd.RunE = pkgApply(applyOrgID, path, hasColor, hasTableBorders)
 
+	exportAllCmd := &cobra.Command{
+		Use:   "exportall",
+		Short: "Export all resources to a pkg for an organization",
+	}
+	wd, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
+	outPath := exportAllCmd.Flags().String("o", filepath.Join(wd, "export_world.json"), "output path for created pkg")
+	exportOrgID := exportAllCmd.Flags().String("org-id", "", "The ID of the organization that owns the bucket")
+	cmd.MarkFlagRequired("org-id")
+	exportAllCmd.RunE = pkgExportAll(exportOrgID, outPath)
+
+	cmd.AddCommand(exportAllCmd)
 	return cmd
 }
 
@@ -88,6 +105,123 @@ func pkgApply(orgID, path *string, hasColor, hasTableBorders *bool) func(*cobra.
 		printPkgSummary(*hasColor, *hasTableBorders, summary)
 
 		return nil
+	}
+}
+
+func pkgExportAll(orgIDStr, outPath *string) func(*cobra.Command, []string) error {
+	return func(cmd *cobra.Command, args []string) error {
+		orgID, err := influxdb.IDFromString(*orgIDStr)
+		if err != nil {
+			return err
+		}
+
+		var resourcesToClone []pkger.ResourceToClone
+		bktSVC, err := newBucketService(flags)
+		if err != nil {
+			return err
+		}
+		{
+			bkts, _, _ := bktSVC.FindBuckets(context.Background(), influxdb.BucketFilter{
+				OrganizationID: orgID,
+			})
+			for _, b := range bkts {
+				if b.Type == influxdb.BucketTypeSystem {
+					continue
+				}
+				resourcesToClone = append(resourcesToClone, pkger.ResourceToClone{
+					Kind: pkger.KindBucket,
+					ID:   b.ID,
+				})
+			}
+		}
+
+		dashSVC, err := newDashboardService(flags)
+		if err != nil {
+			return err
+		}
+		{
+			dashs, _, _ := dashSVC.FindDashboards(context.Background(), influxdb.DashboardFilter{
+				OrganizationID: orgID,
+			}, influxdb.DefaultDashboardFindOptions)
+			for _, d := range dashs {
+				resourcesToClone = append(resourcesToClone, pkger.ResourceToClone{
+					Kind: pkger.KindDashboard,
+					ID:   d.ID,
+				})
+			}
+		}
+
+		labelSVC, err := newLabelService(flags)
+		if err != nil {
+			return err
+		}
+		{
+			labels, _ := labelSVC.FindLabels(context.Background(), influxdb.LabelFilter{
+				OrgID: orgID,
+			})
+			for _, l := range labels {
+				resourcesToClone = append(resourcesToClone, pkger.ResourceToClone{
+					Kind: pkger.KindLabel,
+					ID:   l.ID,
+				})
+			}
+		}
+
+		varSVC, err := newVariableService(flags)
+		if err != nil {
+			return err
+		}
+		{
+			vars, _ := varSVC.FindVariables(context.Background(), influxdb.VariableFilter{
+				OrganizationID: orgID,
+			})
+			for _, v := range vars {
+				resourcesToClone = append(resourcesToClone, pkger.ResourceToClone{
+					Kind: pkger.KindVariable,
+					ID:   v.ID,
+				})
+			}
+		}
+
+		pkgSVC := pkger.NewService(
+			pkger.WithBucketSVC(bktSVC),
+			pkger.WithDashboardSVC(dashSVC),
+			pkger.WithLabelSVC(labelSVC),
+			pkger.WithVariableSVC(varSVC),
+		)
+
+		newPkg, err := pkgSVC.CreatePkg(context.Background(),
+			pkger.CreateWithMetadata(pkger.Metadata{
+				Description: "exporting the world",
+				Name:        "export_world",
+				Version:     "1.0.0",
+			}),
+			pkger.CreateWithExistingResources(resourcesToClone...),
+		)
+		if err != nil {
+			return err
+		}
+
+		var (
+			buf bytes.Buffer
+			enc interface {
+				Encode(interface{}) error
+			}
+		)
+
+		switch ext := filepath.Ext(*outPath); ext {
+		case ".yml":
+			enc = yaml.NewEncoder(&buf)
+		default:
+			jsonEnc := json.NewEncoder(&buf)
+			jsonEnc.SetIndent("", "\t")
+			enc = jsonEnc
+		}
+		if err := enc.Encode(newPkg); err != nil {
+			return err
+		}
+
+		return ioutil.WriteFile(*outPath, buf.Bytes(), os.ModePerm)
 	}
 }
 
