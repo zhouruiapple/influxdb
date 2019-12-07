@@ -22,7 +22,7 @@ func TestLauncher_Pkger(t *testing.T) {
 		pkger.WithBucketSVC(l.BucketService()),
 		pkger.WithDashboardSVC(l.DashboardService()),
 		pkger.WithLabelSVC(l.LabelService()),
-		pkger.WithTelegrafSVC(l.TelegrafService()),
+		pkger.WithTelegrafSVC(l.TelegrafService(t)),
 		pkger.WithVariableSVC(l.VariableService()),
 	)
 
@@ -49,7 +49,7 @@ func TestLauncher_Pkger(t *testing.T) {
 				LabelService: l.LabelService(),
 				killCount:    2, // hits error on 3rd attempt at creating a mapping
 			}),
-			pkger.WithTelegrafSVC(l.TelegrafService()),
+			pkger.WithTelegrafSVC(l.TelegrafService(t)),
 			pkger.WithVariableSVC(l.VariableService()),
 		)
 
@@ -326,7 +326,7 @@ func TestLauncher_Pkger(t *testing.T) {
 				}),
 				pkger.WithDashboardSVC(l.DashboardService()),
 				pkger.WithLabelSVC(l.LabelService()),
-				pkger.WithTelegrafSVC(l.TelegrafService()),
+				pkger.WithTelegrafSVC(l.TelegrafService(t)),
 				pkger.WithVariableSVC(l.VariableService()),
 			)
 
