@@ -1,7 +1,6 @@
 package http
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -509,13 +508,8 @@ func (s *TelegrafService) FindTelegrafConfigs(ctx context.Context, f platform.Te
 
 // CreateTelegrafConfig creates a new telegraf config and sets b.ID with the new identifier.
 func (s *TelegrafService) CreateTelegrafConfig(ctx context.Context, tc *platform.TelegrafConfig, userID platform.ID) error {
-	var body bytes.Buffer
-	if err := json.NewEncoder(&body).Encode(tc); err != nil {
-		return err
-	}
-
 	var teleResp platform.TelegrafConfig
-	err := s.client.post(telegrafsPath, &body).
+	err := s.client.post(telegrafsPath, bodyJSON(tc)).
 		DecodeJSON(&teleResp).
 		Do(ctx)
 	if err != nil {

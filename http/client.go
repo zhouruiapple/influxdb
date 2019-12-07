@@ -1,6 +1,7 @@
 package http
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"net/url"
 	"path"
 
+	"github.com/influxdata/influxdb"
 	"github.com/influxdata/influxdb/kit/tracing"
 )
 
@@ -122,18 +124,55 @@ func NewHTTPClient(addr, token string, insecureSkipVerify bool) (*HTTPClient, er
 }
 
 func (c *HTTPClient) delete(urlPath string) *cReq {
-	return c.newClientReq(http.MethodDelete, urlPath, nil)
+	return c.newClientReq(http.MethodDelete, urlPath, bodyEmpty())
 }
 
 func (c *HTTPClient) get(urlPath string) *cReq {
-	return c.newClientReq(http.MethodGet, urlPath, nil)
+	return c.newClientReq(http.MethodGet, urlPath, bodyEmpty())
 }
 
-func (c *HTTPClient) post(urlPath string, body io.Reader) *cReq {
-	return c.newClientReq(http.MethodPost, urlPath, body)
+func (c *HTTPClient) patch(urlPath string, bFn bodyFn) *cReq {
+	return c.newClientReq(http.MethodPatch, urlPath, bFn)
 }
 
-func (c *HTTPClient) newClientReq(method, urlPath string, body io.Reader) *cReq {
+func (c *HTTPClient) post(urlPath string, bFn bodyFn) *cReq {
+	return c.newClientReq(http.MethodPost, urlPath, bFn)
+}
+
+func (c *HTTPClient) put(urlPath string, bFn bodyFn) *cReq {
+	return c.newClientReq(http.MethodPost, urlPath, bFn)
+}
+
+type bodyFn func() (io.Reader, error)
+
+func bodyEmpty() bodyFn {
+	return func() (io.Reader, error) {
+		return nil, nil
+	}
+}
+
+func bodyJSON(v interface{}) bodyFn {
+	return func() (io.Reader, error) {
+		var buf bytes.Buffer
+		if err := json.NewEncoder(&buf).Encode(v); err != nil {
+			return nil, err
+		}
+		return &buf, nil
+	}
+}
+
+func bodyReader(r io.Reader) bodyFn {
+	return func() (io.Reader, error) {
+		return r, nil
+	}
+}
+
+func (c *HTTPClient) newClientReq(method, urlPath string, bFn bodyFn) *cReq {
+	body, err := bFn()
+	if err != nil {
+		return &cReq{err: err}
+	}
+
 	u := c.addr
 	u.Path = path.Join(u.Path, urlPath)
 	req, err := http.NewRequest(method, u.String(), body)
@@ -192,7 +231,13 @@ func (r *cReq) ContentType(ct string) *cReq {
 
 func (r *cReq) DecodeJSON(v interface{}) *cReq {
 	return r.RespFn(func(resp *http.Response) error {
-		return json.NewDecoder(resp.Body).Decode(v)
+		if err := json.NewDecoder(resp.Body).Decode(v); err != nil {
+			return &influxdb.Error{
+				Code: influxdb.EInvalid,
+				Err:  err,
+			}
+		}
+		return nil
 	})
 }
 
