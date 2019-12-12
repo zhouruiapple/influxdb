@@ -24,7 +24,6 @@ import {
   StatusRow,
   TimeZone,
   XYViewProperties,
-  TimeRange,
 } from 'src/types'
 
 interface Props {
@@ -35,16 +34,18 @@ interface Props {
   properties: QueryViewProperties | CheckViewProperties
   timeZone: TimeZone
   statuses: StatusRow[][]
-  timeRange: TimeRange | null
+  endTime: number
+  startTime: number
 }
 
 const ViewSwitcher: FunctionComponent<Props> = ({
   properties,
   check,
   loading,
-  timeRange,
+  endTime,
   files,
   giraffeResult: {table, fluxGroupKeyUnion},
+  startTime,
   timeZone,
   statuses,
 }) => {
@@ -82,9 +83,10 @@ const ViewSwitcher: FunctionComponent<Props> = ({
     case 'xy':
       return (
         <XYPlot
-          timeRange={timeRange}
+          endTime={endTime}
           fluxGroupKeyUnion={fluxGroupKeyUnion}
           loading={loading}
+          startTime={startTime}
           table={table}
           timeZone={timeZone}
           viewProperties={properties}
@@ -109,9 +111,10 @@ const ViewSwitcher: FunctionComponent<Props> = ({
 
       return (
         <XYPlot
-          timeRange={timeRange}
+          endTime={endTime}
           fluxGroupKeyUnion={fluxGroupKeyUnion}
           loading={loading}
+          startTime={startTime}
           table={table}
           timeZone={timeZone}
           viewProperties={xyProperties}
@@ -150,8 +153,9 @@ const ViewSwitcher: FunctionComponent<Props> = ({
     case 'heatmap':
       return (
         <HeatmapPlot
-          timeRange={timeRange}
+          endTime={endTime}
           loading={loading}
+          startTime={startTime}
           table={table}
           timeZone={timeZone}
           viewProperties={properties}
@@ -163,8 +167,9 @@ const ViewSwitcher: FunctionComponent<Props> = ({
     case 'scatter':
       return (
         <ScatterPlot
-          timeRange={timeRange}
+          endTime={endTime}
           loading={loading}
+          startTime={startTime}
           table={table}
           viewProperties={properties}
           timeZone={timeZone}

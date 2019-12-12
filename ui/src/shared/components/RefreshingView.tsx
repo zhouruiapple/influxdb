@@ -10,12 +10,13 @@ import ViewSwitcher from 'src/shared/components/ViewSwitcher'
 // Utils
 import {GlobalAutoRefresher} from 'src/utils/AutoRefresher'
 import {getTimeRangeVars} from 'src/variables/utils/getTimeRangeVars'
-import {
-  getVariableAssignments,
-  getDashboardValuesStatus,
-} from 'src/variables/selectors'
+import {getVariableAssignments} from 'src/variables/selectors'
+import {getDashboardValuesStatus} from 'src/variables/selectors'
 import {checkResultsLength} from 'src/shared/utils/vis'
-import {getActiveTimeRange} from 'src/timeMachine/selectors/index'
+
+// Selectors
+import {getEndTime, getStartTime} from 'src/timeMachine/selectors/index'
+import {getTimeRangeByDashboardID} from 'src/dashboards/selectors/index'
 
 // Types
 import {
@@ -38,7 +39,8 @@ interface OwnProps {
 }
 
 interface StateProps {
-  ranges: TimeRange | null
+  endTime: number
+  startTime: number
   timeZone: TimeZone
   variableAssignments: VariableAssignment[]
   variablesStatus: RemoteDataState
@@ -71,7 +73,14 @@ class RefreshingView extends PureComponent<Props, State> {
   }
 
   public render() {
-    const {check, ranges, properties, manualRefresh, timeZone} = this.props
+    const {
+      check,
+      endTime,
+      properties,
+      manualRefresh,
+      startTime,
+      timeZone,
+    } = this.props
     const {submitToken} = this.state
 
     return (
@@ -102,11 +111,12 @@ class RefreshingView extends PureComponent<Props, State> {
             >
               <ViewSwitcher
                 check={check}
+                endTime={endTime}
                 files={files}
                 giraffeResult={giraffeResult}
                 loading={loading}
                 properties={properties}
-                timeRange={ranges}
+                startTime={startTime}
                 statuses={statuses}
                 timeZone={timeZone}
               />
@@ -158,13 +168,15 @@ const mstp = (state: AppState, ownProps: OwnProps): StateProps => {
     state,
     ownProps.dashboardID
   )
+  const timeRange = getTimeRangeByDashboardID(state, ownProps.dashboardID)
+
   const valuesStatus = getDashboardValuesStatus(state, ownProps.dashboardID)
-  const {properties} = ownProps
-  const timeRange = getActiveTimeRange(ownProps.timeRange, properties.queries)
+
   const timeZone = state.app.persisted.timeZone
 
   return {
-    ranges: timeRange,
+    endTime: getEndTime(timeRange),
+    startTime: getStartTime(timeRange),
     timeZone,
     variableAssignments,
     variablesStatus: valuesStatus,
