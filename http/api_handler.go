@@ -200,6 +200,10 @@ func NewAPIHandler(b *APIBackend, opts ...APIHandlerOptFn) *APIHandler {
 	writeBackend := NewWriteBackend(b.Logger.With(zap.String("handler", "write")), b)
 	h.Mount(prefixWrite, NewWriteHandler(b.Logger, writeBackend))
 
+	influxqlBackend := NewInfluxQLBackend(b)
+	// NOTE: This is a legacy api endpoint and not under the /api/v2 path.
+	h.Handle("/query", NewInfluxQLHandler(influxqlBackend))
+
 	for _, o := range opts {
 		o(h)
 	}
