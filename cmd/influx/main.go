@@ -57,7 +57,7 @@ type genericCLIOpts struct {
 
 func (o genericCLIOpts) newCmd(use string) *cobra.Command {
 	cmd := &cobra.Command{Use: use}
-	cmd.SetOutput(o.w)
+	cmd.SetOut(o.w)
 	return cmd
 }
 

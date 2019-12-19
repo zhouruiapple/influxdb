@@ -2,15 +2,19 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/influxdata/influxdb"
 	"github.com/influxdata/influxdb/cmd/influxd/generate"
 	"github.com/influxdata/influxdb/cmd/influxd/inspect"
 	"github.com/influxdata/influxdb/cmd/influxd/launcher"
+	"github.com/influxdata/influxdb/kit/cli"
 	_ "github.com/influxdata/influxdb/query/builtin"
 	_ "github.com/influxdata/influxdb/tsdb/tsi1"
 	_ "github.com/influxdata/influxdb/tsdb/tsm1"
@@ -29,12 +33,30 @@ var rootCmd = &cobra.Command{
 	Short: "Influx Server",
 }
 
+var (
+	enableDebugProfiling bool
+	flagsParsedSignal    = make(chan struct{})
+)
+
 func init() {
 	influxdb.SetBuildInfo(version, commit, date)
 	viper.SetEnvPrefix("INFLUXD")
 	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 	rootCmd.InitDefaultHelpCmd()
+	cli.BindOptions(rootCmd, []cli.Opt{
+		{
+			DestP:      &enableDebugProfiling,
+			Flag:       "enable-debug-pprof",
+			Default:    false,
+			Desc:       "setting this enabled profiles to be taken from server initialisation on port 6060",
+			Persistent: true,
+		},
+	})
+	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+		close(flagsParsedSignal)
+	}
+
 	rootCmd.AddCommand(&cobra.Command{
 		Use:   "version",
 		Short: "Print the influxd server version",
@@ -54,15 +76,37 @@ func find(args []string) *cobra.Command {
 	cmd, _, err := rootCmd.Find(args)
 	if err == nil && cmd == rootCmd {
 		// Execute the run command if no sub-command is specified
-		return launcher.NewCommand()
+		// we need to loop through and use the child of the root cmd here
+		// so the inherited flags are used
+		for _, cmd := range cmd.Commands() {
+			if cmd.Name() == "run" {
+				return cmd
+			}
+		}
 	}
 
 	return rootCmd
 }
 
 func main() {
-	cmd := find(os.Args[1:])
-	if err := cmd.Execute(); err != nil {
-		os.Exit(1)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		cmd := find(os.Args[1:])
+		if err := cmd.Execute(); err != nil {
+			os.Exit(1)
+		}
+	}()
+
+	<-flagsParsedSignal
+	if enableDebugProfiling {
+		runtime.SetBlockProfileRate(int(time.Second))
+		runtime.SetMutexProfileFraction(1)
+		go func() {
+			http.ListenAndServe("localhost:6060", nil)
+		}()
 	}
+
+	wg.Wait()
 }

@@ -260,10 +260,8 @@ func buildLauncherCommand(l *Launcher, cmd *cobra.Command) {
 			Desc:    "TLS key for HTTPs",
 		},
 	}
-
 	cli.BindOptions(cmd, opts)
 	cmd.AddCommand(inspect.NewCommand())
-
 }
 
 // Launcher represents the main program execution.

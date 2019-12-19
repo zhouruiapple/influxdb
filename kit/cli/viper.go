@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
 
@@ -78,7 +79,7 @@ func BindOptions(cmd *cobra.Command, opts []Opt) {
 				d = o.Default.(string)
 			}
 			flagset.StringVar(destP, o.Flag, d, o.Desc)
-			mustBindPFlag(o.Flag, cmd)
+			mustBindPFlag(o.Flag, flagset)
 			*destP = viper.GetString(o.Flag)
 		case *int:
 			var d int
@@ -86,7 +87,7 @@ func BindOptions(cmd *cobra.Command, opts []Opt) {
 				d = o.Default.(int)
 			}
 			flagset.IntVar(destP, o.Flag, d, o.Desc)
-			mustBindPFlag(o.Flag, cmd)
+			mustBindPFlag(o.Flag, flagset)
 			*destP = viper.GetInt(o.Flag)
 		case *bool:
 			var d bool
@@ -94,7 +95,7 @@ func BindOptions(cmd *cobra.Command, opts []Opt) {
 				d = o.Default.(bool)
 			}
 			flagset.BoolVar(destP, o.Flag, d, o.Desc)
-			mustBindPFlag(o.Flag, cmd)
+			mustBindPFlag(o.Flag, flagset)
 			*destP = viper.GetBool(o.Flag)
 		case *time.Duration:
 			var d time.Duration
@@ -102,7 +103,7 @@ func BindOptions(cmd *cobra.Command, opts []Opt) {
 				d = o.Default.(time.Duration)
 			}
 			flagset.DurationVar(destP, o.Flag, d, o.Desc)
-			mustBindPFlag(o.Flag, cmd)
+			mustBindPFlag(o.Flag, flagset)
 			*destP = viper.GetDuration(o.Flag)
 		case *[]string:
 			var d []string
@@ -110,7 +111,7 @@ func BindOptions(cmd *cobra.Command, opts []Opt) {
 				d = o.Default.([]string)
 			}
 			flagset.StringSliceVar(destP, o.Flag, d, o.Desc)
-			mustBindPFlag(o.Flag, cmd)
+			mustBindPFlag(o.Flag, flagset)
 			*destP = viper.GetStringSlice(o.Flag)
 		default:
 			// if you get a panic here, sorry about that!
@@ -120,8 +121,8 @@ func BindOptions(cmd *cobra.Command, opts []Opt) {
 	}
 }
 
-func mustBindPFlag(key string, cmd *cobra.Command) {
-	if err := viper.BindPFlag(key, cmd.Flags().Lookup(key)); err != nil {
+func mustBindPFlag(key string, flagSet *pflag.FlagSet) {
+	if err := viper.BindPFlag(key, flagSet.Lookup(key)); err != nil {
 		panic(err)
 	}
 }
