@@ -12,17 +12,16 @@ import {OnboardingStepProps} from 'src/onboarding/containers/OnboardingWizard'
 class InitStep extends PureComponent<OnboardingStepProps> {
   public render() {
     return (
-      <div className="wizard--bookend-step">
-        <div className="splash-logo primary" />
-        <h3 className="wizard-step--title" data-testid="init-step--head-main">
+      <>
+        <h1 className="cf-funnel-page--title" data-testid="init-step--head-main">
           Welcome to InfluxDB 2.0
-        </h3>
-        <h5
-          className="wizard-step--sub-title"
+        </h1>
+        <p
+          className="cf-funnel-page--subtitle"
           data-testid="init-step--head-sub"
         >
           Get started in just a few easy steps
-        </h5>
+        </p>
         <Button
           color={ComponentColor.Primary}
           text="Get Started"
@@ -30,7 +29,7 @@ class InitStep extends PureComponent<OnboardingStepProps> {
           onClick={this.handleNext}
           testID="onboarding-get-started"
         />
-      </div>
+      </>
     )
   }
 

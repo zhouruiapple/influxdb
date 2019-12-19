@@ -51,9 +51,9 @@ export class Setup extends PureComponent<Props, State> {
       loading: RemoteDataState.Done,
     })
 
-    if (!allowed) {
-      return
-    }
+    // if (!allowed) {
+    //   return
+    // }
 
     router.push('/onboarding/0')
   }

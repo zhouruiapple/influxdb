@@ -7,7 +7,6 @@ import _ from 'lodash'
 // Components
 import {ErrorHandling} from 'src/shared/decorators/errors'
 import {
-  WizardFullScreen,
   WizardProgressHeader,
   ProgressBar,
 } from 'src/clockface'
@@ -96,21 +95,17 @@ class OnboardingWizard extends PureComponent<Props> {
     } = this.props
 
     return (
-      <WizardFullScreen>
+      <>
         {this.progressHeader}
-        <div className="wizard-contents">
-          <div className="wizard-step--container">
-            <OnboardingStepSwitcher
-              currentStepIndex={currentStepIndex}
-              onboardingStepProps={this.onboardingStepProps}
-              setupParams={setupParams}
-              onSetupAdmin={onSetupAdmin}
-              orgID={orgID}
-              bucketID={bucketID}
-            />
-          </div>
-        </div>
-      </WizardFullScreen>
+        <OnboardingStepSwitcher
+          currentStepIndex={currentStepIndex}
+          onboardingStepProps={this.onboardingStepProps}
+          setupParams={setupParams}
+          onSetupAdmin={onSetupAdmin}
+          orgID={orgID}
+          bucketID={bucketID}
+        />
+      </>
     )
   }
 

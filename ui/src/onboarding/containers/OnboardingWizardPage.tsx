@@ -13,6 +13,7 @@ import {
   AppWrapper,
   TechnoSpinner,
   SpinnerContainer,
+  FunnelPage,
 } from '@influxdata/clockface'
 import {WizardFullScreen} from 'src/clockface'
 import {ErrorHandling} from 'src/shared/decorators/errors'
@@ -71,48 +72,50 @@ export class OnboardingWizardPage extends PureComponent<Props, State> {
     const {params} = this.props
     const {isSetupComplete} = this.state
 
-    if (isSetupComplete) {
-      return (
-        <SpinnerContainer
-          loading={this.state.loading}
-          spinnerComponent={<TechnoSpinner />}
-        >
-          <WizardFullScreen>
-            <div className="wizard-contents">
-              <div className="wizard-step--container">
-                <EmptyState size={ComponentSize.Large}>
-                  <EmptyState.Text>
-                    <b>Initial User</b> is already set up, nothing to see here
-                    folks!
-                  </EmptyState.Text>
-                  <Button
-                    text="Return to Home Page"
-                    onClick={this.redirectToHome}
-                    color={ComponentColor.Primary}
-                  />
-                </EmptyState>
-              </div>
-            </div>
-          </WizardFullScreen>
-        </SpinnerContainer>
-      )
-    }
+    // if (isSetupComplete) {
+    //   return (
+    //     <SpinnerContainer
+    //       loading={this.state.loading}
+    //       spinnerComponent={<TechnoSpinner />}
+    //     >
+    //       <WizardFullScreen>
+    //         <div className="wizard-contents">
+    //           <div className="wizard-step--container">
+    //             <EmptyState size={ComponentSize.Large}>
+    //               <EmptyState.Text>
+    //                 <b>Initial User</b> is already set up, nothing to see here
+    //                 folks!
+    //               </EmptyState.Text>
+    //               <Button
+    //                 text="Return to Home Page"
+    //                 onClick={this.redirectToHome}
+    //                 color={ComponentColor.Primary}
+    //               />
+    //             </EmptyState>
+    //           </div>
+    //         </div>
+    //       </WizardFullScreen>
+    //     </SpinnerContainer>
+    //   )
+    // }
 
     return (
-      <AppWrapper>
+      <AppWrapper type="funnel">
         <SpinnerContainer
           loading={this.state.loading}
           spinnerComponent={<TechnoSpinner />}
         >
           <Notifications inPresentationMode={true} />
-          <OnboardingWizard
-            onDecrementCurrentStepIndex={this.handleDecrementStepIndex}
-            onIncrementCurrentStepIndex={this.handleIncrementStepIndex}
-            onSetCurrentStepIndex={this.setStepIndex}
-            onSetSubstepIndex={this.setSubstepIndex}
-            currentStepIndex={+params.stepID}
-            onCompleteSetup={this.handleCompleteSetup}
-          />
+          <FunnelPage>
+            <OnboardingWizard
+              onDecrementCurrentStepIndex={this.handleDecrementStepIndex}
+              onIncrementCurrentStepIndex={this.handleIncrementStepIndex}
+              onSetCurrentStepIndex={this.setStepIndex}
+              onSetSubstepIndex={this.setSubstepIndex}
+              currentStepIndex={+params.stepID}
+              onCompleteSetup={this.handleCompleteSetup}
+            />
+          </FunnelPage>
         </SpinnerContainer>
       </AppWrapper>
     )

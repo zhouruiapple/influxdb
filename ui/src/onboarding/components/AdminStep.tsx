@@ -3,7 +3,7 @@ import React, {PureComponent, ChangeEvent} from 'react'
 import {getDeep} from 'src/utils/wrappers'
 
 // Components
-import {Form, Input, Grid, QuestionMarkTooltip} from '@influxdata/clockface'
+import {Form, Input, Grid} from '@influxdata/clockface'
 import OnboardingButtons from 'src/onboarding/components/OnboardingButtons'
 
 // Actions
@@ -15,9 +15,13 @@ import {
   Columns,
   IconFont,
   InputType,
+  ButtonType,
   ComponentSize,
   ComponentStatus,
   ComponentColor,
+  Bullet,
+  Panel,
+  CTAButton,
 } from '@influxdata/clockface'
 import {StepStatus} from 'src/clockface/constants/wizard'
 import {OnboardingStepProps} from 'src/onboarding/containers/OnboardingWizard'
@@ -68,139 +72,146 @@ class AdminStep extends PureComponent<Props, State> {
     const icon = this.InputIcon
     const status = this.InputStatus
     return (
-      <div className="onboarding-step">
+      <>
         <Form onSubmit={this.handleNext}>
-          <div className="wizard-step--scroll-area">
-            <div className="wizard-step--scroll-content">
-              <h3
-                className="wizard-step--title"
-                data-testid="admin-step--head-main"
+          <h1
+            className="cf-funnel-page--title"
+            data-testid="admin-step--head-main"
+          >
+            Welcome to InfluxDB!
+          </h1>
+          <p
+            className="cf-funnel-page--subtitle"
+            data-testid="admin-step--head-sub"
+          >
+            Before using the platform, configure the first <strong>User, Organization, and Bucket.</strong><br/>You will be able to create additional Users, Organizations and
+            Buckets later.
+          </p>
+          <Grid>
+            <Grid.Row>
+              <Grid.Column
+                widthXS={Columns.Twelve}
+                widthMD={Columns.Eight}
+                offsetMD={Columns.Two}
               >
-                Setup Initial User
-              </h3>
-              <h5
-                className="wizard-step--sub-title"
-                data-testid="admin-step--head-sub"
-              >
-                You will be able to create additional Users, Buckets and
-                Organizations later
-              </h5>
-              <Grid>
-                <Grid.Row>
-                  <Grid.Column
-                    widthXS={Columns.Twelve}
-                    widthMD={Columns.Ten}
-                    offsetMD={Columns.One}
-                  >
-                    <Form.Element label="Username">
-                      <Input
-                        value={username}
-                        onChange={this.handleUsername}
-                        titleText="Username"
-                        size={ComponentSize.Medium}
-                        icon={icon}
-                        status={status}
-                        disabledTitleText="Username has been set"
-                        autoFocus={true}
-                        testID="input-field--username"
-                      />
-                    </Form.Element>
-                  </Grid.Column>
-                  <Grid.Column
-                    widthXS={Columns.Six}
-                    widthMD={Columns.Five}
-                    offsetMD={Columns.One}
-                  >
-                    <Form.Element label="Password">
-                      <Input
-                        type={InputType.Password}
-                        value={password}
-                        onChange={this.handlePassword}
-                        titleText="Password"
-                        size={ComponentSize.Medium}
-                        icon={icon}
-                        status={status}
-                        disabledTitleText="Password has been set"
-                        testID="input-field--password"
-                      />
-                    </Form.Element>
-                  </Grid.Column>
-                  <Grid.Column widthXS={Columns.Six} widthMD={Columns.Five}>
-                    <Form.Element
-                      label="Confirm Password"
-                      errorMessage={
-                        isPassMismatched && 'Passwords do not match'
-                      }
-                    >
-                      <Input
-                        type={InputType.Password}
-                        value={confirmPassword}
-                        onChange={this.handleConfirmPassword}
-                        titleText="Confirm Password"
-                        size={ComponentSize.Medium}
-                        icon={icon}
-                        status={this.passwordStatus}
-                        disabledTitleText="password has been set"
-                        testID="input-field--password-chk"
-                      />
-                    </Form.Element>
-                  </Grid.Column>
-                  <Grid.Column
-                    widthXS={Columns.Twelve}
-                    widthMD={Columns.Ten}
-                    offsetMD={Columns.One}
-                  >
-                    <Form.Element
-                      label="Initial Organization Name"
-                      labelAddOn={this.orgTip}
-                      testID="form-elem--orgname"
-                    >
-                      <Input
-                        value={org}
-                        onChange={this.handleOrg}
-                        titleText="Initial Organization Name"
-                        size={ComponentSize.Medium}
-                        icon={icon}
-                        status={ComponentStatus.Default}
-                        placeholder="An organization is a workspace for a group of users."
-                        disabledTitleText="Initial organization name has been set"
-                        testID="input-field--orgname"
-                      />
-                    </Form.Element>
-                  </Grid.Column>
-                  <Grid.Column
-                    widthXS={Columns.Twelve}
-                    widthMD={Columns.Ten}
-                    offsetMD={Columns.One}
-                  >
-                    <Form.Element
-                      label="Initial Bucket Name"
-                      labelAddOn={this.bucketTip}
-                      testID="form-elem--bucketname"
-                    >
-                      <Input
-                        value={bucket}
-                        onChange={this.handleBucket}
-                        titleText="Initial Bucket Name"
-                        size={ComponentSize.Medium}
-                        icon={icon}
-                        status={status}
-                        placeholder="A bucket is where your time series data is stored with a retention policy."
-                        disabledTitleText="Initial bucket name has been set"
-                        testID="input-field--bucketname"
-                      />
-                    </Form.Element>
-                  </Grid.Column>
-                </Grid.Row>
-              </Grid>
-            </div>
-          </div>
-          <OnboardingButtons
+                <Panel>
+                  <Panel.SymbolHeader symbol={<Bullet text="1" />} title={<h5 className="cf-funnel-page--panel-title">Initial User</h5>} />
+                  <Panel.Body>
+                    <Grid>
+                      <Grid.Row>
+                        <Grid.Column widthXS={Columns.Twelve}>
+                          <Form.Element label="Username">
+                            <Input
+                              value={username}
+                              onChange={this.handleUsername}
+                              titleText="Username"
+                              size={ComponentSize.Medium}
+                              icon={icon}
+                              status={status}
+                              disabledTitleText="Username has been set"
+                              autoFocus={true}
+                              testID="input-field--username"
+                            />
+                          </Form.Element>
+                        </Grid.Column>
+                        <Grid.Column widthXS={Columns.Six}>
+                          <Form.Element label="Password">
+                            <Input
+                              type={InputType.Password}
+                              value={password}
+                              onChange={this.handlePassword}
+                              titleText="Password"
+                              size={ComponentSize.Medium}
+                              icon={icon}
+                              status={status}
+                              disabledTitleText="Password has been set"
+                              testID="input-field--password"
+                            />
+                          </Form.Element>
+                        </Grid.Column>
+                        <Grid.Column widthXS={Columns.Six}>
+                          <Form.Element
+                            label="Confirm Password"
+                            errorMessage={
+                              isPassMismatched && 'Passwords do not match'
+                            }
+                          >
+                            <Input
+                              type={InputType.Password}
+                              value={confirmPassword}
+                              onChange={this.handleConfirmPassword}
+                              titleText="Confirm Password"
+                              size={ComponentSize.Medium}
+                              icon={icon}
+                              status={this.passwordStatus}
+                              disabledTitleText="password has been set"
+                              testID="input-field--password-chk"
+                            />
+                          </Form.Element>
+                        </Grid.Column>
+                      </Grid.Row>
+                    </Grid>
+                  </Panel.Body>
+                </Panel>
+                <Panel>
+                  <Panel.SymbolHeader symbol={<Bullet text="2" />} title={<h5 className="cf-funnel-page--panel-title">Initial Organization & Bucket</h5>} />
+                  <Panel.Body>
+                    <Grid>
+                      <Grid.Row>
+                        <Grid.Column widthXS={Columns.Six}>
+                          <Form.Element
+                            label="Organization Name"
+                            testID="form-elem--orgname"
+                          >
+                            <Input
+                              value={org}
+                              onChange={this.handleOrg}
+                              titleText="Organization Name"
+                              size={ComponentSize.Medium}
+                              icon={icon}
+                              status={ComponentStatus.Default}
+                              placeholder="ex: DevOps team"
+                              disabledTitleText="Initial organization name has been set"
+                              testID="input-field--orgname"
+                            />
+                          </Form.Element>
+                          <p className="onboarding--explainer">An organization is a workspace for a group of users requiring access to time series data, dashboards, and other resources.
+        You can create organizations for different functional groups, teams, or projects.</p>
+                        </Grid.Column>
+                        <Grid.Column widthXS={Columns.Six}>
+                          <Form.Element
+                            label="Bucket Name"
+                            testID="form-elem--bucketname"
+                          >
+                            <Input
+                              value={bucket}
+                              onChange={this.handleBucket}
+                              titleText="Bucket Name"
+                              size={ComponentSize.Medium}
+                              icon={icon}
+                              status={status}
+                              placeholder="ex: My Cool Bucket"
+                              disabledTitleText="Initial bucket name has been set"
+                              testID="input-field--bucketname"
+                            />
+                          </Form.Element>
+                          <p className="onboarding--explainer">A bucket is where your time series data is stored with a retention policy.</p>
+                        </Grid.Column>
+                      </Grid.Row>
+                    </Grid>
+                  </Panel.Body>
+                </Panel>
+                <p className="cf-funnel-page--subtitle">Next: <strong>Quick Start Options</strong></p>
+                <CTAButton text="Continue" color={ComponentColor.Primary} disabledTitleText="Complete the form above to continue" status={this.nextButtonStatus} type={ButtonType.Submit} />
+              </Grid.Column>
+            </Grid.Row>
+          </Grid>
+          {/* <OnboardingButtons
             nextButtonStatus={this.nextButtonStatus}
             autoFocusNext={false}
-          />
+          /> */}
         </Form>
-      </div>
+      </>
     )
   }
 
@@ -239,33 +250,6 @@ class AdminStep extends PureComponent<Props, State> {
   private handleBucket = (e: ChangeEvent<HTMLInputElement>): void => {
     const bucket = e.target.value
     this.setState({bucket})
-  }
-
-  private orgTip = (): JSX.Element => {
-    return (
-      <QuestionMarkTooltip
-        diameter={16}
-        style={{marginLeft: '8px'}}
-        color={ComponentColor.Primary}
-        testID="admin_org_tooltip"
-        tooltipStyle={{width: '300px'}}
-        tooltipContents="An organization is a workspace for a group of users requiring access to time series data, dashboards, and other resources.
-        You can create organizations for different functional groups, teams, or projects."
-      />
-    )
-  }
-
-  private bucketTip = (): JSX.Element => {
-    return (
-      <QuestionMarkTooltip
-        diameter={16}
-        style={{marginLeft: '8px'}}
-        color={ComponentColor.Primary}
-        testID="admin_bucket_tooltip"
-        tooltipStyle={{width: '300px'}}
-        tooltipContents="A bucket is where your time series data is stored with a retention policy."
-      />
-    )
   }
 
   private get nextButtonStatus(): ComponentStatus {

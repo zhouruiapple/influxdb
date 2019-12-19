@@ -34,13 +34,13 @@ class OnboardingStepSwitcher extends PureComponent<Props> {
     } = this.props
 
     switch (currentStepIndex) {
+      // case 0:
+        // return <InitStep {...onboardingStepProps} />
       case 0:
-        return <InitStep {...onboardingStepProps} />
-      case 1:
         return (
           <AdminStep {...onboardingStepProps} onSetupAdmin={onSetupAdmin} />
         )
-      case 2:
+      case 1:
         return (
           <CompletionStep
             {...onboardingStepProps}
