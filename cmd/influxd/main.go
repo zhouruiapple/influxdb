@@ -2,8 +2,10 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"runtime"
 	"strings"
 	"time"
 
@@ -61,8 +63,15 @@ func find(args []string) *cobra.Command {
 }
 
 func main() {
+	runtime.SetBlockProfileRate(int(time.Second))
+	runtime.SetMutexProfileFraction(1)
+	go func() {
+		http.ListenAndServe("localhost:6060", nil)
+	}()
+	
 	cmd := find(os.Args[1:])
 	if err := cmd.Execute(); err != nil {
 		os.Exit(1)
 	}
+
 }
