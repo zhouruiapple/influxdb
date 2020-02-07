@@ -5,10 +5,24 @@ import (
 	"testing"
 
 	"github.com/influxdata/influxdb"
+	"github.com/influxdata/influxdb/inmem"
 	"github.com/influxdata/influxdb/kv"
+	"github.com/influxdata/influxdb/snowflake"
 	influxdbtesting "github.com/influxdata/influxdb/testing"
 	"go.uber.org/zap/zaptest"
 )
+
+type testable interface {
+	Logf(string, ...interface{})
+	Error(args ...interface{})
+	Errorf(string, ...interface{})
+	Fail()
+	Failed() bool
+	Name() string
+	FailNow()
+	Fatal(args ...interface{})
+	Fatalf(format string, args ...interface{})
+}
 
 func TestBoltUserResourceMappingService(t *testing.T) {
 	influxdbtesting.UserResourceMappingService(initBoltUserResourceMappingService, t)
@@ -27,7 +41,7 @@ func initBoltUserResourceMappingService(f influxdbtesting.UserResourceFields, t 
 	}
 }
 
-func initUserResourceMappingService(s kv.Store, f influxdbtesting.UserResourceFields, t *testing.T) (influxdb.UserResourceMappingService, func()) {
+func initUserResourceMappingService(s kv.Store, f influxdbtesting.UserResourceFields, t testable) (influxdb.UserResourceMappingService, func()) {
 	svc := kv.NewService(zaptest.NewLogger(t), s)
 
 	ctx := context.Background()
@@ -48,4 +62,36 @@ func initUserResourceMappingService(s kv.Store, f influxdbtesting.UserResourceFi
 			}
 		}
 	}
+}
+
+func BenchmarkReadURMs(b *testing.B) {
+	urms := influxdbtesting.UserResourceFields{
+		UserResourceMappings: make([]*influxdb.UserResourceMapping, b.N),
+	}
+	idgen := snowflake.NewDefaultIDGenerator()
+	userCount := b.N / 50
+	if userCount < 1 {
+		userCount = 1
+	}
+	users := make([]influxdb.ID, userCount)
+	for i := 0; i < userCount; i++ {
+		users[i] = idgen.ID()
+	}
+
+	for i := 0; i < b.N; i++ {
+		urms.UserResourceMappings[i] = &influxdb.UserResourceMapping{
+			ResourceID:   idgen.ID(),
+			UserID:       users[i%len(users)],
+			UserType:     influxdb.Member,
+			ResourceType: influxdb.BucketsResourceType,
+		}
+	}
+	st := inmem.NewKVStore()
+	initUserResourceMappingService(st, urms, b)
+	svc := kv.NewService(zaptest.NewLogger(b), st)
+	b.ResetTimer()
+
+	svc.FindUserResourceMappings(context.Background(), influxdb.UserResourceMappingFilter{
+		UserID: users[0],
+	})
 }
