@@ -206,6 +206,7 @@ func (c *Controller) Query(ctx context.Context, req *query.Request) (flux.Query,
 	for _, dep := range c.dependencies {
 		ctx = dep.Inject(ctx)
 	}
+	ctx = req.CompileOptions.Inject(ctx)
 	q, err := c.query(ctx, req.Compiler)
 	if err != nil {
 		return q, err
@@ -337,7 +338,6 @@ func (c *Controller) compileQuery(q *Query, compiler flux.Compiler) (err error) 
 			Msg:  "failed to transition query to compiling state",
 		}
 	}
-
 	prog, err := compiler.Compile(ctx)
 	if err != nil {
 		return &flux.Error{

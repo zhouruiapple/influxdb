@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/influxdata/flux/lang"
 	"net/http"
 
 	"github.com/influxdata/flux"
@@ -14,6 +15,7 @@ const (
 	PreferHeaderKey                = "Prefer"
 	PreferNoContentHeaderValue     = "return-no-content"
 	PreferNoContentWErrHeaderValue = "return-no-content-with-error"
+	EnableProfilingHeaderKey       = "Query-Enable-Profiling"
 )
 
 // Request represents the query to run.
@@ -29,6 +31,8 @@ type Request struct {
 
 	// Compiler converts the query to a specification to run against the data.
 	Compiler flux.Compiler `json:"compiler"`
+	// CompileOptions ...
+	CompileOptions lang.CompileOptions
 
 	// Source represents the ultimate source of the request.
 	Source string `json:"source"`
@@ -64,6 +68,14 @@ func (r *Request) WithReturnNoContent(withError bool) {
 	})
 }
 
+// WithProfiling makes this Request enable profiling on the query under execution.
+func (r *Request) WithProfiling() {
+	r.WithOption(func(header http.Header) error {
+		header.Set(EnableProfilingHeaderKey, "true")
+		return nil
+	})
+}
+
 // ApplyOptions applies every option added to this Request to the given header.
 func (r *Request) ApplyOptions(header http.Header) error {
 	for _, visitor := range r.options {
@@ -77,6 +89,11 @@ func (r *Request) ApplyOptions(header http.Header) error {
 // WithCompilerMappings sets the query type mappings on the request.
 func (r *Request) WithCompilerMappings(mappings flux.CompilerMappings) {
 	r.compilerMappings = mappings
+}
+
+// WithCompileOptions sets the compile options to this request.
+func (r *Request) WithCompileOptions(opts lang.CompileOptions) {
+	r.CompileOptions = opts
 }
 
 // UnmarshalJSON populates the request from the JSON data.

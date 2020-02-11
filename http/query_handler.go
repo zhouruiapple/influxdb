@@ -35,6 +35,7 @@ import (
 const (
 	prefixQuery   = "/api/v2/query"
 	traceIDHeader = "Trace-Id"
+	QueryStatsHeaderKey = "Influx-Query-Statistics"
 )
 
 // FluxBackend is all services and associated parameters required to construct
@@ -176,7 +177,8 @@ func (h *FluxHandler) handleQuery(w http.ResponseWriter, r *http.Request) {
 	hd.SetHeaders(w)
 
 	cw := iocounter.Writer{Writer: w}
-	if _, err := h.ProxyQueryService.Query(ctx, &cw, req); err != nil {
+	stats, err := h.ProxyQueryService.Query(ctx, &cw, req)
+	if err != nil {
 		if cw.Count() == 0 {
 			// Only record the error headers IFF nothing has been written to w.
 			h.HandleHTTPError(ctx, err, w)
@@ -188,6 +190,15 @@ func (h *FluxHandler) handleQuery(w http.ResponseWriter, r *http.Request) {
 			zap.Error(err),
 		)
 	}
+
+	// Write statistics trailer
+	data, err := json.Marshal(stats)
+	if err != nil {
+		log.Info("Failed to encode statistics", zap.Error(err))
+		return
+	}
+
+	w.Header().Set(QueryStatsHeaderKey, string(data))
 }
 
 type langRequest struct {
@@ -487,13 +498,45 @@ func (s *FluxQueryService) Query(ctx context.Context, r *query.Request) (flux.Re
 		return nil, tracing.LogError(span, err)
 	}
 
-	decoder := csv.NewMultiResultDecoder(csv.ResultDecoderConfig{})
+	//decoder := csv.NewMultiResultDecoder(csv.ResultDecoderConfig{})
+	sstats := resp.Header.Get(QueryStatsHeaderKey)
+	stats := flux.Statistics{}
+	if len(sstats) > 0 {
+		if err := json.Unmarshal([]byte(sstats), &stats); err !=  nil {
+			return nil, tracing.LogError(span, err)
+		}
+	}
+	decoder := decoderWithStats{
+		MultiResultDecoder: csv.NewMultiResultDecoder(csv.ResultDecoderConfig{}),
+		stats: stats,
+	}
 	itr, err := decoder.Decode(resp.Body)
 	if err != nil {
 		return nil, tracing.LogError(span, err)
 	}
-
 	return itr, nil
+}
+
+type decoderWithStats struct {
+	*csv.MultiResultDecoder
+	stats flux.Statistics
+}
+
+func (d decoderWithStats) Decode(r io.ReadCloser) (flux.ResultIterator, error) {
+	ri, err := d.MultiResultDecoder.Decode(r)
+	if err != nil {
+		return nil, err
+	}
+	return iteratorWithStats{ResultIterator: ri, stats: d.stats}, nil
+}
+
+type iteratorWithStats struct {
+	flux.ResultIterator
+	stats flux.Statistics
+}
+
+func (i iteratorWithStats) Statistics() flux.Statistics {
+	return i.stats
 }
 
 func (s FluxQueryService) Check(ctx context.Context) check.Response {

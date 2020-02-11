@@ -17,6 +17,7 @@ import (
 	"github.com/influxdata/flux"
 	"github.com/influxdata/flux/ast"
 	"github.com/influxdata/flux/csv"
+	"github.com/influxdata/flux/execute"
 	"github.com/influxdata/flux/lang"
 	"github.com/influxdata/flux/parser"
 	"github.com/influxdata/flux/repl"
@@ -59,6 +60,9 @@ type QueryRequest struct {
 	// To obtain a QueryRequest with no result but runtime errors,
 	// add the header `Prefer: return-no-content-with-error` to the HTTP request.
 	PreferNoContentWithError bool
+	// CompileOptions are the compile options encoded in the header of the HTTP
+	// request associated with this QueryRequest.
+	CompileOptions lang.CompileOptions `json:"-"`
 }
 
 // QueryDialect is the formatting options for the query response.
@@ -325,6 +329,7 @@ func (r QueryRequest) proxyRequest(now func() time.Time) (*query.ProxyRequest, e
 		Request: query.Request{
 			OrganizationID: r.Org.ID,
 			Compiler:       compiler,
+			CompileOptions: r.CompileOptions,
 		},
 		Dialect: dialect,
 	}, nil
@@ -363,7 +368,20 @@ func QueryRequestFromProxyRequest(req *query.ProxyRequest) (*QueryRequest, error
 	default:
 		return nil, fmt.Errorf("unsupported dialect %T", d)
 	}
+	qr.CompileOptions = req.Request.CompileOptions
 	return qr, nil
+}
+
+func decodeHeader(h http.Header, r *QueryRequest) {
+	switch hv := h.Get(query.PreferHeaderKey); hv {
+	case query.PreferNoContentHeaderValue:
+		r.PreferNoContent = true
+	case query.PreferNoContentWErrHeaderValue:
+		r.PreferNoContentWithError = true
+	}
+	if hv := h.Get(query.EnableProfilingHeaderKey); len(hv) > 0 {
+		r.CompileOptions = append(r.CompileOptions, lang.WithExecuteOptions(execute.WithProfiling()))
+	}
 }
 
 func decodeQueryRequest(ctx context.Context, r *http.Request, svc influxdb.OrganizationService) (*QueryRequest, int, error) {
@@ -393,13 +411,7 @@ func decodeQueryRequest(ctx context.Context, r *http.Request, svc influxdb.Organ
 		}
 	}
 
-	switch hv := r.Header.Get(query.PreferHeaderKey); hv {
-	case query.PreferNoContentHeaderValue:
-		req.PreferNoContent = true
-	case query.PreferNoContentWErrHeaderValue:
-		req.PreferNoContentWithError = true
-	}
-
+	decodeHeader(r.Header, &req)
 	req = req.WithDefaults()
 	if err := req.Validate(); err != nil {
 		return nil, body.bytesRead, err

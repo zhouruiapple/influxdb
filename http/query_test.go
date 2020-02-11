@@ -3,6 +3,7 @@ package http
 import (
 	"bytes"
 	"context"
+	"github.com/influxdata/flux/execute"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -206,13 +207,14 @@ func TestQueryRequest_Validate(t *testing.T) {
 
 func TestQueryRequest_proxyRequest(t *testing.T) {
 	type fields struct {
-		Extern  *ast.File
-		Spec    *flux.Spec
-		AST     *ast.Package
-		Query   string
-		Type    string
-		Dialect QueryDialect
-		org     *platform.Organization
+		Extern         *ast.File
+		Spec           *flux.Spec
+		AST            *ast.Package
+		Query          string
+		Type           string
+		Dialect        QueryDialect
+		org            *platform.Organization
+		compileOptions lang.CompileOptions
 	}
 	tests := []struct {
 		name    string
@@ -333,6 +335,35 @@ func TestQueryRequest_proxyRequest(t *testing.T) {
 			},
 		},
 		{
+			name: "valid AST with compile options",
+			fields: fields{
+				AST:  &ast.Package{},
+				Type: "flux",
+				Dialect: QueryDialect{
+					Delimiter:      ",",
+					DateTimeFormat: "RFC3339",
+				},
+				org:            &platform.Organization{},
+				compileOptions: []lang.CompileOption{lang.Verbose(true)},
+			},
+			now: func() time.Time { return time.Unix(1, 1) },
+			want: &query.ProxyRequest{
+				Request: query.Request{
+					Compiler: lang.ASTCompiler{
+						AST: &ast.Package{},
+						Now: time.Unix(1, 1),
+					},
+					CompileOptions: []lang.CompileOption{lang.Verbose(true)},
+				},
+				Dialect: &csv.Dialect{
+					ResultEncoderConfig: csv.ResultEncoderConfig{
+						NoHeader:  false,
+						Delimiter: ',',
+					},
+				},
+			},
+		},
+		{
 			name: "valid spec",
 			fields: fields{
 				Type: "flux",
@@ -365,13 +396,14 @@ func TestQueryRequest_proxyRequest(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := QueryRequest{
-				Extern:  tt.fields.Extern,
-				Spec:    tt.fields.Spec,
-				AST:     tt.fields.AST,
-				Query:   tt.fields.Query,
-				Type:    tt.fields.Type,
-				Dialect: tt.fields.Dialect,
-				Org:     tt.fields.org,
+				Extern:         tt.fields.Extern,
+				Spec:           tt.fields.Spec,
+				AST:            tt.fields.AST,
+				Query:          tt.fields.Query,
+				Type:           tt.fields.Type,
+				Dialect:        tt.fields.Dialect,
+				Org:            tt.fields.org,
+				CompileOptions: tt.fields.compileOptions,
 			}
 			got, err := r.proxyRequest(tt.now)
 			if (err != nil) != tt.wantErr {
@@ -449,6 +481,36 @@ func Test_decodeQueryRequest(t *testing.T) {
 				Org: &platform.Organization{
 					ID: func() platform.ID { s, _ := platform.IDFromString("deadbeefdeadbeef"); return *s }(),
 				},
+			},
+		},
+		{
+			name: "valid query request with compile options",
+			args: args{
+				r: func() *http.Request {
+					r := httptest.NewRequest("POST", "/", bytes.NewBufferString(`{"query": "from()"}`))
+					r.Header.Set(query.EnableProfilingHeaderKey, "True") // could be anything
+					return r
+				}(),
+				svc: &mock.OrganizationService{
+					FindOrganizationF: func(ctx context.Context, filter platform.OrganizationFilter) (*platform.Organization, error) {
+						return &platform.Organization{
+							ID: func() platform.ID { s, _ := platform.IDFromString("deadbeefdeadbeef"); return *s }(),
+						}, nil
+					},
+				},
+			},
+			want: &QueryRequest{
+				Query: "from()",
+				Type:  "flux",
+				Dialect: QueryDialect{
+					Delimiter:      ",",
+					DateTimeFormat: "RFC3339",
+					Header:         func(x bool) *bool { return &x }(true),
+				},
+				Org: &platform.Organization{
+					ID: func() platform.ID { s, _ := platform.IDFromString("deadbeefdeadbeef"); return *s }(),
+				},
+				CompileOptions: []lang.CompileOption{lang.WithExecuteOptions(execute.WithProfiling())},
 			},
 		},
 		{
