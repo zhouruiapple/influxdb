@@ -3,3 +3,5 @@
 //
 
 declare module '*.png'
+
+declare var ENABLE_AMPLITUDE: string

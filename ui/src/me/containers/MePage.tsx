@@ -21,6 +21,7 @@ import GettingStarted from 'src/me/components/GettingStarted'
 
 // Utils
 import {pageTitleSuffixer} from 'src/shared/utils/pageTitles'
+import {analytics} from 'src/utils/analytics'
 
 // Types
 import {AppState} from 'src/types'
@@ -38,6 +39,10 @@ interface StateProps {
 
 @ErrorHandling
 export class MePage extends PureComponent<StateProps> {
+  componentDidMount() {
+    analytics.fireEvent('Me Page View')
+  }
+
   public render() {
     const {me, orgName} = this.props
 

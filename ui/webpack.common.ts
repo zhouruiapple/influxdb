@@ -5,10 +5,10 @@ const MiniCssExtractPlugin = require('mini-css-extract-plugin')
 const {CleanWebpackPlugin} = require('clean-webpack-plugin')
 const webpack = require('webpack')
 const {
+  API_BASE_PATH,
+  BASE_PATH,
   GIT_SHA,
   STATIC_DIRECTORY,
-  BASE_PATH,
-  API_BASE_PATH,
 } = require('./src/utils/env')
 
 module.exports = {
@@ -116,9 +116,12 @@ module.exports = {
     new webpack.ProgressPlugin(),
     new webpack.EnvironmentPlugin({
       ...process.env,
-      GIT_SHA,
       API_PREFIX: API_BASE_PATH,
+      GIT_SHA,
       STATIC_PREFIX: BASE_PATH,
+    }),
+    new webpack.DefinePlugin({
+      ENABLE_AMPLITUDE: process.env.ENABLE_AMPLITUDE || JSON.stringify(false)
     }),
   ],
   stats: {

@@ -53,6 +53,7 @@ export const VERSION = process.env.npm_package_version
 export const GIT_SHA = process.env.GIT_SHA
 export const BASE_PATH = process.env.STATIC_PREFIX
 export const API_BASE_PATH = process.env.API_PREFIX
+export const AMPLITUDE_API_KEY = process.env.AMPLITUDE_API_KEY
 
 export const CLOUD = !!process.env.CLOUD_URL
 export const CLOUD_SIGNIN_PATHNAME = '/api/v2/signin'
