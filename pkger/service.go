@@ -27,6 +27,13 @@ type SVC interface {
 // SVCMiddleware is a service middleware func.
 type SVCMiddleware func(SVC) SVC
 
+type Store interface {
+	Create(ctx context.Context, orgID influxdb.ID, pkg *Pkg) error
+	Read(ctx context.Context, orgID influxdb.ID, pkgName string) (*Pkg, error)
+	Update(ctx context.Context, orgID influxdb.ID, pkg *Pkg) error
+	Delete(ctx context.Context, orgID influxdb.ID, pkgName string) error
+}
+
 type serviceOpt struct {
 	logger *zap.Logger
 
@@ -139,6 +146,8 @@ type Service struct {
 	taskSVC     influxdb.TaskService
 	teleSVC     influxdb.TelegrafConfigStore
 	varSVC      influxdb.VariableService
+
+	store Store
 
 	applyReqLimit int
 }
