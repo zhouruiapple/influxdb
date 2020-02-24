@@ -603,6 +603,19 @@ func (p *Partition) MeasurementSeriesIDIterator(name []byte) (tsdb.SeriesIDItera
 	return newFileSetSeriesIDIterator(fs, fs.MeasurementSeriesIDIterator(name)), nil
 }
 
+type singleTagKeyIterator struct {
+	done bool
+	elem TagKeyElem
+}
+
+func (s *singleTagKeyIterator) Next() TagKeyElem {
+	if s.done {
+		return nil
+	}
+	s.done = true
+	return s.elem
+}
+
 // DropMeasurement deletes a measurement from the index. DropMeasurement does
 // not remove any series from the index directly.
 func (p *Partition) DropMeasurement(name []byte) error {
@@ -612,82 +625,57 @@ func (p *Partition) DropMeasurement(name []byte) error {
 	}
 	defer fs.Release()
 
-	// Delete all keys and values.
-	if kitr := fs.TagKeyIterator(name); kitr != nil {
-		for k := kitr.Next(); k != nil; k = kitr.Next() {
-			// Delete key if not already deleted.
-			if !k.Deleted() {
-				if err := func() error {
-					p.mu.RLock()
-					defer p.mu.RUnlock()
-					return p.activeLogFile.DeleteTagKey(name, k.Key())
-				}(); err != nil {
-					return err
-				}
-			}
-
-			// Delete each value in key.
-			if vitr := k.TagValueIterator(); vitr != nil {
-				for v := vitr.Next(); v != nil; v = vitr.Next() {
-					if !v.Deleted() {
-						if err := func() error {
-							p.mu.RLock()
-							defer p.mu.RUnlock()
-							return p.activeLogFile.DeleteTagValue(name, k.Key(), v.Value())
-						}(); err != nil {
-							return err
-						}
-					}
-				}
-			}
+	for {
+		kitr := fs.TagKeyIterator(name)
+		done, elem, err := p.activeLogFile.DeleteTagKeyValues(name, kitr)
+		if err != nil {
+			return err
+		}
+		if done {
+			return nil
+		}
+		// Put any elements with potentially more tag values to process back in.
+		if elem != nil {
+			kitr = MergeTagKeyIterators(&singleTagKeyIterator{false, elem}, kitr)
 		}
 	}
 
-	// Delete all series.
-	// TODO(edd): it's not clear to me why we have to delete all series IDs from
-	// the index when we could just mark the measurement as deleted.
-	if itr := fs.MeasurementSeriesIDIterator(name); itr != nil {
-		defer itr.Close()
-
-		// 1024 is assuming that typically a bucket (measurement) will have at least
-		// 1024 series in it.
-		all := make([]tsdb.SeriesID, 0, 1024)
+	// 1024 is assuming that typically a bucket (measurement) will have at least
+	// 1024 series in it.
+	batch := make([]tsdb.SeriesID, 0, 1024)
+	sitr := fs.MeasurementSeriesIDIterator(name)
+	for {
 		for {
-			elem, err := itr.Next()
+			elem, err := sitr.Next()
 			if err != nil {
 				return err
 			} else if elem.SeriesID.IsZero() {
 				break
 			}
-			all = append(all, elem.SeriesID)
+			batch = append(batch, elem.SeriesID)
 
 			// Update series set.
 			p.seriesIDSet.Remove(elem.SeriesID)
+			if len(batch) == deleteBatchSize {
+				break
+			}
 		}
 
-		if err := p.activeLogFile.DeleteSeriesIDList(all); err != nil {
+		if len(batch) == 0 {
+			break
+		}
+
+		if err := p.activeLogFile.DeleteSeriesIDList(batch); err != nil {
 			return err
 		}
 
-		p.tracker.AddSeriesDropped(uint64(len(all)))
-		p.tracker.SubSeries(uint64(len(all)))
+		p.tracker.AddSeriesDropped(uint64(len(batch)))
+		p.tracker.SubSeries(uint64(len(batch)))
 
-		if err = itr.Close(); err != nil {
-			return err
-		}
+		batch = batch[:0]
 	}
 
-	// Mark measurement as deleted.
-	if err := func() error {
-		p.mu.RLock()
-		defer p.mu.RUnlock()
-		return p.activeLogFile.DeleteMeasurement(name)
-	}(); err != nil {
-		return err
-	}
-
-	// Check if the log file needs to be swapped.
-	if err := p.CheckLogFile(); err != nil {
+	if err = sitr.Close(); err != nil {
 		return err
 	}
 

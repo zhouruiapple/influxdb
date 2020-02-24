@@ -44,6 +44,9 @@ const defaultLogFileBufferSize = 4096
 // into a .tsi file.
 const indexFileBufferSize = 1 << 17 // 128K
 
+// deleteBatchSize is the number of entries we will delete at a time before fsyncing
+const deleteBatchSize = 10000
+
 // LogFile represents an on-disk write-ahead log file.
 type LogFile struct {
 	mu  sync.RWMutex
@@ -101,8 +104,7 @@ func (f *LogFile) bytes() int {
 	b += int(unsafe.Sizeof(f.w))
 	b += int(unsafe.Sizeof(f.bufferSize))
 	b += int(unsafe.Sizeof(f.nosync))
-	// TODO(jacobmarble): Uncomment when we are using go >= 1.10.0
-	//b += f.w.Size()
+	b += f.w.Size()
 	b += int(unsafe.Sizeof(f.buf)) + len(f.buf)
 	b += int(unsafe.Sizeof(f.keyBuf)) + len(f.keyBuf)
 	b += int(unsafe.Sizeof(f.sfile))
@@ -352,6 +354,22 @@ func (f *LogFile) DeleteMeasurement(name []byte) error {
 	return f.FlushAndSync()
 }
 
+func (f *LogFile) DeleteMeasurements(names [][]byte) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	for _, name := range names {
+		e := LogEntry{Flag: LogEntryMeasurementTombstoneFlag, Name: name}
+		if err := f.appendEntry(&e); err != nil {
+			return err
+		}
+		f.execEntry(&e)
+	}
+
+	// Flush buffer and sync to disk.
+	return f.FlushAndSync()
+}
+
 // TagKeySeriesIDIterator returns a series iterator for a tag key.
 func (f *LogFile) TagKeySeriesIDIterator(name, key []byte) (tsdb.SeriesIDIterator, error) {
 	f.mu.RLock()
@@ -468,6 +486,73 @@ func (f *LogFile) DeleteTagKey(name, key []byte) error {
 
 	// Flush buffer and sync to disk.
 	return f.FlushAndSync()
+}
+
+// DeleteTagKeyValues adds a tombstone for a tag key and associated values to the log file.
+// Returns if done (error or all entries processed) and, in case we split
+// the batch on tag values, the last element we were processing.
+func (f *LogFile) DeleteTagKeyValues(name []byte, itr TagKeyIterator) (bool, TagKeyElem, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	count := 0
+	var elem TagKeyElem
+	for count < deleteBatchSize {
+		k := itr.Next()
+		elem = nil
+		if k == nil {
+			break
+		}
+
+		// Delete key if not already deleted.
+		if !k.Deleted() {
+			if err := func() error {
+				e := LogEntry{Flag: LogEntryTagKeyTombstoneFlag, Name: name,
+					Key: k.Key()}
+				if err := f.appendEntry(&e); err != nil {
+					return err
+				}
+				f.execEntry(&e)
+				count++
+				return nil
+			}(); err != nil {
+				return true, nil, err
+			}
+		}
+
+		elem = k.(namedTagKeyElem)
+		// Delete each value in key.
+		if vitr := k.TagValueIterator(); vitr != nil {
+			for count < deleteBatchSize {
+				v := vitr.Next()
+				if v == nil {
+					break
+				}
+
+				if !v.Deleted() {
+					if err := func() error {
+						e := LogEntry{Flag: LogEntryTagValueTombstoneFlag, Name: name,
+							Key: k.Key(), Value: v.Value()}
+						if err := f.appendEntry(&e); err != nil {
+							return err
+						}
+						f.execEntry(&e)
+						count++
+						return nil
+					}(); err != nil {
+						return true, nil, err
+					}
+				}
+			}
+		}
+	}
+
+	// Flush buffer and sync to disk.
+	if count == deleteBatchSize {
+		return false, elem, f.FlushAndSync()
+	} else {
+		return true, nil, f.FlushAndSync()
+	}
 }
 
 // TagValueSeriesIDSet returns a series iterator for a tag value.
