@@ -626,11 +626,12 @@ func (p *Partition) DropMeasurement(name []byte) error {
 			} else if elem.SeriesID == 0 {
 				break
 			}
-			if err := func() error {
-				p.mu.RLock()
-				defer p.mu.RUnlock()
-				return p.activeLogFile.DeleteSeriesID(elem.SeriesID)
-			}(); err != nil {
+
+			p.mu.RLock()
+			err = p.activeLogFile.DeleteSeriesID(elem.SeriesID)
+			p.mu.RUnlock()
+
+			if err != nil {
 				return err
 			}
 		}
@@ -691,11 +692,11 @@ func (p *Partition) createSeriesListIfNotExists(names [][]byte, tagsSlice []mode
 
 func (p *Partition) DropSeries(seriesID uint64) error {
 	// Delete series from index.
-	if err := func() error {
-		p.mu.RLock()
-		defer p.mu.RUnlock()
-		return p.activeLogFile.DeleteSeriesID(seriesID)
-	}(); err != nil {
+	p.mu.RLock()
+	err := p.activeLogFile.DeleteSeriesID(seriesID)
+	p.mu.RUnlock()
+
+	if err != nil {
 		return err
 	}
 
