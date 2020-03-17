@@ -94,6 +94,8 @@ import NewEndpointOverlay from 'src/notifications/endpoints/components/NewEndpoi
 import EditEndpointOverlay from 'src/notifications/endpoints/components/EditEndpointOverlay'
 import NoOrgsPage from 'src/organizations/containers/NoOrgsPage'
 
+import {PerformanceBoy} from 'src/Performance'
+
 // Overlays
 import OverlayHandler, {
   RouteOverlay,
@@ -471,90 +473,6 @@ class Root extends PureComponent {
           <Route path="*" component={NotFound} />
         </Router>
       </Provider>
-    )
-  }
-}
-
-class PerformanceBoy extends React.Component {
-  public componentDidMount() {
-    this.updateFPSCounter()
-  }
-
-  updateFPSCounter = () => {
-    let {
-      currentFps,
-      currentFrameTime,
-      frameStartTime,
-      lastTick,
-      maxFps,
-      maxTimeInFrame,
-      minFps,
-      totalFrames,
-      totalTimeInFrame,
-    } = this.state
-    frameStartTime = Date.now() // variable is part of state to prevent continual variable re-initialization
-    currentFps = 1 / ((frameStartTime - lastTick) / 1000)
-
-    if (currentFps > maxFps) {
-      maxFps = currentFps
-    }
-    if (currentFps < minFps) {
-      minFps = currentFps
-    }
-
-    totalFrames++
-    lastTick = Date.now()
-    currentFrameTime = lastTick - frameStartTime
-    totalTimeInFrame += currentFrameTime
-    if (currentFrameTime > maxTimeInFrame) {
-      maxTimeInFrame = currentFrameTime
-    }
-    this.setState({
-      currentFps,
-      lastTick,
-      maxFps,
-      maxTimeInFrame,
-      minFps,
-      totalFrames,
-      totalTimeInFrame,
-    })
-    requestAnimationFrame(this.updateFPSCounter)
-  }
-
-  constructor(props) {
-    super(props)
-
-    this.state = {
-      currentFps: 0,
-      currentFrameTime: 0,
-      lastTick: Date.now(),
-      frameStartTime: Date.now(),
-      maxFps: 0,
-      maxTimeInFrame: 0,
-      minFps: 100,
-      totalFrames: 0,
-      totalTimeInFrame: 0,
-    }
-  }
-
-  public render() {
-    return (
-      <>
-        <div style={{ zIndex: 10000 }}>
-          fps: {this.state.currentFps}
-          <br />
-          max: {this.state.maxFps}
-          <br />
-          min: {this.state.minFps}
-          <br />
-          totalFrames: {this.state.totalFrames}
-          <br />
-          average time per frame: {this.state.totalTimeInFrame / this.state.totalFrames * 1000}
-          <br />
-          worst time in frame: {this.state.maxTimeInFrame}
-        </div>
-        {this.props.children}
-      </>
     )
   }
 }
