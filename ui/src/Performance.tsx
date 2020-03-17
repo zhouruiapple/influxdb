@@ -1,8 +1,41 @@
 import React from 'react'
 
+const INTERVAL = 120
+
+const url = 'https://us-west-2-1.aws.cloud2.influxdata.com'
+const orgId = '275ac1e8a61d71f2'
+const bucketName = 'performance'
+const authToken = 'iEoLyuknDOIzw7ByDlwAmTwPADgFD0C7Jni6u3UMc5iL18Ph4V6bnQex753GBv_L3yqQCMOI1yr7sJBPsYChtg=='
+
 export class PerformanceBoy extends React.Component {
+  averageFPS: number
+  cummulativeFPS: number[]
   frameStartTime: number
-  currentFrameTime: number
+  lastTick: number
+  startTime: number
+  timeInCurrentFrame: number
+
+  constructor(props) {
+    super(props)
+    this.startTime = Date.now()
+
+    this.averageFPS = 0
+    this.currentFPS = 0
+    this.cummulativeFPS = Array(INTERVAL)
+    this.maxFPS = 0
+
+    this.frameStartTime = Date.now()
+    this.lastTick = this.frameStartTime
+    this.timeInCurrentFrame = this.frameStartTime
+
+    this.totalFrames = 0
+
+    this.state = {
+      maxTimeInFrame: 0,
+      totalTimeInFrame: 0,
+    }
+  }
+
   public componentDidMount() {
     this.updateFPSCounter()
     this.writeToDatabase()
@@ -10,82 +43,66 @@ export class PerformanceBoy extends React.Component {
 
   updateFPSCounter = () => {
     let {
-      currentFps,
-      lastTick,
-      maxFps,
       maxTimeInFrame,
-      minFps,
-      totalFrames,
       totalTimeInFrame,
     } = this.state
+    this.totalFrames++
     this.frameStartTime = Date.now()
-    currentFps = 1 / ((this.frameStartTime - lastTick) / 1000)
 
-    if (currentFps > maxFps) {
-      maxFps = currentFps
-    }
-    if (currentFps < minFps) {
-      minFps = currentFps
+    this.currentFPS = this.totalFrames / (Math.floor(this.frameStartTime / 1000) - Math.floor(this.startTime / 1000))
+
+    if (this.currentFPS > this.maxFPS) {
+      this.maxFPS = this.currentFPS
     }
 
-    totalFrames++
-    lastTick = Date.now()
-    this.currentFrameTime = lastTick - this.frameStartTime
-    totalTimeInFrame += this.currentFrameTime
-    if (this.currentFrameTime > maxTimeInFrame) {
-      maxTimeInFrame = this.currentFrameTime
+    this.cummulativeFPS.push(this.currentFPS)
+
+    this.timeInCurrentFrame = Date.now() - this.frameStartTime
+    totalTimeInFrame += this.timeInCurrentFrame
+
+    if (this.timeInCurrentFrame > maxTimeInFrame) {
+      maxTimeInFrame = this.timeInCurrentFrame
     }
+
     this.setState({
-      currentFps,
-      lastTick,
-      maxFps,
       maxTimeInFrame,
-      minFps,
-      totalFrames,
       totalTimeInFrame,
     })
+
+    this.lastTick = Date.now()
     requestAnimationFrame(this.updateFPSCounter)
   }
 
   writeToDatabase = () => {
-    if (this.state.totalFrames % 300 === 0) {
+    if (this.totalFrames % INTERVAL === 0) {
       // https://v2.docs.influxdata.com/v2.0/write-data/#influxdb-api
-      console.log('curl -XPOST "http://localhost:9999/api/v2/write?org=YOUR_ORG&bucket=YOUR_BUCKET&precision=s" \
-        --header "Authorization: Token YOURAUTHTOKEN" \
-        --data-raw "mem,host=host1 used_percent=23.43234543 1556896326"')
+      this.averageFPS = (this.cummulativeFPS.reduce((total, currentFPS) => (total + currentFPS), 0) / INTERVAL)
+
+      fetch(`${url}/api/v2/write?org=${orgId}&bucket=${bucketName}&precision=s`, {
+        method: 'POST',
+        mode: 'cors',
+        headers: {
+          'Authorization': `Token ${authToken}`
+        },
+        body: `performance,environment=dev,interval=${INTERVAL} fps=${this.currentFPS},maxFPS=${this.maxFPS},totalFrames=${this.totalFrames},averageFrames=${this.averageFPS} ${Math.floor(Date.now() / 1000)}`
+      })
+      this.maxFPS = this.currentFPS
+      this.cummulativeFPS = Array(INTERVAL)
     }
     requestAnimationFrame(this.writeToDatabase)
-  }
-
-  constructor(props) {
-    super(props)
-
-    this.frameStartTime = Date.now()
-    this.currentFrameTime = Date.now()
-    this.state = {
-      currentFps: 0,
-      lastTick: Date.now(),
-      maxFps: 0,
-      maxTimeInFrame: 0,
-      minFps: 100,
-      totalFrames: 0,
-      totalTimeInFrame: 0,
-    }
   }
 
   public render() {
     return (
       <>
         <div style={{ zIndex: 10000 }}>
-          fps: {this.state.currentFps}
+          fps: {this.currentFPS}
           <br />
-          max: {this.state.maxFps}
+          max: {this.maxFPS}
           <br />
-          min: {this.state.minFps}
+          totalFrames: {this.totalFrames}
           <br />
-          totalFrames: {this.state.totalFrames}
-          <br />
-          average time per frame: {this.state.totalTimeInFrame / this.state.totalFrames * 1000}
+          average time per frame: {this.state.totalTimeInFrame / this.totalFrames * 1000}
           <br />
           worst time in frame: {this.state.maxTimeInFrame}
         </div>
