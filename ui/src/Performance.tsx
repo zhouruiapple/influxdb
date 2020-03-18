@@ -1,55 +1,70 @@
 import React from 'react'
 
-const INTERVAL = 120
+import {performanceLineWriter} from 'src/utils/performanceLineWriter'
 
-const url = 'https://us-west-2-1.aws.cloud2.influxdata.com'
-const orgId = '275ac1e8a61d71f2'
-const bucketName = 'performance'
-const authToken = 'iEoLyuknDOIzw7ByDlwAmTwPADgFD0C7Jni6u3UMc5iL18Ph4V6bnQex753GBv_L3yqQCMOI1yr7sJBPsYChtg=='
+const INTERVAL = 120
 
 export class PerformanceBoy extends React.Component {
   averageFPS: number
   cummulativeFPS: number[]
   frameStartTime: number
-  lastTick: number
+  lastFrameEndTime: number
   startTime: number
   timeInCurrentFrame: number
 
   constructor(props) {
     super(props)
-    this.startTime = Date.now()
+    this.startTime = performance.now()
 
     this.averageFPS = 0
     this.currentFPS = 0
     this.cummulativeFPS = Array(INTERVAL)
     this.maxFPS = 0
 
-    this.frameStartTime = Date.now()
-    this.lastTick = this.frameStartTime
+    this.frameStartTime = performance.now()
+    this.lastFrameEndTime = this.frameStartTime
     this.timeInCurrentFrame = this.frameStartTime
 
+    this.maxTimeInFrame = 0
     this.totalFrames = 0
+    this.totalTimeInFrame = 0
+
+    this.appPerformance = {
+      currentFPS: this.currentFPS,
+      maxFPS: this.maxFPS,
+      totalFrames: this.totalFrames,
+      averageFPS: this.averageFPS,
+      timeInCurrentFrame: this.timeInCurrentFrame,
+      maxTimeInFrame: this.maxTimeInFrame,
+    }
 
     this.state = {
-      maxTimeInFrame: 0,
-      totalTimeInFrame: 0,
+      currentFPS: this.currentFPS,
     }
   }
 
   public componentDidMount() {
+    document.addEventListener('visibilitychange', this.handleVisibilityChange)
     this.updateFPSCounter()
     this.writeToDatabase()
   }
 
-  updateFPSCounter = () => {
-    let {
-      maxTimeInFrame,
-      totalTimeInFrame,
-    } = this.state
-    this.totalFrames++
-    this.frameStartTime = Date.now()
+  handleVisibilityChange = () => {
+    // When the document becomes invisible, total frames stop being counted.
+    // FPS is calculated as (total frames / time elapsed since start).
+    // Since frames aren't counted, but time elapsed keeps increasing, we want to reset counting state.
+    if (!document.hidden) {
+      this.totalFrames = 0
+      this.startTime = performance.now()
+    }
+  }
 
-    this.currentFPS = this.totalFrames / (Math.floor(this.frameStartTime / 1000) - Math.floor(this.startTime / 1000))
+  updateFPSCounter = () => {
+    this.frameStartTime = performance.now()
+    this.totalFrames++
+
+    this.currentFPS =
+      (this.totalFrames / (this.frameStartTime - this.startTime)) * 1000
 
     if (this.currentFPS > this.maxFPS) {
       this.maxFPS = this.currentFPS
@@ -57,37 +72,42 @@ export class PerformanceBoy extends React.Component {
 
     this.cummulativeFPS.push(this.currentFPS)
 
-    this.timeInCurrentFrame = Date.now() - this.frameStartTime
-    totalTimeInFrame += this.timeInCurrentFrame
-
-    if (this.timeInCurrentFrame > maxTimeInFrame) {
-      maxTimeInFrame = this.timeInCurrentFrame
+    this.timeInCurrentFrame = performance.now() - this.lastFrameEndTime
+    this.lastFrameEndTime = performance.now()
+    this.totalTimeInFrame += this.timeInCurrentFrame
+    if (this.timeInCurrentFrame > this.maxTimeInFrame) {
+      this.maxTimeInFrame = this.timeInCurrentFrame
     }
 
     this.setState({
-      maxTimeInFrame,
-      totalTimeInFrame,
+      currentFPS: this.currentFPS,
     })
-
-    this.lastTick = Date.now()
     requestAnimationFrame(this.updateFPSCounter)
   }
 
   writeToDatabase = () => {
     if (this.totalFrames % INTERVAL === 0) {
       // https://v2.docs.influxdata.com/v2.0/write-data/#influxdb-api
-      this.averageFPS = (this.cummulativeFPS.reduce((total, currentFPS) => (total + currentFPS), 0) / INTERVAL)
+      this.averageFPS =
+        this.cummulativeFPS.reduce(
+          (total, currentFPS) => total + currentFPS,
+          0
+        ) / INTERVAL
 
-      fetch(`${url}/api/v2/write?org=${orgId}&bucket=${bucketName}&precision=s`, {
-        method: 'POST',
-        mode: 'cors',
-        headers: {
-          'Authorization': `Token ${authToken}`
-        },
-        body: `performance,environment=dev,interval=${INTERVAL} fps=${this.currentFPS},maxFPS=${this.maxFPS},totalFrames=${this.totalFrames},averageFrames=${this.averageFPS} ${Math.floor(Date.now() / 1000)}`
-      })
+      this.appPerformance = {
+        currentFPS: this.currentFPS,
+        maxFPS: this.maxFPS,
+        totalFrames: this.totalFrames,
+        averageFPS: this.averageFPS,
+        timeInCurrentFrame: this.timeInCurrentFrame,
+        maxTimeInFrame: this.maxTimeInFrame,
+      }
+
+      performanceLineWriter(this.appPerformance)
+
       this.maxFPS = this.currentFPS
       this.cummulativeFPS = Array(INTERVAL)
+      this.maxTimeInFrame = this.timeInCurrentFrame
     }
     requestAnimationFrame(this.writeToDatabase)
   }
@@ -95,16 +115,19 @@ export class PerformanceBoy extends React.Component {
   public render() {
     return (
       <>
-        <div style={{ zIndex: 10000 }}>
+        <div style={{zIndex: 10000}}>
           fps: {this.currentFPS}
           <br />
           max: {this.maxFPS}
           <br />
           totalFrames: {this.totalFrames}
           <br />
-          average time per frame: {this.state.totalTimeInFrame / this.totalFrames * 1000}
+          time in frame: {this.timeInCurrentFrame} ms
           <br />
-          worst time in frame: {this.state.maxTimeInFrame}
+          average time per frame:{' '}
+          {(this.totalTimeInFrame / this.totalFrames)} ms
+          <br />
+          worst time in frame: {this.maxTimeInFrame} ms
         </div>
         {this.props.children}
       </>
