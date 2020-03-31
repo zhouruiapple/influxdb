@@ -34,6 +34,7 @@ func LogError(span opentracing.Span, err error) error {
 
 	file, line := runtime.FuncForPC(pcs[0]).FileLine(pcs[0])
 	span.LogFields(log.String("filename", file), log.Int("line", line), log.Error(err))
+	span.SetTag("error", true)
 
 	return err
 }
