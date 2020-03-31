@@ -116,6 +116,9 @@ describe('VariableSelectors', () => {
       expect(vars[1].name).toEqual('5678')
     })
 
+    it('should account for unordered objects', () => {
+    })
+
     // skipping this one as it requires some weird mocking
     // to be done for the ast parser
     it.skip('should dynamically load in the windowPeriod', () => {
