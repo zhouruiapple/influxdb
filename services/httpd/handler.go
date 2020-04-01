@@ -467,6 +467,28 @@ func (h *Handler) writeHeader(w http.ResponseWriter, code int) {
 
 // serveQuery parses an incoming query and, if valid, executes the query.
 func (h *Handler) serveQuery(w http.ResponseWriter, r *http.Request, user meta.User) {
+
+	// record the begining of the function call.  we use this in a deferred
+	// closure that logs the time.Since(handlerStart).
+	handlerStart := time.Now()
+
+	// declare our parserDuration and exectorDuration here since they are used in
+	// the deferred closure below.
+	//
+	// FIXME:  this is a proof of concept. ideally the parser and executor would
+	// return these statistics.
+	//
+	// we may want to make this optional as well. this adds a few time system
+	// calls which is non-trivial.
+	//
+	var parserDuration, executorDuration time.Duration
+	defer func() {
+		h.Logger.Info("influxql_query_timing",
+			zap.Duration("handler_duration", time.Since(handlerStart)),
+			zap.Duration("parser_duration", parserDuration),
+			zap.Duration("executor_duration", executorDuration))
+	}()
+
 	atomic.AddInt64(&h.stats.QueryRequests, 1)
 	defer func(start time.Time) {
 		atomic.AddInt64(&h.stats.QueryRequestDuration, time.Since(start).Nanoseconds())
@@ -543,8 +565,13 @@ func (h *Handler) serveQuery(w http.ResponseWriter, r *http.Request, user meta.U
 		p.SetParams(params)
 	}
 
-	// Parse query from query string.
-	q, err := p.ParseQuery()
+	// parse query and store duration
+	q, parserDuration, err := func() (*influxql.Query, time.Duration, error) {
+		start := time.Now()
+		q, err := p.ParseQuery()
+		return q, time.Since(start), err
+	}()
+
 	if err != nil {
 		h.httpError(rw, "error parsing query: "+err.Error(), http.StatusBadRequest)
 		return
@@ -623,7 +650,19 @@ func (h *Handler) serveQuery(w http.ResponseWriter, r *http.Request, user meta.U
 		}
 	}
 
-	// Execute query.
+	// mark the beginning of query execution.
+	executorStart := time.Now()
+
+	// from here to the end of the function is considered query execution.  we
+	// defer assigning executionDuration because there might be places we return
+	// early.
+	//
+	// pushing this onto the stack of deferred calls should allow us to properly
+	// report total exequetion time using a previously deferred go-routine.
+	//
+	defer func() { executorDuration = time.Since(executorStart) }()
+
+	// execute query
 	results := h.QueryExecutor.ExecuteQuery(q, opts, closing)
 
 	// If we are running in async mode, open a goroutine to drain the results
@@ -756,6 +795,7 @@ func (h *Handler) serveQuery(w http.ResponseWriter, r *http.Request, user meta.U
 		n, _ := rw.WriteResponse(resp)
 		atomic.AddInt64(&h.stats.QueryRequestBytesTransmitted, int64(n))
 	}
+
 }
 
 // async drains the results from an async query and logs a message if it fails.
