@@ -4,9 +4,10 @@
 */
 
 .time-machine {
-  height: 100%;
-  flex: 0 0 100%;
-  @include no-user-select();
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .time-machine--split {
@@ -40,9 +41,11 @@
 }
 
 .time-machine--view {
+  background-color: $g0-obsidian;
+  border-radius: $cf-radius;
   width: 100%;
-  height: 100%;
-  position: absolute;
+  height: 400px;
+  position: relative;
   padding: 16px;
   
   > .single-stat {
@@ -62,5 +65,128 @@
 
   > .cell--view-empty {
     justify-content: flex-end;
+  }
+}
+
+
+/*
+  New Design Styles
+  ------------------------------------------------------------------------------
+*/
+
+$tm-block--collapsed-height: 46px;
+$tm-block--expanded-height: 390px;
+
+.tm-block {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  margin-bottom: $cf-marg-b;
+  background-color: $g0-obsidian;
+  border-radius: $cf-radius;
+}
+
+.tm-block--header {
+  flex: 0 0 $tm-block--collapsed-height;
+  display: flex;
+  align-items: center;
+  padding: $cf-marg-b;
+  justify-content: space-between;
+  border-radius: $cf-radius;
+  transition: background-color 0.25s ease;
+  
+  .tm-block__expanded & {
+    background-color: $g3-castle;
+  }
+
+  .tm-block__collapsed & {
+    background-color: $g2-kevlar;
+  }
+}
+
+.tm-block--header-left,
+.tm-block--header-right {
+  flex: 1 0 0;
+  display: flex;
+  align-items: center;
+}
+
+.tm-block--header-left {
+  justify-content: flex-start;
+}
+.tm-block--header-left > * {
+  margin-right: $cf-marg-a;
+}
+
+.tm-block--header-right {
+  justify-content: flex-end;
+}
+.tm-block--header-right > * {
+  margin-left: $cf-marg-a;
+}
+
+
+.tm-block--toggle {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  position: relative;
+  outline: none;
+  color: $g13-mist;
+  transition: color 0.25s ease;
+  background-color: transparent;
+
+  &:hover {
+    color: $g16-pearl;
+    cursor: pointer;
+  }
+}
+
+.tm-block--title {
+  height: 30px;
+  line-height: 30px;
+  font-size: 15px;
+  font-weight: $cf-font-weight--medium;
+  color: $g13-mist;
+  user-select: none;
+  margin-right: $cf-marg-c;
+}
+
+.tm-block--toggle-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transition: transform 0.25s ease;
+
+  .tm-block__expanded & {
+    transform: translate(-50%, -50%) rotate(90deg);
+  }
+
+  .tm-block__collapsed & {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+}
+
+
+.tm-block--contents {
+  flex: 1 0 0;
+  margin: $cf-marg-b;
+  position: relative;
+}
+
+.tm-block__collapsed {
+  flex: 0 0 $tm-block--collapsed-height;
+
+  .tm-block--contents {
+    display: none;
+  }
+}
+
+.tm-block__expanded {
+  flex: 0 0 $tm-block--expanded-height;
+
+  .tm-block--contents {
+    display: flex;
   }
 }

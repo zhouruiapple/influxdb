@@ -5,12 +5,11 @@ import React, {SFC} from 'react'
 import DataExplorer from 'src/dataExplorer/components/DataExplorer'
 import {Page} from '@influxdata/clockface'
 import SaveAsButton from 'src/dataExplorer/components/SaveAsButton'
-import VisOptionsButton from 'src/timeMachine/components/VisOptionsButton'
-import ViewTypeDropdown from 'src/timeMachine/components/view_options/ViewTypeDropdown'
 import GetResources from 'src/resources/components/GetResources'
 import TimeZoneDropdown from 'src/shared/components/TimeZoneDropdown'
 import DeleteDataButton from 'src/dataExplorer/components/DeleteDataButton'
 import CloudUpgradeButton from 'src/shared/components/CloudUpgradeButton'
+import QueryTabs from 'src/timeMachine/components/QueryTabs'
 
 // Types
 import {ResourceType} from 'src/types'
@@ -29,8 +28,7 @@ const DataExplorerPage: SFC = ({children}) => {
         </Page.Header>
         <Page.ControlBar fullWidth={true}>
           <Page.ControlBarLeft>
-            <ViewTypeDropdown />
-            <VisOptionsButton />
+            <QueryTabs />
           </Page.ControlBarLeft>
           <Page.ControlBarRight>
             <DeleteDataButton />
@@ -38,7 +36,7 @@ const DataExplorerPage: SFC = ({children}) => {
             <SaveAsButton />
           </Page.ControlBarRight>
         </Page.ControlBar>
-        <Page.Contents fullWidth={true} scrollable={false}>
+        <Page.Contents fullWidth={true} scrollable={true}>
           <DataExplorer />
         </Page.Contents>
       </GetResources>

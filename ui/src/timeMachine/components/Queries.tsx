@@ -1,23 +1,19 @@
 // Libraries
-import React, {PureComponent} from 'react'
+import React, {FC, useState} from 'react'
 import {connect} from 'react-redux'
+import classnames from 'classnames'
 
 // Components
 import TimeMachineFluxEditor from 'src/timeMachine/components/TimeMachineFluxEditor'
-import CSVExportButton from 'src/shared/components/CSVExportButton'
 import TimeMachineQueriesSwitcher from 'src/timeMachine/components/QueriesSwitcher'
 import TimeMachineRefreshDropdown from 'src/timeMachine/components/RefreshDropdown'
 import TimeRangeDropdown from 'src/shared/components/TimeRangeDropdown'
 import TimeMachineQueryBuilder from 'src/timeMachine/components/QueryBuilder'
 import SubmitQueryButton from 'src/timeMachine/components/SubmitQueryButton'
-import RawDataToggle from 'src/timeMachine/components/RawDataToggle'
-import QueryTabs from 'src/timeMachine/components/QueryTabs'
 import EditorShortcutsToolTip from 'src/timeMachine/components/EditorShortcutsTooltip'
 import {
-  ComponentSize,
-  FlexBox,
-  FlexDirection,
-  JustifyContent,
+  Icon,
+  IconFont,
 } from '@influxdata/clockface'
 
 // Actions
@@ -55,44 +51,17 @@ interface DispatchProps {
 
 type Props = StateProps & DispatchProps
 
-class TimeMachineQueries extends PureComponent<Props> {
-  public render() {
-    const {timeRange, isInCheckOverlay, activeQuery} = this.props
+const TimeMachineQueries: FC<Props> = ({activeQuery, timeRange, autoRefresh, isInCheckOverlay, onSetAutoRefresh, onSetTimeRange}) => {
+  const [blockMode, setBlockMode] = useState<'expanded' | 'collapsed'>('expanded')
 
-    return (
-      <div className="time-machine-queries">
-        <div className="time-machine-queries--controls">
-          <QueryTabs />
-          <FlexBox
-            direction={FlexDirection.Row}
-            justifyContent={JustifyContent.FlexEnd}
-            margin={ComponentSize.Small}
-            className="time-machine-queries--buttons"
-          >
-            {activeQuery.editMode === 'advanced' && <EditorShortcutsToolTip />}
-            <RawDataToggle />
-            {!isInCheckOverlay && (
-              <>
-                <CSVExportButton />
-                <TimeMachineRefreshDropdown />
-                <TimeRangeDropdown
-                  timeRange={timeRange}
-                  onSetTimeRange={this.handleSetTimeRange}
-                />
-                <TimeMachineQueriesSwitcher />
-              </>
-            )}
-            <SubmitQueryButton />
-          </FlexBox>
-        </div>
-        <div className="time-machine-queries--body">{this.queryEditor}</div>
-      </div>
-    )
+  const timeMachineBlockClass = classnames('tm-block', {[`tm-block__${blockMode}`]: blockMode})
+
+  const handleToggleClick = (): void => {
+    const newBlockMode = blockMode === 'expanded' ? 'collapsed' : 'expanded'
+    setBlockMode(newBlockMode)
   }
-
-  private handleSetTimeRange = (timeRange: TimeRange) => {
-    const {autoRefresh, onSetAutoRefresh, onSetTimeRange} = this.props
-
+  
+  const handleSetTimeRange = (timeRange: TimeRange) => {
     onSetTimeRange(timeRange)
 
     if (timeRange.type === 'custom') {
@@ -110,17 +79,54 @@ class TimeMachineQueries extends PureComponent<Props> {
     }
   }
 
-  private get queryEditor(): JSX.Element {
-    const {activeQuery} = this.props
+  let queryEditor
+  let scriptHelpTooltip
 
-    if (activeQuery.editMode === 'builder') {
-      return <TimeMachineQueryBuilder />
-    } else if (activeQuery.editMode === 'advanced') {
-      return <TimeMachineFluxEditor />
-    } else {
-      return null
-    }
+  if (activeQuery.editMode === 'builder') {
+    queryEditor = <TimeMachineQueryBuilder />
+  } else if (activeQuery.editMode === 'advanced') {
+    scriptHelpTooltip = <EditorShortcutsToolTip />
+    queryEditor = <TimeMachineFluxEditor />
   }
+
+  let timeControls
+  let modeSwitcher
+
+  if (!isInCheckOverlay) {
+    timeControls = (
+      <>
+        <TimeMachineRefreshDropdown />
+        <TimeRangeDropdown
+          timeRange={timeRange}
+          onSetTimeRange={handleSetTimeRange}
+        />
+      </>
+    )
+
+    modeSwitcher = <TimeMachineQueriesSwitcher />
+  }
+
+  return (
+    <div className={timeMachineBlockClass}>
+      <div className="tm-block--header">
+        <div className="tm-block--header-left">
+          <button className="tm-block--toggle" onClick={handleToggleClick}>
+            <Icon glyph={IconFont.CaretRight} className="tm-block--toggle-icon" />
+          </button>
+          <div className="tm-block--title">Query</div>
+          {modeSwitcher}
+        </div>
+        <div className="tm-block--header-right">
+          {scriptHelpTooltip}
+          {timeControls}
+          <SubmitQueryButton />
+        </div>
+      </div>
+      <div className="tm-block--contents">
+        {queryEditor}
+      </div>
+    </div>
+  )
 }
 
 const mstp = (state: AppState) => {

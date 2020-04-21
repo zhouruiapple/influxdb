@@ -2,15 +2,15 @@
 import React, {FC, useState} from 'react'
 import {connect} from 'react-redux'
 import {FromFluxResult} from '@influxdata/giraffe'
+import {AutoSizer} from 'react-virtualized'
 import classnames from 'classnames'
 
 // Components
 import EmptyQueryView, {ErrorFormat} from 'src/shared/components/EmptyQueryView'
-import ViewSwitcher from 'src/shared/components/ViewSwitcher'
+import RawFluxDataTable from 'src/timeMachine/components/RawFluxDataTable'
 import ErrorBoundary from 'src/shared/components/ErrorBoundary'
-import {Icon, IconFont, Button, ComponentColor, SquareButton} from '@influxdata/clockface'
-import VisOptionsButton from 'src/timeMachine/components/VisOptionsButton'
-import ViewTypeDropdown from 'src/timeMachine/components/view_options/ViewTypeDropdown'
+import CSVExportButton from 'src/shared/components/CSVExportButton'
+import {Icon, IconFont} from '@influxdata/clockface'
 
 // Utils
 import {getActiveTimeMachine} from 'src/timeMachine/selectors'
@@ -21,6 +21,7 @@ import {
   getYColumnSelection,
   getFillColumnsSelection,
   getSymbolColumnsSelection,
+  getIsInCheckOverlay,
 } from 'src/timeMachine/selectors'
 import {getTimeRange} from 'src/dashboards/selectors'
 
@@ -36,15 +37,8 @@ import {
   Threshold,
 } from 'src/types'
 
-// Actions
-import {setIsViewingRawData} from 'src/timeMachine/actions'
-
 // Selectors
 import {getActiveTimeRange} from 'src/timeMachine/selectors/index'
-
-interface DispatchProps {
-  onSetIsViewingRawData: typeof setIsViewingRawData
-}
 
 interface StateProps {
   timeRange: TimeRange | null
@@ -53,7 +47,6 @@ interface StateProps {
   files: string[]
   viewProperties: QueryViewProperties
   isInitialFetch: boolean
-  isViewingRawData: boolean
   giraffeResult: FromFluxResult
   xColumn: string
   yColumn: string
@@ -63,42 +56,20 @@ interface StateProps {
   symbolColumns: string[]
   timeZone: TimeZone
   statuses: StatusRow[][]
+  isInCheckOverlay: boolean
 }
 
-type Props = StateProps & DispatchProps
+type Props = StateProps
 
 const TimeMachineVis: FC<Props> = ({
   loading,
   errorMessage,
-  timeRange,
   isInitialFetch,
-  isViewingRawData,
   files,
-  checkType,
-  checkThresholds,
   viewProperties,
   giraffeResult,
-  xColumn,
-  yColumn,
-  fillColumns,
-  symbolColumns,
-  timeZone,
-  statuses,
-  onSetIsViewingRawData,
+  isInCheckOverlay,
 }) => {
-  // If the current selections for `xColumn`/`yColumn`/ etc. are invalid given
-  // the current Flux response, attempt to make a valid selection instead. This
-  // fallback logic is contained within the selectors that supply each of these
-  // props. Note that in a dashboard context, we display an error instead of
-  // attempting to fall back to an valid selection.
-  const resolvedViewProperties = {
-    ...viewProperties,
-    xColumn,
-    yColumn,
-    fillColumns,
-    symbolColumns,
-  }
-
   const [blockMode, setBlockMode] = useState<'expanded' | 'collapsed'>('expanded')
 
   const timeMachineBlockClass = classnames('tm-block', {[`tm-block__${blockMode}`]: blockMode})
@@ -108,20 +79,6 @@ const TimeMachineVis: FC<Props> = ({
     setBlockMode(newBlockMode)
   }
 
-  const handleAddVisualization = (): void => {
-    onSetIsViewingRawData(false)
-  }
-
-  const handleRemoveVisualization = (): void => {
-    onSetIsViewingRawData(true)
-  }
-
-  if (isViewingRawData) {
-    return (
-      <Button text="Add Visualization" color={ComponentColor.Primary} icon={IconFont.BarChart} onClick={handleAddVisualization} />
-    )
-  }
-
   return (
     <div className={timeMachineBlockClass}>
       <div className="tm-block--header">
@@ -129,12 +86,10 @@ const TimeMachineVis: FC<Props> = ({
           <button className="tm-block--toggle" onClick={handleToggleClick}>
             <Icon glyph={IconFont.CaretRight} className="tm-block--toggle-icon" />
           </button>
-          <div className="tm-block--title">Visualization</div>
-          <ViewTypeDropdown />
+          <div className="tm-block--title">Results</div>
         </div>
         <div className="tm-block--header-right">
-          <VisOptionsButton />
-          <SquareButton icon={IconFont.Remove} color={ComponentColor.Danger} onClick={handleRemoveVisualization} />
+          {!isInCheckOverlay && <CSVExportButton />}
         </div>
       </div>
       <div className="tm-block--contents">
@@ -147,18 +102,18 @@ const TimeMachineVis: FC<Props> = ({
             queries={viewProperties.queries}
             hasResults={checkResultsLength(giraffeResult)}
           >
-            <ViewSwitcher
-              giraffeResult={giraffeResult}
-              timeRange={timeRange}
-              files={files}
-              loading={loading}
-              properties={resolvedViewProperties}
-              checkType={checkType}
-              checkThresholds={checkThresholds}
-              timeZone={timeZone}
-              statuses={statuses}
-              theme="dark"
-            />
+            <AutoSizer>
+              {({width, height}) =>
+                width &&
+                height && (
+                  <RawFluxDataTable
+                    files={files}
+                    width={width}
+                    height={height}
+                  />
+                )
+              }
+            </AutoSizer>
           </EmptyQueryView>
         </ErrorBoundary>
       </div>
@@ -169,7 +124,6 @@ const TimeMachineVis: FC<Props> = ({
 const mstp = (state: AppState): StateProps => {
   const activeTimeMachine = getActiveTimeMachine(state)
   const {
-    isViewingRawData,
     view: {properties: viewProperties},
     queryResults: {
       status: loading,
@@ -200,7 +154,6 @@ const mstp = (state: AppState): StateProps => {
     isInitialFetch,
     files,
     viewProperties,
-    isViewingRawData,
     giraffeResult,
     xColumn,
     yColumn,
@@ -208,12 +161,9 @@ const mstp = (state: AppState): StateProps => {
     symbolColumns,
     timeZone,
     timeRange: getActiveTimeRange(timeRange, viewProperties.queries),
+    isInCheckOverlay: getIsInCheckOverlay(state),
     statuses,
   }
 }
 
-const mdtp = {
-  onSetIsViewingRawData: setIsViewingRawData,
-}
-
-export default connect<StateProps, DispatchProps>(mstp, mdtp)(TimeMachineVis)
+export default connect<StateProps>(mstp)(TimeMachineVis)
