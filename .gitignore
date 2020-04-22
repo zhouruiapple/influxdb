@@ -143,6 +143,3 @@ cypress/videos
 
 # vendored files
 /vendor
-
-# duplicates of the swagger yaml for docker context purposes
-/ui/.swagger.yml
