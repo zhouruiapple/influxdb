@@ -206,5 +206,9 @@ protoc:
 	unzip -o -d /go /tmp/protoc.zip
 	chmod +x /go/bin/protoc
 
+build-docker-ui:
+	cp http/swagger.yml ui/.swagger.yml
+	docker image build -t influxdb-ui:local -f ui/docker/Dockerfile .
+
 # .PHONY targets represent actions that do not create an actual file.
 .PHONY: all $(SUBDIRS) run fmt checkfmt tidy checktidy checkgenerate test test-go test-js test-go-race bench clean node_modules vet nightly chronogiraffe dist ping protoc e2e run-e2e influxd libflux
