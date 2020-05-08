@@ -502,3 +502,4 @@ class Root extends PureComponent {
 if (rootNode) {
   render(<Root />, rootNode)
 }
+
