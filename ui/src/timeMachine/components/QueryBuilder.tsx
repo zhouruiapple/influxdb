@@ -105,6 +105,8 @@ const mstp = (state: AppState): StateProps => {
   }
 }
 
+export {TimeMachineQueryBuilder}
+
 const mdtp = {
   onLoadBuckets: loadBuckets,
   onAddTagSelector: addTagSelector,
