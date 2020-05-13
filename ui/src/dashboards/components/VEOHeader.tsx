@@ -1,5 +1,6 @@
 // Libraries
 import React, {PureComponent, MouseEvent} from 'react'
+import {connect} from 'react-redux'
 
 // Components
 import RenamablePageTitle from 'src/pageLayout/components/RenamablePageTitle'
@@ -7,6 +8,7 @@ import {
   SquareButton,
   ComponentColor,
   ComponentSize,
+  ComponentStatus,
   IconFont,
   Page,
   Button,
@@ -14,6 +16,11 @@ import {
 } from '@influxdata/clockface'
 import VisOptionsButton from 'src/timeMachine/components/VisOptionsButton'
 import ViewTypeDropdown from 'src/timeMachine/components/view_options/ViewTypeDropdown'
+
+// ragnarok stuff
+import {addQuery, editActiveQueryAsFlux, setActiveQueryText} from 'src/timeMachine/actions'
+import {saveAndExecuteQueries} from 'src/timeMachine/actions/queries'
+import {getActiveQuery} from 'src/timeMachine/selectors'
 
 // Constants
 import {
@@ -33,6 +40,17 @@ interface Props {
 const saveButtonClass = 'veo-header--save-cell-button'
 
 class VEOHeader extends PureComponent<Props> {
+  state = {
+    forecastButtonEnabled: true
+  }
+
+  get forecastButtonStatus() {
+    if (this.state.forecastButtonEnabled) {
+      return ComponentStatus.Default
+    }
+    return ComponentStatus.Loading
+  }
+
   public render() {
     const {name, onSetName, onCancel, onSave} = this.props
     return (
@@ -54,6 +72,7 @@ class VEOHeader extends PureComponent<Props> {
               color={ComponentColor.Primary}
               onClick={this.forecast}
               size={ComponentSize.Small}
+              status={this.forecastButtonStatus}
               text="Forecast"
             />
           </Page.ControlBarLeft>
@@ -79,34 +98,27 @@ class VEOHeader extends PureComponent<Props> {
   }
 
   private forecast = async() => {
+    this.setState({forecastButtonEnabled: false})
     const services = await listServices()
     const {id: serviceId, name: serviceName} = services[0]
 
-
-    console.log('services', services)
-
-    // curl -XPOST /ragnarok/instances --data '{"name":"MyFB1","serviceId":"sha256:b824898cc847a69b8d514cb241e427dd4e75f295dfb3c5cc86913998068d795c"}' --header "Content-Type: application/json"
-
     const instance = await getInstance({name: serviceName, serviceId})
     const {id: instanceId} = instance
-    console.log('instance', instance)
 
-    const body = {
-      instanceId,
-      operationName: 'Forecast',
-      inputQuery: 'from(bucket: "ds-bucket") |> range(start: -15y) |> filter(fn: (r) => r["_measurement"] == "historical") |> filter(fn: (r) => r["_field"] == "value")',
-      outputDatabase: 'ds-bucket',
-      outputMeasurement: 'forecasting',
-      params: {Days: '365'},
-    }
-
-    const inputQuery = 'from(bucket: "ds-bucket") |> range(start: -15y) |> filter(fn: (r) => r["_measurement"] == "historical") |> filter(fn: (r) => r["_field"] == "value")'
-
-    const activityId = await startForecasting(instanceId, inputQuery)
-    console.log('result!', activityId)
+    const activityId = await startForecasting(instanceId, this.props.activeQuery.text)
 
     runWhenComplete(activityId, () => {
-      console.log('callback, hi!')
+      this.setState({forecastButtonEnabled: true})
+      const forecastQuery =
+`from(bucket: "ds-bucket")
+   |> range(start: -15)
+   |> filter(fn: (r) => r["_measurement"] == "forecast")
+   |> filter(fn: (r) => r["_field"] == "yhat_lower" or r["_field"] == "yhat_upper")`
+
+      this.props.addQuery()
+      this.props.editActiveQueryAsFlux()
+      this.props.setActiveQueryText(forecastQuery)
+      this.props.saveAndExecuteQueries()
     })
   }
 
@@ -122,4 +134,21 @@ class VEOHeader extends PureComponent<Props> {
   }
 }
 
-export default VEOHeader
+const mstp = (state: AppState): StateProps => {
+  const activeQuery = getActiveQuery(state)
+
+  return {activeQuery}
+}
+
+
+const mdtp = {
+  addQuery,
+  editActiveQueryAsFlux,
+  saveAndExecuteQueries,
+  setActiveQueryText,
+}
+
+export default connect(
+  mstp,
+  mdtp
+)(VEOHeader)

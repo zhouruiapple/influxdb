@@ -38,9 +38,6 @@ module.exports = merge(common, {
           }
           return path
         },
-        onProxyReq: (proxyReq, req, res) => {
-          console.log('dasadfa', req, proxyReq, res)
-        },
       }
     },
     disableHostCheck: true,
