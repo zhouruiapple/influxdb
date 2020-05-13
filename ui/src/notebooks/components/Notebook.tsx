@@ -1,6 +1,7 @@
 import React, {FC} from 'react'
 
 import {Page} from '@influxdata/clockface'
+import 'src/notebooks/Notebook.scss'
 
 const NotebookPage: FC = () => {
   return (
