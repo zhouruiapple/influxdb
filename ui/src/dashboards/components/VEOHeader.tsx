@@ -9,7 +9,8 @@ import {
   ComponentSize,
   IconFont,
   Page,
-  Button
+  Button,
+  Overlay
 } from '@influxdata/clockface'
 import VisOptionsButton from 'src/timeMachine/components/VisOptionsButton'
 import ViewTypeDropdown from 'src/timeMachine/components/view_options/ViewTypeDropdown'
@@ -19,6 +20,8 @@ import {
   DEFAULT_CELL_NAME,
   CELL_NAME_MAX_LENGTH,
 } from 'src/dashboards/constants/index'
+
+import {getInstance, listServices, runWhenComplete, startForecasting} from 'src/dashboards/utils/ragnarok'
 
 interface Props {
   name: string
@@ -76,50 +79,17 @@ class VEOHeader extends PureComponent<Props> {
   }
 
   private forecast = async() => {
-    let servicesResponse
-    try {
-      servicesResponse = await fetch('http://localhost:8081/api/services')
-    } catch (err) {
-      console.log('error', err)
-    }
-    if (!servicesResponse.ok) {
-      alert('error')
-      return
-    }
-
-    const [meta] = await servicesResponse.json()
-    const {id: serviceId, name: serviceName} = meta
+    const services = await listServices()
+    const {id: serviceId, name: serviceName} = services[0]
 
 
-    console.log('meta', meta)
+    console.log('services', services)
 
-    // curl -XPOST http://localhost:8081/api/instances --data '{"name":"MyFB1","serviceId":"sha256:b824898cc847a69b8d514cb241e427dd4e75f295dfb3c5cc86913998068d795c"}' --header "Content-Type: application/json"
+    // curl -XPOST /ragnarok/instances --data '{"name":"MyFB1","serviceId":"sha256:b824898cc847a69b8d514cb241e427dd4e75f295dfb3c5cc86913998068d795c"}' --header "Content-Type: application/json"
 
-    const instances = {
-      name: serviceName,
-      serviceId
-    }
-
-    let instancesResponse
-    try {
-       instancesResponse = await fetch('http://localhost:8081/api/instances', {
-        method: 'POST',
-        body: JSON.stringify(instances),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      })
-    } catch (error) {
-      console.error(error)
-    }
-
-    if (!instancesResponse.ok) {
-      alert('error')
-      return
-    }
-
-    const instance = await instancesResponse.json()
+    const instance = await getInstance({name: serviceName, serviceId})
     const {id: instanceId} = instance
+    console.log('instance', instance)
 
     const body = {
       instanceId,
@@ -130,26 +100,14 @@ class VEOHeader extends PureComponent<Props> {
       params: {Days: '365'},
     }
 
-    let activitiesResponse
-    try {
-       activitiesResponse = await fetch('http://localhost:8081/api/activities', {
-        method: 'POST',
-        body: JSON.stringify(body),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      })
-    } catch (error) {
-      console.error(error)
-    }
+    const inputQuery = 'from(bucket: "ds-bucket") |> range(start: -15y) |> filter(fn: (r) => r["_measurement"] == "historical") |> filter(fn: (r) => r["_field"] == "value")'
 
-    if (!activitiesResponse.ok) {
-      alert('error')
-      return
-    }
-
-    const {activityId} = await activitiesResponse.json()
+    const activityId = await startForecasting(instanceId, inputQuery)
     console.log('result!', activityId)
+
+    runWhenComplete(activityId, () => {
+      console.log('callback, hi!')
+    })
   }
 
   private handleClickOutsideTitle = (e: MouseEvent<HTMLElement>) => {

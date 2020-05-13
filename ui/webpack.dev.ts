@@ -32,7 +32,12 @@ module.exports = merge(common, {
       '/ragnarok': {
         target: 'http://localhost:8081/',
         changeOrigin: true,
-        pathRewrite: {"^/ragnarok" : "api"},
+        pathRewrite: (path) => {
+          if (path.includes('ragnarok')) {
+            return path.replace(/ragnarok/gi, 'api')
+          }
+          return path
+        },
         onProxyReq: (proxyReq, req, res) => {
           console.log('dasadfa', req, proxyReq, res)
         },
