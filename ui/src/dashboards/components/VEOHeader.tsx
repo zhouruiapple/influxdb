@@ -21,6 +21,7 @@ import ViewTypeDropdown from 'src/timeMachine/components/view_options/ViewTypeDr
 import {addQuery, editActiveQueryAsFlux, setActiveQueryText} from 'src/timeMachine/actions'
 import {saveAndExecuteQueries} from 'src/timeMachine/actions/queries'
 import {getActiveQuery} from 'src/timeMachine/selectors'
+import {RagnarokAlgorithms} from 'src/dashboards/utils/RagnarokAlgorithms'
 
 // Constants
 import {
@@ -38,6 +39,8 @@ interface Props {
 }
 
 const saveButtonClass = 'veo-header--save-cell-button'
+
+const algorithms = [{ name: 'Facebook Prophet', id: 'asdf' }]
 
 class VEOHeader extends PureComponent<Props> {
   state = {
@@ -68,13 +71,7 @@ class VEOHeader extends PureComponent<Props> {
           <Page.ControlBarLeft>
             <ViewTypeDropdown />
             <VisOptionsButton />
-            <Button
-              color={ComponentColor.Primary}
-              onClick={this.forecast}
-              size={ComponentSize.Small}
-              status={this.forecastButtonStatus}
-              text="Forecast"
-            />
+            <RagnarokAlgorithms algorithms={algorithms} onClick={this.handleAlgorithmSelect} />
           </Page.ControlBarLeft>
           <Page.ControlBarRight>
             <SquareButton
@@ -95,6 +92,12 @@ class VEOHeader extends PureComponent<Props> {
         </Page.ControlBar>
       </>
     )
+  }
+
+
+  private handleAlgorithmSelect = async({id, name}) => {
+    console.log('name, id', name, id)
+    this.forecast();
   }
 
   private forecast = async() => {
