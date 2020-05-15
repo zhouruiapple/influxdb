@@ -10,9 +10,10 @@ import {
   ComponentSize,
   ComponentStatus,
   IconFont,
+  Input,
   Page,
   Button,
-  Overlay
+  Overlay,
 } from '@influxdata/clockface'
 import VisOptionsButton from 'src/timeMachine/components/VisOptionsButton'
 import ViewTypeDropdown from 'src/timeMachine/components/view_options/ViewTypeDropdown'
@@ -40,11 +41,16 @@ interface Props {
 
 const saveButtonClass = 'veo-header--save-cell-button'
 
-const algorithms = [{ name: 'Facebook Prophet', id: 'asdf' }]
+const algorithms = [{ name: 'Facebook Prophet', id: 'sha256:f76d7d549549c4ea18b735e9373e2c4deb1392b93599e089430023dc3f088650' }]
 
 class VEOHeader extends PureComponent<Props> {
   state = {
-    forecastButtonEnabled: true
+    forecastButtonEnabled: true,
+    isOverlayVisible: false,
+    destinationBucket: '',
+    destinationMeasurement: '',
+    serviceId: '',
+    serviceName: '',
   }
 
   get forecastButtonStatus() {
@@ -71,7 +77,20 @@ class VEOHeader extends PureComponent<Props> {
           <Page.ControlBarLeft>
             <ViewTypeDropdown />
             <VisOptionsButton />
-            <RagnarokAlgorithms algorithms={algorithms} onClick={this.handleAlgorithmSelect} />
+            <RagnarokAlgorithms algorithms={algorithms} onClick={this.displayOverlay} />
+            <Overlay visible={this.state.isOverlayVisible}>
+              <Overlay.Container maxWidth={600}>
+                <Overlay.Header />
+                <Overlay.Body>
+                  <Input value={this.state.destinationBucket} placeholder="Destination Bucket" onChange={this.updateDestinationBucket} />
+                  <Input value={this.state.destinationMeasurement} placeholder="Destination Measurement" onChange={this.updateDestinationMeasurement} />
+                </Overlay.Body>
+                <Overlay.Footer>
+                  <Button text="Apply" onClick={this.applyAlgorithm} />
+                  <Button text="Cancel" onClick={this.cancelAlgorithm} />
+                </Overlay.Footer>
+              </Overlay.Container>
+            </Overlay>
           </Page.ControlBarLeft>
           <Page.ControlBarRight>
             <SquareButton
@@ -94,18 +113,36 @@ class VEOHeader extends PureComponent<Props> {
     )
   }
 
+  private updateDestinationBucket = (event) => {
+    this.setState({ destinationBucket: event.target.value })
+  }
 
-  private handleAlgorithmSelect = async({id, name}) => {
-    console.log('name, id', name, id)
+  private updateDestinationMeasurement = (event) => {
+    this.setState({ destinationMeasurement: event.target.value })
+  }
+
+  private cancelAlgorithm = () => {
+     this.setState({isOverlayVisible: false})
+  }
+
+  private displayOverlay = ({id, name}) => {
+    this.setState({isOverlayVisible: true, serviceId: id, serviceName: name})
+  }
+
+  private applyAlgorithm = async() => {
+    console.log(this.state)
+    this.setState({isOverlayVisible: false})
     this.forecast();
   }
 
   private forecast = async() => {
     this.setState({forecastButtonEnabled: false})
-    const services = await listServices()
-    const {id: serviceId, name: serviceName} = services[0]
 
-    const instance = await getInstance({name: serviceName, serviceId})
+    // grab this on mount
+    // const services = await listServices()
+    // const {id: serviceId, name: serviceName} = services[0]
+
+    const instance = await getInstance({name: this.state.serviceName, serviceId: this.state.serviceId})
     const {id: instanceId} = instance
 
     const activityId = await startForecasting(instanceId, this.props.activeQuery.text)
