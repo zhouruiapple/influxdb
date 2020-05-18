@@ -108,6 +108,18 @@ export const generateNavItems = (orgID: string): NavItem[] => {
       activeKeywords: ['data-explorer'],
     },
     {
+      id: 'predictive-analysis',
+      testID: 'nav-item-predictive-analysis',
+      icon: IconFont.GraphLine,
+      label: 'Predictive Analysis',
+      shortLabel: 'Predictions',
+      link: {
+        type: 'link',
+        location: `${orgPrefix}/predictive-analysis`,
+      },
+      activeKeywords: ['predictive-analysis'],
+    },
+    {
       id: 'notebooks',
       testID: 'nav-item-notebooks',
       icon: IconFont.Erlenmeyer,
