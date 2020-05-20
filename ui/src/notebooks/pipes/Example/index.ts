@@ -9,6 +9,7 @@ register({
   component: ExampleView,
   button: 'Example Adding',
   initial: () => ({
+    title: 'Example Pipe',
     text: 'Example Text ' + counter++,
   }),
 })

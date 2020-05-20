@@ -9,12 +9,16 @@ const PipeList: FC = () => {
     const moveUp = () => movePipe(index, index - 1)
     const moveDown = () => movePipe(index, index + 1)
 
+    const canBeMovedUp = index > 0
+    const canBeMovedDown = index < pipes.length - 1
+    const canBeRemoved = index !== 0
+
     return (
       <Pipe
         index={index}
-        remove={remove}
-        moveUp={moveUp}
-        moveDown={moveDown}
+        remove={canBeRemoved && remove}
+        moveUp={canBeMovedUp && moveUp}
+        moveDown={canBeMovedDown && moveDown}
         key={`pipe-${id}-${index}`}
       />
     )
