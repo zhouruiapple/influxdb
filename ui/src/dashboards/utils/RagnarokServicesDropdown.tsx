@@ -2,6 +2,7 @@ import React from 'react'
 import {Dropdown, Popover, PopoverPosition, PopoverInteraction} from '@influxdata/clockface'
 import { createGzip } from 'zlib'
 import { Proposed } from 'monaco-languageclient/lib/services'
+import { prependListener } from 'cluster'
 
 export type Props = {
   services: any,
@@ -11,7 +12,9 @@ export type Props = {
 
 type NameIDPair = {
   name: string,
-  id: string
+  id: string,
+  service: any,
+  action: any,
 }
 type CategorizedList = {
   name: string,
@@ -21,7 +24,9 @@ type CategorizedList = {
 type CategoryOrService = {
     category: boolean,
     name: string,
-    id: string
+    id: string,
+    service: any,
+    action: any
 }
 
 export const RagnarokServicesDropdown = ({services,onClick}: Props) => {
@@ -35,21 +40,35 @@ export const RagnarokServicesDropdown = ({services,onClick}: Props) => {
                 for (const t of s.tags) {
                     if (t.startsWith("Category=")) {
                         var cat = t.substring(9)
-                        let added = false
-                        for (const cs of categorizedServices) {
-                            if (cs.name == cat) {
-                                cs.list.push({name:s.name,id:s.id})
-                                added = true
-                                //console.log("added",s.name,"to",cs.name)
-                                break
-                            } else {
-                                //console.log("didn't add",s.name,"to",cs.name)
-                            }
+
+
+                        for (const action of s.actions) {
+                            if (action.enablingStatuses == null || 
+                                action.enablingStatuses.length == 0 || 
+                                action.enablingStatuses.includes(s.initialStatus)) {
+
+                                let added = false
+                                for (const cs of categorizedServices) {
+                                    if (cs.name == cat) {
+                                        cs.list.push({name:s.name+":"+action.name,id:s.id,service:s,action:action})
+                                        added = true
+                                        //console.log("added",s.name,"to",cs.name)
+                                        break
+                                    } else {
+                                        //console.log("didn't add",s.name,"to",cs.name)
+                                    }
+                                }
+                                if (!added) {
+                                    //console.log("new category",cat)
+                                    categorizedServices.push({name:cat,list:[{name:s.name+":"+action.name,id:s.id,service:s,action:action}]})
+                                }
+
+                           } else {
+                               console.log("not adding",s.name,action.name,action.enablingStatuses,action.enablingStatuses.length,action.enablingStatuses[0],action.enablingStatuses[0] == "Ready",s.initialStatus)
+                           }
                         }
-                        if (!added) {
-                            //console.log("new category",cat)
-                            categorizedServices.push({name:cat,list:[{name:s.name,id:s.id}]})
-                        }
+
+                        
                     }
                 }
             }
@@ -61,13 +80,17 @@ export const RagnarokServicesDropdown = ({services,onClick}: Props) => {
       toRender.push({
         category: true,
         name: cs.name,
-        id: cs.name
+        id: cs.name,
+        service:null,
+        action:null,
       })
       cs.list.map(m => {
           toRender.push({
               category:false,
               name: m.name,
-              id: m.id
+              id: m.id,
+              service:m.service,
+              action:m.action,
           })
       })
   })
@@ -90,7 +113,7 @@ export const RagnarokServicesDropdown = ({services,onClick}: Props) => {
         onCollapse={onCollapse}
         >
             {toRender.map(r => (
-              <RenderCategory key={r.name} text={r.name} name={r.name} category={r.category} id={r.id} onClick={onClick}/>
+              <RenderCategory key={r.name} text={r.name} name={r.name} category={r.category} id={r.id} service={r.service} action={r.action} onClick={onClick}/>
             ))}
         </Dropdown.Menu>)}
   />
@@ -105,7 +128,7 @@ function RenderCategory (props) {
             key={props.id}
             value={props.name}
             onClick={() => {
-                props.onClick({id: props.id, name: props.name})
+                props.onClick({id: props.id, name: props.name, service:props.service, action:props.action})
               }}
             >
                 {props.name}

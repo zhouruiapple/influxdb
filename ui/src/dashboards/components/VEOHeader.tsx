@@ -31,7 +31,6 @@ import ViewTypeDropdown from 'src/timeMachine/components/view_options/ViewTypeDr
 import {addQuery, editActiveQueryAsFlux, setActiveQueryText} from 'src/timeMachine/actions'
 import {saveAndExecuteQueries} from 'src/timeMachine/actions/queries'
 import {getActiveQuery} from 'src/timeMachine/selectors'
-//import {RagnarokAlgorithms} from 'src/dashboards/utils/RagnarokAlgorithms'
 import {RagnarokServicesDropdown} from 'src/dashboards/utils/RagnarokServicesDropdown'
 
 // Constants
@@ -41,6 +40,7 @@ import {
 } from 'src/dashboards/constants/index'
 
 import {getInstance, listServices, runWhenComplete, startForecasting} from 'src/dashboards/utils/ragnarok'
+import { ActionTypes } from '../actions/ranges'
 
 interface Props {
   name: string
@@ -50,8 +50,6 @@ interface Props {
 }
 
 const saveButtonClass = 'veo-header--save-cell-button'
-
-const algorithms = [{ name: 'Facebook Prophet', id: 'sha256:f76d7d549549c4ea18b735e9373e2c4deb1392b93599e089430023dc3f088650' }]
 
 class VEOHeader extends PureComponent<Props> {
   state = {
@@ -64,6 +62,10 @@ class VEOHeader extends PureComponent<Props> {
     serviceName: '',
     services: null,
     params: [{name:"days",placeholder:"ph",value:"v"},{name:"age",placeholder:"ph",value:"v"}],
+    service: null,
+    action: null,
+    outputTags: '',
+    repeat:'',
   }
 
   timerID: any
@@ -110,7 +112,6 @@ class VEOHeader extends PureComponent<Props> {
           <Page.ControlBarLeft>
             <ViewTypeDropdown />
             <VisOptionsButton />
-            {/*<RagnarokAlgorithms algorithms={algorithms} onClick={this.displayOverlay} />*/}
             <RagnarokServicesDropdown services={this.state.services} onClick={this.displayOverlay} />
             <Overlay visible={this.state.isProcessingOverlayVisible}>
               <Notification
@@ -132,11 +133,11 @@ class VEOHeader extends PureComponent<Props> {
               <Overlay.Container maxWidth={600}>
                 <Overlay.Header title={this.state.serviceName}/>
                 <Overlay.Body>
-                {this.state.params.map(r => (
-                 [<Form.Label required={true} label="Form Label"/>,
-                  <Input  value={r.value} placeholder={r.placeholder} onChange={(e)=>{this.updateParam(r.name,e)}} />,
-                  <Form.HelpText text="help text"></Form.HelpText>]
-                  ))}
+                {this.state.action != null ? this.state.action.parameters.map(p => (
+                 [<Form.Label required={true} label={p.name}/>,
+                  <Input  value={p.default} placeholder={p.name} onChange={(e)=>{this.updateParam(p.name,e)}} />,
+                  <Form.HelpText text={p.description}></Form.HelpText>]
+                  )):""}
               
                 <Form.Divider lineColor={ComponentColor.Primary}/>
                 <Form.Label required={true} label="Destination Bucket"/>
@@ -148,15 +149,14 @@ class VEOHeader extends PureComponent<Props> {
                 <Input value={this.state.destinationMeasurement} placeholder="Destination Measurement" onChange={this.updateDestinationMeasurement} />
                 <Form.HelpText text="The measurement to write resuls to"/>
 
-
                 <Form.Divider lineColor={ComponentColor.Primary}/>
                 <Form.Label required={false} label="Output Tags"/>
-                <Input value="foo,bar" placeholder="Output Tags"/>
-                <Form.HelpText text="Any additional tags to attach to the results"/>
-
+                <Input value={this.state.outputTags} placeholder="Output Tags" onChange={this.updateOutputTags}/>
+                <Form.HelpText text="Any additional tags to attach to the results"/>):
+                
                 <Form.Divider lineColor={ComponentColor.Primary}/>
                 <Form.Label required={false} label="Repeat Every"/>
-                <Input value="0s" placeholder="How often to repeat"/>
+                <Input value={this.state.repeat} placeholder="How often to repeat" onChange={this.updateRepeat}/>
                 <Form.HelpText text="If required, how often should this action to be repeated?"/>
 
                 </Overlay.Body>
@@ -190,13 +190,22 @@ class VEOHeader extends PureComponent<Props> {
 
   private updateParam = (name, event) => {
     console.log(name,"changed to",event.target.value)
-    let p = this.state.params.slice(0) // otherwise nasty cycles happen
+    let p = this.state.action.parameters.slice(0) // otherwise nasty cycles happen
     p.forEach(element => {
       if (element.name == name) {
-        element.value = event.target.value
+        element.default = event.target.value
       }
     });
-    this.setState({params:p})
+    this.setState({params:p}) // THIS IS BROKEN, BUT IT TRIGGERS THE RENDER SO AINT BROKE< NOT FIXING!
+  }
+
+  private updateRepeat = (event) => {
+    this.setState({repeat:event.target.value})
+  }
+
+
+  private updateOutputTags = (event) => {
+    this.setState({outputTags:event.target.value})
   }
 
   private updateDestinationBucket = (event) => {
@@ -211,8 +220,9 @@ class VEOHeader extends PureComponent<Props> {
      this.setState({isOverlayVisible: false})
   }
 
-  private displayOverlay = ({id, name}) => {
-    this.setState({isOverlayVisible: true, serviceId: id, serviceName: name})
+  private displayOverlay = ({id, name, service, action}) => {
+    console.log("setting outputTags",action.output.defaultTags)
+    this.setState({isOverlayVisible: true, serviceId: id, serviceName: name, service:service, action:action, outputTags:action.output.defaultTags,repeat:'0s'})
   }
 
   private applyAlgorithm = async() => {
