@@ -2,7 +2,7 @@ import {UserSettingsState} from 'src/userSettings/reducers'
 import {AutoRefreshState} from 'src/shared/reducers/autoRefresh'
 import {FlagState} from 'src/shared/reducers/flags'
 import {RangeState} from 'src/dashboards/reducers/ranges'
-import {AppState, ResourceState} from 'src/types'
+import {AppState, ResourceState, Snippit} from 'src/types'
 
 export interface LocalStorage {
   VERSION: string
@@ -14,5 +14,6 @@ export interface LocalStorage {
   resources: {
     orgs: ResourceState['orgs']
     variables: ResourceState['variables']
+    snippits: Snippit
   }
 }

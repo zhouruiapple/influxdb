@@ -9,6 +9,7 @@ import {
   Member,
   Organization,
   Scraper,
+  Snippit,
   Task,
   Telegraf,
   TemplateSummary,
@@ -98,6 +99,12 @@ export interface OrgEntities {
 export interface RuleEntities {
   rules: {
     [uuid: string]: NotificationRule
+  }
+}
+
+export interface SnippitEntities {
+  snippits: {
+    [uuid: string]: Snippit
   }
 }
 

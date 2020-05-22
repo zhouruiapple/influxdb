@@ -9,6 +9,7 @@ import {
   NotificationRule,
   Organization,
   RemoteDataState,
+  Snippit,
   Scraper,
   TasksState,
   Telegraf,
@@ -31,6 +32,7 @@ export enum ResourceType {
   NotificationEndpoints = 'endpoints',
   Plugins = 'plugins',
   Scrapers = 'scrapers',
+  Snippits = 'snippits',
   Tasks = 'tasks',
   Templates = 'templates',
   Telegrafs = 'telegrafs',
@@ -72,6 +74,7 @@ export interface ResourceState {
   [ResourceType.Members]: NormalizedState<Member>
   [ResourceType.Orgs]: OrgsState
   [ResourceType.Scrapers]: NormalizedState<Scraper>
+  [ResourceType.Snippits]: NormalizedState<Snippit>
   [ResourceType.Tasks]: TasksState
   [ResourceType.Telegrafs]: TelegrafsState
   [ResourceType.Templates]: TemplatesState

@@ -34,6 +34,7 @@ import templatesReducer from 'src/templates/reducers'
 import {scrapersReducer} from 'src/scrapers/reducers'
 import {userSettingsReducer} from 'src/userSettings/reducers'
 import {membersReducer} from 'src/members/reducers'
+import {snippitsReducer} from 'src/snippits/reducers'
 import {autoRefreshReducer} from 'src/shared/reducers/autoRefresh'
 import {limitsReducer, LimitsState} from 'src/cloud/reducers/limits'
 import {demoDataReducer, DemoDataState} from 'src/cloud/reducers/demodata'
@@ -99,6 +100,7 @@ export const rootReducer = combineReducers<ReducerState>({
     tokens: authsReducer,
     variables: variablesReducer,
     views: viewsReducer,
+    snippits: snippitsReducer,
   }),
   routing: routerReducer,
   telegrafEditor: editorReducer,
