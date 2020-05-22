@@ -157,6 +157,19 @@ $flux-toolbar--item-height: $cf-marg-d;
   }
 }
 
+
+.flux-toolbar--snippit {
+  > code {
+    color: $c-comet;
+  }
+
+  &:hover > code {
+    color: $c-potassium;
+    text-shadow: 0 0 4px $c-amethyst;
+  }
+}
+
+
 .flux-toolbar--popover {
   font-size: 13px;
   padding: $cf-marg-c + $cf-marg-a;

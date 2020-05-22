@@ -5,11 +5,7 @@ import {connect} from 'react-redux'
 // Components
 import FluxToolbarSearch from 'src/timeMachine/components/FluxToolbarSearch'
 import {DapperScrollbars, ComponentSize, EmptyState} from '@influxdata/clockface'
-
-// Actions
-import {setActiveQueryText} from 'src/timeMachine/actions'
-
-
+import SnippitItem from './SnippitItem'
 
 // Types
 import {AppState, Snippit} from 'src/types'
@@ -19,14 +15,14 @@ interface StateProps {
   snippits: Snippit[]
 }
 
-interface DispatchProps {
-  onSetActiveQueryText: (script: string) => void
+interface OwnProps {
+  onInsertSnippit: (snippitCode: string) => void
 }
 
-type Props = StateProps & DispatchProps
+type Props = StateProps & OwnProps
 
 
-const SnippitsToolbar: FC<Props> = ({snippits}) => {
+const SnippitsToolbar: FC<Props> = ({snippits, onInsertSnippit}) => {
   const [searchTerm, setSearchTerm] = useState('')
   console.log('snippits:', snippits)
   const filteredSnippits = snippits.filter(v => v.name.includes(searchTerm))
@@ -38,7 +34,7 @@ const SnippitsToolbar: FC<Props> = ({snippits}) => {
   )
 
   if (Boolean(filteredSnippits.length)) {
-    content = filteredSnippits.map(s => <div key={s.id}>{s.name}</div>)
+    content = filteredSnippits.map(s => <SnippitItem onClickSnippit={onInsertSnippit} snippit={s} key={s.id} />)
   }
 
   return (
@@ -63,11 +59,6 @@ const mstp = (state: AppState) => {
   return {snippits}
 }
 
-const mdtp = {
-  onSetActiveQueryText: setActiveQueryText,
-}
-
-export default connect<StateProps, DispatchProps>(
-  mstp,
-  mdtp
+export default connect<StateProps>(
+  mstp
 )(SnippitsToolbar)

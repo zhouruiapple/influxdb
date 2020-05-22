@@ -59,6 +59,22 @@ const TimeMachineFluxEditor: FC<Props> = ({
     onSetActiveQueryText(editorInstance.getValue())
   }
 
+  const handleInsertSnippit = (snippitCode: string): void => {
+    const p = editorInstance.getPosition()
+    editorInstance.executeEdits('', [
+      {
+        range: new window.monaco.Range(
+          p.lineNumber,
+          p.column,
+          p.lineNumber,
+          p.column
+        ),
+        text: snippitCode,
+      },
+    ])
+    onSetActiveQueryText(editorInstance.getValue())
+  }
+
   const getInsertLineNumber = (currentLineNumber: number): number => {
     const scriptLines = activeQueryText.split('\n')
 
@@ -152,6 +168,7 @@ const TimeMachineFluxEditor: FC<Props> = ({
       <div className="flux-editor--right-panel">
         <FluxToolbar
           activeQueryBuilderTab={activeTab}
+          onInsertSnippit={handleInsertSnippit}
           onInsertFluxFunction={handleInsertFluxFunction}
           onInsertVariable={handleInsertVariable}
         />

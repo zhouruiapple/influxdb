@@ -1,5 +1,5 @@
 // Libraries
-import React, { FC, useState } from 'react'
+import React, {FC, useState} from 'react'
 
 // Components
 import FluxFunctionsToolbar from 'src/timeMachine/components/fluxFunctionsToolbar/FluxFunctionsToolbar'
@@ -8,12 +8,13 @@ import SnippitsToolbar from 'src/timeMachine/components/snippitsToolbar/Snippits
 import FluxToolbarTab from 'src/timeMachine/components/FluxToolbarTab'
 
 // Types
-import { FluxToolbarFunction } from 'src/types'
+import {FluxToolbarFunction} from 'src/types'
 
 interface Props {
   activeQueryBuilderTab: string
   onInsertFluxFunction: (func: FluxToolbarFunction) => void
   onInsertVariable: (variableName: string) => void
+  onInsertSnippit: (snippitCode: string) => void
 }
 
 type FluxToolbarTabs = 'functions' | 'variables' | 'snippits'
@@ -22,6 +23,7 @@ const FluxToolbar: FC<Props> = ({
   activeQueryBuilderTab,
   onInsertFluxFunction,
   onInsertVariable,
+  onInsertSnippit,
 }) => {
   const [activeTab, setActiveTab] = useState<FluxToolbarTabs>('functions')
 
@@ -35,7 +37,7 @@ const FluxToolbar: FC<Props> = ({
       case 'variables':
         return <VariableToolbar onClickVariable={onInsertVariable} />
       case 'snippits':
-        return <SnippitsToolbar />
+        return <SnippitsToolbar onInsertSnippit={onInsertSnippit} />
       default:
         return <FluxFunctionsToolbar onInsertFluxFunction={onInsertFluxFunction} />
 
