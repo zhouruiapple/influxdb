@@ -108,18 +108,6 @@ export const generateNavItems = (orgID: string): NavItem[] => {
       activeKeywords: ['data-explorer'],
     },
     {
-      id: 'predictive-analysis',
-      testID: 'nav-item-predictive-analysis',
-      icon: IconFont.GraphLine,
-      label: 'Predictive Analysis',
-      shortLabel: 'Predictions',
-      link: {
-        type: 'link',
-        location: `${orgPrefix}/predictive-analysis`,
-      },
-      activeKeywords: ['predictive-analysis'],
-    },
-    {
       id: 'notebooks',
       testID: 'nav-item-notebooks',
       icon: IconFont.Erlenmeyer,
@@ -143,6 +131,47 @@ export const generateNavItems = (orgID: string): NavItem[] => {
         location: `${orgPrefix}/dashboards`,
       },
       activeKeywords: ['dashboards'],
+    },
+    {
+      id: 'services',
+      testID: 'nav-item-pservices',
+      icon: IconFont.BarChart,
+      label: 'Services',
+      shortLabel: 'Services',
+      link: {
+        type: 'link',
+        location: `${orgPrefix}/services`,
+      },
+      activeKeywords: ['services'],
+      menu: [
+        {
+          id: 'types',
+          testID: 'nav-subitem-types',
+          label: 'Types',
+          link: {
+            type: 'link',
+            location: `${orgPrefix}/services/types`,
+          },
+        },
+        {
+          id: 'instances',
+          testID: 'nav-subitem-instances',
+          label: 'Instances',
+          link: {
+            type: 'link',
+            location: `${orgPrefix}/services/instances`,
+          },
+        },
+        {
+          id: 'activities',
+          testID: 'nav-subitem-activities',
+          label: 'Activities',
+          link: {
+            type: 'link',
+            location: `${orgPrefix}/services/activities`,
+          },
+        },
+      ],
     },
     {
       id: 'tasks',

@@ -40,14 +40,14 @@ export const RagnarokServicesDropdown = ({services,onClick}: Props) => {
                             if (cs.name == cat) {
                                 cs.list.push({name:s.name,id:s.id})
                                 added = true
-                                console.log("added",s.name,"to",cs.name)
+                                //console.log("added",s.name,"to",cs.name)
                                 break
                             } else {
-                                console.log("didn't add",s.name,"to",cs.name)
+                                //console.log("didn't add",s.name,"to",cs.name)
                             }
                         }
                         if (!added) {
-                            console.log("new category",cat)
+                            //console.log("new category",cat)
                             categorizedServices.push({name:cat,list:[{name:s.name,id:s.id}]})
                         }
                     }
@@ -72,7 +72,7 @@ export const RagnarokServicesDropdown = ({services,onClick}: Props) => {
       })
   })
 
-  console.log("cat services are",categorizedServices)
+  //console.log("cat services are",categorizedServices)
   console.log("render service",toRender)
 
   return <Dropdown

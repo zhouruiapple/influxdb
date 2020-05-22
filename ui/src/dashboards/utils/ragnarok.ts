@@ -18,9 +18,10 @@ export const listServices = async () => {
 }
 
 export const getInstance = async (instance) => {
+  console.log("instance to create",instance)
   let instanceResponse
   try {
-     instanceResponse = await fetch('/ragnarok/instances', {
+     instanceResponse = await fetch('http://localhost:8081/api/instances', {
       method: 'POST',
       body: JSON.stringify(instance),
       headers: {
@@ -44,14 +45,14 @@ export const startForecasting = async (instanceId, inputQuery) => {
     instanceId,
     operationName: 'Forecast',
     inputQuery,
-    outputDatabase: 'ds-bucket',
-    outputMeasurement: 'forecasting',
+    outputDatabase: 'forecasting-bucket',
+    outputMeasurement: 'forecast',
     params: {Days: '365'},
   }
 
   let activitiesResponse
   try {
-     activitiesResponse = await fetch('/ragnarok/activities', {
+     activitiesResponse = await fetch('http://localhost:8081/api/activities', {
       method: 'POST',
       body: JSON.stringify(body),
       headers: {
@@ -72,7 +73,7 @@ export const startForecasting = async (instanceId, inputQuery) => {
 }
 
 export const runWhenComplete = async (activityId, callback) => {
-  let activitiesResponse = await fetch('/ragnarok/activities', {
+  let activitiesResponse = await fetch('http://localhost:8081/api/activities', {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',

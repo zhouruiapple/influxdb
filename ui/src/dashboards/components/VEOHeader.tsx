@@ -14,15 +14,25 @@ import {
   Page,
   Button,
   Overlay,
+  Notification,
+  Gradients,
+  Alignment,
+  SpinnerContainer,
+  TechnoSpinner,
+  RemoteDataState,
+  Form,
+
 } from '@influxdata/clockface'
 import VisOptionsButton from 'src/timeMachine/components/VisOptionsButton'
 import ViewTypeDropdown from 'src/timeMachine/components/view_options/ViewTypeDropdown'
+
 
 // ragnarok stuff
 import {addQuery, editActiveQueryAsFlux, setActiveQueryText} from 'src/timeMachine/actions'
 import {saveAndExecuteQueries} from 'src/timeMachine/actions/queries'
 import {getActiveQuery} from 'src/timeMachine/selectors'
-import {RagnarokAlgorithms} from 'src/dashboards/utils/RagnarokAlgorithms'
+//import {RagnarokAlgorithms} from 'src/dashboards/utils/RagnarokAlgorithms'
+import {RagnarokServicesDropdown} from 'src/dashboards/utils/RagnarokServicesDropdown'
 
 // Constants
 import {
@@ -47,11 +57,34 @@ class VEOHeader extends PureComponent<Props> {
   state = {
     forecastButtonEnabled: true,
     isOverlayVisible: false,
+    isProcessingOverlayVisible: false,
     destinationBucket: '',
     destinationMeasurement: '',
     serviceId: '',
     serviceName: '',
+    services: null,
+    params: [{name:"days",placeholder:"ph",value:"v"},{name:"age",placeholder:"ph",value:"v"}],
   }
+
+  timerID: any
+
+  componentDidMount() {
+    this.timerID = setInterval(
+      () => this.tick(),
+      2000
+    );
+  }
+
+  componentWillUnmount() {
+    clearInterval(this.timerID);
+  }
+
+  tick() {
+    listServices().then((services)=>{
+      this.setState({services:services})
+    })
+  }
+
 
   get forecastButtonStatus() {
     if (this.state.forecastButtonEnabled) {
@@ -77,13 +110,55 @@ class VEOHeader extends PureComponent<Props> {
           <Page.ControlBarLeft>
             <ViewTypeDropdown />
             <VisOptionsButton />
-            <RagnarokAlgorithms algorithms={algorithms} onClick={this.displayOverlay} />
+            {/*<RagnarokAlgorithms algorithms={algorithms} onClick={this.displayOverlay} />*/}
+            <RagnarokServicesDropdown services={this.state.services} onClick={this.displayOverlay} />
+            <Overlay visible={this.state.isProcessingOverlayVisible}>
+              <Notification
+                horizontalAlignment={Alignment.Center}
+                  key="k"
+                  id="i"
+                  gradient = {Gradients.DefaultDark}
+                  size={ComponentSize.Large}
+                >
+                  <span className="notification--message">Processing {this.state.serviceName}</span>
+                  <SpinnerContainer
+                    loading={RemoteDataState.Loading}
+                    spinnerComponent={<TechnoSpinner />}
+                  >
+            </SpinnerContainer>
+                </Notification>
+            </Overlay>
             <Overlay visible={this.state.isOverlayVisible}>
               <Overlay.Container maxWidth={600}>
-                <Overlay.Header />
+                <Overlay.Header title={this.state.serviceName}/>
                 <Overlay.Body>
-                  <Input value={this.state.destinationBucket} placeholder="Destination Bucket" onChange={this.updateDestinationBucket} />
-                  <Input value={this.state.destinationMeasurement} placeholder="Destination Measurement" onChange={this.updateDestinationMeasurement} />
+                {this.state.params.map(r => (
+                 [<Form.Label required={true} label="Form Label"/>,
+                  <Input  value={r.value} placeholder={r.placeholder} onChange={(e)=>{this.updateParam(r.name,e)}} />,
+                  <Form.HelpText text="help text"></Form.HelpText>]
+                  ))}
+              
+                <Form.Divider lineColor={ComponentColor.Primary}/>
+                <Form.Label required={true} label="Destination Bucket"/>
+                <Input value={this.state.destinationBucket} placeholder="Destination Bucket" onChange={this.updateDestinationBucket} />
+                <Form.HelpText text="The bucket to write resuls to"/>
+
+                <Form.Divider lineColor={ComponentColor.Primary}/>
+                <Form.Label required={true} label="Destination Measurement"/>
+                <Input value={this.state.destinationMeasurement} placeholder="Destination Measurement" onChange={this.updateDestinationMeasurement} />
+                <Form.HelpText text="The measurement to write resuls to"/>
+
+
+                <Form.Divider lineColor={ComponentColor.Primary}/>
+                <Form.Label required={false} label="Output Tags"/>
+                <Input value="foo,bar" placeholder="Output Tags"/>
+                <Form.HelpText text="Any additional tags to attach to the results"/>
+
+                <Form.Divider lineColor={ComponentColor.Primary}/>
+                <Form.Label required={false} label="Repeat Every"/>
+                <Input value="0s" placeholder="How often to repeat"/>
+                <Form.HelpText text="If required, how often should this action to be repeated?"/>
+
                 </Overlay.Body>
                 <Overlay.Footer>
                   <Button text="Apply" onClick={this.applyAlgorithm} />
@@ -113,6 +188,17 @@ class VEOHeader extends PureComponent<Props> {
     )
   }
 
+  private updateParam = (name, event) => {
+    console.log(name,"changed to",event.target.value)
+    let p = this.state.params.slice(0) // otherwise nasty cycles happen
+    p.forEach(element => {
+      if (element.name == name) {
+        element.value = event.target.value
+      }
+    });
+    this.setState({params:p})
+  }
+
   private updateDestinationBucket = (event) => {
     this.setState({ destinationBucket: event.target.value })
   }
@@ -131,7 +217,7 @@ class VEOHeader extends PureComponent<Props> {
 
   private applyAlgorithm = async() => {
     console.log(this.state)
-    this.setState({isOverlayVisible: false})
+    this.setState({isOverlayVisible: false, isProcessingOverlayVisible: true})
     this.forecast();
   }
 
@@ -148,9 +234,9 @@ class VEOHeader extends PureComponent<Props> {
     const activityId = await startForecasting(instanceId, this.props.activeQuery.text)
 
     runWhenComplete(activityId, () => {
-      this.setState({forecastButtonEnabled: true})
+      this.setState({forecastButtonEnabled: true, isProcessingOverlayVisible: false})
       const forecastQuery =
-`from(bucket: "ds-bucket")
+`from(bucket: "forecasting-bucket")
    |> range(start: -15)
    |> filter(fn: (r) => r["_measurement"] == "forecast")
    |> filter(fn: (r) => r["_field"] == "yhat_lower" or r["_field"] == "yhat_upper")`

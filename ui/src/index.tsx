@@ -33,7 +33,7 @@ import DashboardImportOverlay from 'src/dashboards/components/DashboardImportOve
 import CreateFromTemplateOverlay from 'src/templates/components/createFromTemplateOverlay/CreateFromTemplateOverlay'
 import CreateVariableOverlay from 'src/variables/components/CreateVariableOverlay'
 import DataExplorerPage from 'src/dataExplorer/components/DataExplorerPage'
-import RangarokEmpty from 'src/dashboards/utils/RagnarokAlgorithms'
+import RangarokEmpty from 'src/dashboards/utils/RagnarokEmpty'
 import SaveAsOverlay from 'src/dataExplorer/components/SaveAsOverlay'
 import {MePage} from 'src/me'
 import NotebookPage from 'src/notebooks/components/Notebook'
@@ -246,10 +246,12 @@ class Root extends PureComponent {
                                 component={DEDeleteDataOverlay}
                               />
                             </Route>
-                            <Route
-                              path="predictive-analysis"
-                              component={RangarokEmpty}
-                            />
+                            <Route path="services">
+                              <IndexRoute component={RangarokEmpty} />
+                              <Route path="types" component={RangarokEmpty}/>
+                              <Route path="instances" component={RangarokEmpty}/>
+                              <Route path="activities" component={RangarokEmpty}/>
+                            </Route>
                             <Route
                               path="dashboards"
                               component={DashboardsIndex}

@@ -7,7 +7,7 @@ export interface RagnarokAlgorithm {
 }
 
 export type Props = {
-  algorithms: RagnarokAlgorithms[],
+  algorithms: RagnarokAlgorithm[],
   onClick: (any) => void
 }
 
