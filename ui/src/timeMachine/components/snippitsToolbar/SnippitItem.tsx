@@ -11,10 +11,22 @@ import {
   Button,
   ComponentSize,
   ComponentColor,
+  ConfirmationButton,
+  IconFont,
+  FlexBox,
 } from '@influxdata/clockface'
 
 // Types
 import {Snippit} from 'src/types'
+import {connect} from 'react-redux'
+
+// Actions
+import {deleteSnippit} from 'src/snippits/actions/thunks'
+
+
+interface DispatchProps {
+  onDelete: typeof deleteSnippit
+}
 
 interface Props {
   snippit: Snippit
@@ -26,11 +38,12 @@ const defaultProps = {
   testID: 'flux-snippit',
 }
 
-const ToolbarSnippit: FC<Props> = ({snippit, onClickSnippit, testID}) => {
+const SnippitItem: FC<Props & DispatchProps> = ({snippit, onClickSnippit, onDelete, testID}) => {
   const snippitRef = createRef<HTMLDListElement>()
   const handleClickSnippit = () => {
     onClickSnippit(snippit.code)
   }
+
   return (
     <>
       <Popover
@@ -51,19 +64,35 @@ const ToolbarSnippit: FC<Props> = ({snippit, onClickSnippit, testID}) => {
         className="flux-toolbar--list-item flux-toolbar--snippit"
       >
         <code>{snippit.name}</code>
-        <Button
-          testID={`flux--${testID}--inject`}
-          text="Inject"
-          onClick={handleClickSnippit}
-          size={ComponentSize.ExtraSmall}
-          className="flux-toolbar--injector"
-          color={ComponentColor.Secondary}
-        />
+        <FlexBox className="flux-toolbar--injector" margin={ComponentSize.Small}>
+          <Button
+            testID={`flux--${testID}--inject`}
+            text="Inject"
+            onClick={handleClickSnippit}
+            size={ComponentSize.ExtraSmall}
+            color={ComponentColor.Secondary}
+          />
+          <ConfirmationButton
+            size={ComponentSize.ExtraSmall}
+            icon={IconFont.Trash}
+            color={ComponentColor.Danger}
+            confirmationLabel="Delete your life's work?"
+            confirmationButtonText="OMG Yes!"
+            confirmationButtonColor={ComponentColor.Danger}
+            onConfirm={() => onDelete(snippit.id)} />
+        </FlexBox>
       </dd>
     </>
   )
 }
 
-ToolbarSnippit.defaultProps = defaultProps
+SnippitItem.defaultProps = defaultProps
 
-export default ToolbarSnippit
+const mdtp = {
+  onDelete: deleteSnippit
+}
+
+export default connect<{}, DispatchProps, {}>(
+  null,
+  mdtp
+)(SnippitItem)
