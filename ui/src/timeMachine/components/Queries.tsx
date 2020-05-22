@@ -9,6 +9,7 @@ import TimeMachineQueriesSwitcher from 'src/timeMachine/components/QueriesSwitch
 import TimeMachineRefreshDropdown from 'src/timeMachine/components/RefreshDropdown'
 import TimeRangeDropdown from 'src/shared/components/TimeRangeDropdown'
 import TimeMachineQueryBuilder from 'src/timeMachine/components/QueryBuilder'
+import SaveSnippitButton from 'src/timeMachine/components/SaveSnippitButton'
 import SubmitQueryButton from 'src/timeMachine/components/SubmitQueryButton'
 import RawDataToggle from 'src/timeMachine/components/RawDataToggle'
 import QueryTabs from 'src/timeMachine/components/QueryTabs'
@@ -73,6 +74,7 @@ class TimeMachineQueries extends PureComponent<Props> {
             <RawDataToggle />
             {!isInCheckOverlay && (
               <>
+                {activeQuery.editMode === 'advanced' && <SaveSnippitButton />}
                 <CSVExportButton />
                 <TimeMachineRefreshDropdown />
                 <TimeRangeDropdown
