@@ -1,18 +1,18 @@
 // Libraries
-import React, { FC, useState } from 'react'
-import { connect } from 'react-redux'
+import React, {FC, useState} from 'react'
+import {connect} from 'react-redux'
 
 // Components
 import FluxToolbarSearch from 'src/timeMachine/components/FluxToolbarSearch'
-import { DapperScrollbars, ComponentSize, EmptyState } from '@influxdata/clockface'
+import {DapperScrollbars, ComponentSize, EmptyState} from '@influxdata/clockface'
 
 // Actions
-import { setActiveQueryText } from 'src/timeMachine/actions'
+import {setActiveQueryText} from 'src/timeMachine/actions'
 
 
 
 // Types
-import { AppState, Snippit } from 'src/types'
+import {AppState, Snippit} from 'src/types'
 
 
 interface StateProps {
@@ -26,8 +26,9 @@ interface DispatchProps {
 type Props = StateProps & DispatchProps
 
 
-const SnippitsToolbar: FC<Props> = ({ snippits }) => {
+const SnippitsToolbar: FC<Props> = ({snippits}) => {
   const [searchTerm, setSearchTerm] = useState('')
+  console.log('snippits:', snippits)
   const filteredSnippits = snippits.filter(v => v.name.includes(searchTerm))
 
   let content: JSX.Element | JSX.Element[] = (
@@ -37,7 +38,7 @@ const SnippitsToolbar: FC<Props> = ({ snippits }) => {
   )
 
   if (Boolean(filteredSnippits.length)) {
-    content = filteredSnippits.map(s => <div>{s.name}</div>)
+    content = filteredSnippits.map(s => <div key={s.id}>{s.name}</div>)
   }
 
   return (
@@ -59,7 +60,7 @@ const mstp = (state: AppState) => {
   const byID = state.resources.snippits.byID
   const snippits = state.resources.snippits.allIDs.map(id => byID[id])
 
-  return { snippits }
+  return {snippits}
 }
 
 const mdtp = {
