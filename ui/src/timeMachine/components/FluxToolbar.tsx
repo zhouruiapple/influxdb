@@ -1,13 +1,14 @@
 // Libraries
-import React, {FC, useState} from 'react'
+import React, { FC, useState } from 'react'
 
 // Components
 import FluxFunctionsToolbar from 'src/timeMachine/components/fluxFunctionsToolbar/FluxFunctionsToolbar'
 import VariableToolbar from 'src/timeMachine/components/variableToolbar/VariableToolbar'
+import SnippitsToolbar from 'src/timeMachine/components/snippitsToolbar/SnippitsToolbar'
 import FluxToolbarTab from 'src/timeMachine/components/FluxToolbarTab'
 
 // Types
-import {FluxToolbarFunction} from 'src/types'
+import { FluxToolbarFunction } from 'src/types'
 
 interface Props {
   activeQueryBuilderTab: string
@@ -15,7 +16,7 @@ interface Props {
   onInsertVariable: (variableName: string) => void
 }
 
-type FluxToolbarTabs = 'functions' | 'variables'
+type FluxToolbarTabs = 'functions' | 'variables' | 'snippits'
 
 const FluxToolbar: FC<Props> = ({
   activeQueryBuilderTab,
@@ -28,12 +29,17 @@ const FluxToolbar: FC<Props> = ({
     setActiveTab(id)
   }
 
-  let activeToolbar = (
-    <FluxFunctionsToolbar onInsertFluxFunction={onInsertFluxFunction} />
-  )
 
-  if (activeTab === 'variables') {
-    activeToolbar = <VariableToolbar onClickVariable={onInsertVariable} />
+  const activeToolbar = () => {
+    switch (activeTab) {
+      case 'variables':
+        return <VariableToolbar onClickVariable={onInsertVariable} />
+      case 'snippits':
+        return <SnippitsToolbar />
+      default:
+        return <FluxFunctionsToolbar onInsertFluxFunction={onInsertFluxFunction} />
+
+    }
   }
 
   return (
@@ -46,6 +52,13 @@ const FluxToolbar: FC<Props> = ({
           active={activeTab === 'functions'}
           testID="functions-toolbar-tab"
         />
+        <FluxToolbarTab
+          id="snippits"
+          onClick={handleTabClick}
+          name="My Snippits"
+          active={activeTab === 'snippits'}
+          testID="functions-toolbar-tab"
+        />
         {activeQueryBuilderTab !== 'customCheckQuery' && (
           <FluxToolbarTab
             id="variables"
@@ -55,7 +68,7 @@ const FluxToolbar: FC<Props> = ({
           />
         )}
       </div>
-      <div className="flux-toolbar--tab-contents">{activeToolbar}</div>
+      <div className="flux-toolbar--tab-contents">{activeToolbar()}</div>
     </div>
   )
 }

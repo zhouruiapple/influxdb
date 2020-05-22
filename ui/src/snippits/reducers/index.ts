@@ -1,8 +1,8 @@
 // Libraries
-import {produce} from 'immer'
+import { produce } from 'immer'
 
 // Types
-import {Snippit, RemoteDataState, ResourceState, ResourceType} from 'src/types'
+import { Snippit, RemoteDataState, ResourceState, ResourceType } from 'src/types'
 import {
   ADD_SNIPPIT,
   SET_SNIPPITS,
@@ -19,10 +19,10 @@ import {
   editResource,
 } from 'src/resources/reducers/helpers'
 
-const {Snippits} = ResourceType
+const { Snippits } = ResourceType
 type SnippitsState = ResourceState['snippits']
 
-const initialState = (): SnippitsState => ({
+export const initialState = (): SnippitsState => ({
   status: RemoteDataState.NotStarted,
   byID: {},
   allIDs: [],
@@ -38,8 +38,7 @@ export const snippitsReducer = (
         setResource<Snippit>(draftState, action, Snippits)
 
         return
-      
-
+      }
       case ADD_SNIPPIT: {
         addResource<Snippit>(draftState, action, Snippits)
 

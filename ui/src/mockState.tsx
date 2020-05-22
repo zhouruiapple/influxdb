@@ -1,16 +1,17 @@
 import React from 'react'
-import {Provider} from 'react-redux'
-import {Router, createMemoryHistory} from 'react-router'
+import { Provider } from 'react-redux'
+import { Router, createMemoryHistory } from 'react-router'
 
-import {render} from 'react-testing-library'
-import {initialState as initialVariablesState} from 'src/variables/reducers'
-import {initialState as initialUserSettingsState} from 'src/userSettings/reducers'
-import {default as configureStore, clearStore} from 'src/store/configureStore'
-import {RemoteDataState, TimeZone, LocalStorage, ResourceType} from 'src/types'
-import {pastFifteenMinTimeRange} from './shared/constants/timeRanges'
+import { render } from 'react-testing-library'
+import { initialState as initialVariablesState } from 'src/variables/reducers'
+import { initialState as initialSnippitsState } from 'src/snippits/reducers'
+import { initialState as initialUserSettingsState } from 'src/userSettings/reducers'
+import { default as configureStore, clearStore } from 'src/store/configureStore'
+import { RemoteDataState, TimeZone, LocalStorage, ResourceType } from 'src/types'
+import { pastFifteenMinTimeRange } from './shared/constants/timeRanges'
 
-const {Orgs} = ResourceType
-const {Done} = RemoteDataState
+const { Orgs } = ResourceType
+const { Done } = RemoteDataState
 
 export const localState: LocalStorage = {
   app: {
@@ -45,14 +46,15 @@ export const localState: LocalStorage = {
         },
       },
       allIDs: ['orgid'],
-      org: {name: 'org', id: 'orgid'},
+      org: { name: 'org', id: 'orgid' },
       status: Done,
     },
     variables: initialVariablesState(),
+    snippits: initialSnippitsState(),
   },
 }
 
-const history = createMemoryHistory({entries: ['/']})
+const history = createMemoryHistory({ entries: ['/'] })
 
 export function renderWithRedux(ui, initialState = s => s) {
   clearStore()
@@ -70,7 +72,7 @@ export function renderWithRedux(ui, initialState = s => s) {
 export function renderWithReduxAndRouter(
   ui,
   initialState = s => s,
-  {route = '/', history = createMemoryHistory({entries: [route]})} = {}
+  { route = '/', history = createMemoryHistory({ entries: [route] }) } = {}
 ) {
   clearStore()
   const seedStore = configureStore(localState, history)
@@ -90,7 +92,7 @@ export function renderWithReduxAndRouter(
 
 export function renderWithRouter(
   ui,
-  {route = '/', history = createMemoryHistory({entries: [route]})} = {}
+  { route = '/', history = createMemoryHistory({ entries: [route] }) } = {}
 ) {
   return {
     ...render(<Router history={history}>{ui}</Router>),

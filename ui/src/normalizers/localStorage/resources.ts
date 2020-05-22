@@ -1,10 +1,11 @@
 // Types
-import {RemoteDataState, LocalStorage} from 'src/types'
+import { RemoteDataState, LocalStorage } from 'src/types'
 
 export const normalizeResources = (state: LocalStorage) => {
   return {
     variables: state.resources.variables,
     orgs: normalizeOrgs(state.resources.orgs),
+    snippits: state.resources.snippits
   }
 }
 

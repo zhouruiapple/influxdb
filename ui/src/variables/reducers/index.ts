@@ -1,6 +1,6 @@
 // Libraries
-import {produce} from 'immer'
-import {get} from 'lodash'
+import { produce } from 'immer'
+import { get } from 'lodash'
 
 // Types
 import {
@@ -19,7 +19,7 @@ import {
 } from 'src/variables/actions/creators'
 
 // Utils
-import {setResource, removeResource} from 'src/resources/reducers/helpers'
+import { setResource, removeResource } from 'src/resources/reducers/helpers'
 
 export const initialState = (): VariablesState => ({
   status: RemoteDataState.NotStarted,
@@ -41,13 +41,13 @@ export const variablesReducer = (
       }
 
       case SET_VARIABLE: {
-        const {id, status, schema} = action
+        const { id, status, schema } = action
 
         const variable = get(schema, ['entities', 'variables', id])
         const variableExists = !!draftState.byID[id]
 
         if (variable) {
-          draftState.byID[id] = {...variable, status}
+          draftState.byID[id] = { ...variable, status }
 
           if (!variableExists) {
             draftState.allIDs.push(id)
@@ -66,7 +66,7 @@ export const variablesReducer = (
       }
 
       case SELECT_VARIABLE_VALUE: {
-        const {contextID, variableID, selectedValue} = action
+        const { contextID, variableID, selectedValue } = action
 
         if (!draftState.values[contextID]) {
           draftState.values[contextID] = {
@@ -92,7 +92,7 @@ export const variablesReducer = (
       }
 
       case MOVE_VARIABLE: {
-        const {originalIndex, newIndex, contextID} = action
+        const { originalIndex, newIndex, contextID } = action
         let newOrder = get(draftState, `values.${contextID}.order`)
 
         // if no order, take it from allIDs
@@ -121,4 +121,4 @@ export const variablesReducer = (
     }
   })
 
-export {variableEditorReducer} from 'src/variables/reducers/editor'
+export { variableEditorReducer } from 'src/variables/reducers/editor'
