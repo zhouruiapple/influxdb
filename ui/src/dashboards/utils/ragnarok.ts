@@ -17,6 +17,40 @@ export const listServices = async () => {
   return await servicesResponse.json()
 }
 
+export const listInstances = async () => {
+  let instancesResponse
+
+  try {
+    instancesResponse = await fetch('http://localhost:8081/api/instances')
+  } catch (err) {
+    throw err
+  }
+
+  if (!instancesResponse.ok) {
+    console.error(instancesResponse)
+    return []
+  }
+
+  return await instancesResponse.json()
+}
+
+export const listActivities = async () => {
+  let activitiesResponse
+
+  try {
+    activitiesResponse = await fetch('http://localhost:8081/api/activities')
+  } catch (err) {
+    throw err
+  }
+
+  if (!activitiesResponse.ok) {
+    console.error(activitiesResponse)
+    return []
+  }
+
+  return await activitiesResponse.json()
+}
+
 export const getInstance = async (instance) => {
   console.log("instance to create",instance)
   let instanceResponse

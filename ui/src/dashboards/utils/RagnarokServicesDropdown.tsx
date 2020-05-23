@@ -64,7 +64,7 @@ export const RagnarokServicesDropdown = ({services,onClick}: Props) => {
                                 }
 
                            } else {
-                               console.log("not adding",s.name,action.name,action.enablingStatuses,action.enablingStatuses.length,action.enablingStatuses[0],action.enablingStatuses[0] == "Ready",s.initialStatus)
+                               //console.log("not adding",s.name,action.name,action.enablingStatuses,action.enablingStatuses.length,action.enablingStatuses[0],action.enablingStatuses[0] == "Ready",s.initialStatus)
                            }
                         }
 
@@ -96,7 +96,7 @@ export const RagnarokServicesDropdown = ({services,onClick}: Props) => {
   })
 
   //console.log("cat services are",categorizedServices)
-  console.log("render service",toRender)
+  //console.log("render service",toRender)
 
   return <Dropdown
     button={(active, onClick) => (

@@ -32,6 +32,8 @@ import {addQuery, editActiveQueryAsFlux, setActiveQueryText} from 'src/timeMachi
 import {saveAndExecuteQueries} from 'src/timeMachine/actions/queries'
 import {getActiveQuery} from 'src/timeMachine/selectors'
 import {RagnarokServicesDropdown} from 'src/dashboards/utils/RagnarokServicesDropdown'
+import {RagnarokActionParametersForm} from 'src/dashboards/utils/RagnarokActionParametersForm'
+
 
 // Constants
 import {
@@ -56,16 +58,11 @@ class VEOHeader extends PureComponent<Props> {
     forecastButtonEnabled: true,
     isOverlayVisible: false,
     isProcessingOverlayVisible: false,
-    destinationBucket: '',
-    destinationMeasurement: '',
     serviceId: '',
     serviceName: '',
     services: null,
-    params: [{name:"days",placeholder:"ph",value:"v"},{name:"age",placeholder:"ph",value:"v"}],
     service: null,
     action: null,
-    outputTags: '',
-    repeat:'',
   }
 
   timerID: any
@@ -129,43 +126,9 @@ class VEOHeader extends PureComponent<Props> {
             </SpinnerContainer>
                 </Notification>
             </Overlay>
-            <Overlay visible={this.state.isOverlayVisible}>
-              <Overlay.Container maxWidth={600}>
-                <Overlay.Header title={this.state.serviceName}/>
-                <Overlay.Body>
-                {this.state.action != null ? this.state.action.parameters.map(p => (
-                 [<Form.Label required={true} label={p.name}/>,
-                  <Input  value={p.default} placeholder={p.name} onChange={(e)=>{this.updateParam(p.name,e)}} />,
-                  <Form.HelpText text={p.description}></Form.HelpText>]
-                  )):""}
-              
-                <Form.Divider lineColor={ComponentColor.Primary}/>
-                <Form.Label required={true} label="Destination Bucket"/>
-                <Input value={this.state.destinationBucket} placeholder="Destination Bucket" onChange={this.updateDestinationBucket} />
-                <Form.HelpText text="The bucket to write resuls to"/>
 
-                <Form.Divider lineColor={ComponentColor.Primary}/>
-                <Form.Label required={true} label="Destination Measurement"/>
-                <Input value={this.state.destinationMeasurement} placeholder="Destination Measurement" onChange={this.updateDestinationMeasurement} />
-                <Form.HelpText text="The measurement to write resuls to"/>
-
-                <Form.Divider lineColor={ComponentColor.Primary}/>
-                <Form.Label required={false} label="Output Tags"/>
-                <Input value={this.state.outputTags} placeholder="Output Tags" onChange={this.updateOutputTags}/>
-                <Form.HelpText text="Any additional tags to attach to the results"/>):
-                
-                <Form.Divider lineColor={ComponentColor.Primary}/>
-                <Form.Label required={false} label="Repeat Every"/>
-                <Input value={this.state.repeat} placeholder="How often to repeat" onChange={this.updateRepeat}/>
-                <Form.HelpText text="If required, how often should this action to be repeated?"/>
-
-                </Overlay.Body>
-                <Overlay.Footer>
-                  <Button text="Apply" onClick={this.applyAlgorithm} />
-                  <Button text="Cancel" onClick={this.cancelAlgorithm} />
-                </Overlay.Footer>
-              </Overlay.Container>
-            </Overlay>
+          {this.state.action != null && <RagnarokActionParametersForm isVisible={this.state.isOverlayVisible} service={this.state.service} action={this.state.action} onCancel={this.cancelAlgorithm} onApply={this.applyAlgorithm}/>}
+            
           </Page.ControlBarLeft>
           <Page.ControlBarRight>
             <SquareButton
@@ -188,34 +151,6 @@ class VEOHeader extends PureComponent<Props> {
     )
   }
 
-  private updateParam = (name, event) => {
-    console.log(name,"changed to",event.target.value)
-    let p = this.state.action.parameters.slice(0) // otherwise nasty cycles happen
-    p.forEach(element => {
-      if (element.name == name) {
-        element.default = event.target.value
-      }
-    });
-    this.setState({params:p}) // THIS IS BROKEN, BUT IT TRIGGERS THE RENDER SO AINT BROKE< NOT FIXING!
-  }
-
-  private updateRepeat = (event) => {
-    this.setState({repeat:event.target.value})
-  }
-
-
-  private updateOutputTags = (event) => {
-    this.setState({outputTags:event.target.value})
-  }
-
-  private updateDestinationBucket = (event) => {
-    this.setState({ destinationBucket: event.target.value })
-  }
-
-  private updateDestinationMeasurement = (event) => {
-    this.setState({ destinationMeasurement: event.target.value })
-  }
-
   private cancelAlgorithm = () => {
      this.setState({isOverlayVisible: false})
   }
@@ -225,8 +160,8 @@ class VEOHeader extends PureComponent<Props> {
     this.setState({isOverlayVisible: true, serviceId: id, serviceName: name, service:service, action:action, outputTags:action.output.defaultTags,repeat:'0s'})
   }
 
-  private applyAlgorithm = async() => {
-    console.log(this.state)
+  private applyAlgorithm = async(obj: any) => {
+    console.log(this.state,obj)
     this.setState({isOverlayVisible: false, isProcessingOverlayVisible: true})
     this.forecast();
   }

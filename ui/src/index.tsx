@@ -246,12 +246,7 @@ class Root extends PureComponent {
                                 component={DEDeleteDataOverlay}
                               />
                             </Route>
-                            <Route path="services">
-                              <IndexRoute component={RangarokEmpty} />
-                              <Route path="types" component={RangarokEmpty}/>
-                              <Route path="instances" component={RangarokEmpty}/>
-                              <Route path="activities" component={RangarokEmpty}/>
-                            </Route>
+                            <Route path="services" component={RangarokEmpty} />
                             <Route
                               path="dashboards"
                               component={DashboardsIndex}
