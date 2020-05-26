@@ -163,34 +163,64 @@ class VEOHeader extends PureComponent<Props> {
   private applyAlgorithm = async(obj: any) => {
     console.log(this.state,obj)
     this.setState({isOverlayVisible: false, isProcessingOverlayVisible: true})
-    this.forecast();
+    this.executeServiceAction(obj);
   }
 
-  private forecast = async() => {
-    this.setState({forecastButtonEnabled: false})
-
-    // grab this on mount
-    // const services = await listServices()
-    // const {id: serviceId, name: serviceName} = services[0]
+  private executeServiceAction = async(obj: any) => {
 
     const instance = await getInstance({name: this.state.serviceName, serviceId: this.state.serviceId})
     const {id: instanceId} = instance
 
-    const activityId = await startForecasting(instanceId, this.props.activeQuery.text)
+    const activityId = await startForecasting(instanceId, this.props.activeQuery.text, obj)
 
-    runWhenComplete(activityId, () => {
+    runWhenComplete(activityId, (activity: any) => {
       this.setState({forecastButtonEnabled: true, isProcessingOverlayVisible: false})
-      const forecastQuery =
-`from(bucket: "forecasting-bucket")
-   |> range(start: -15)
-   |> filter(fn: (r) => r["_measurement"] == "forecast")
-   |> filter(fn: (r) => r["_field"] == "yhat_lower" or r["_field"] == "yhat_upper")`
+
+
+      const forecastQuery = this.generateActivityResultQuery(activity)
+
+      //const forecastQuery =
+//`from(bucket: "forecasting-bucket")
+//   |> range(start: -15)
+//   |> filter(fn: (r) => r["_measurement"] == "forecast")
+//   |> filter(fn: (r) => r["_field"] == "yhat_lower" or r["_field"] == "yhat_upper")`
 
       this.props.addQuery()
       this.props.editActiveQueryAsFlux()
       this.props.setActiveQueryText(forecastQuery)
       this.props.saveAndExecuteQueries()
     })
+  }
+
+  private generateActivityResultQuery (activity: any) {
+    let query = ''
+    if (activity.resultInfo != null) {
+      query = `from(bucket:"${activity.resultInfo.bucket}")\n`
+      query = query + `|> range(start:${activity.resultInfo.minTimestamp}, stop:${activity.resultInfo.maxTimestamp})\n`
+      query = query + `|> filter(fn: (r) => r["_measurement"] == "${activity.resultInfo.measurement}")\n`
+      if (this.state.action != null && this.state.action.output && this.state.action.output.presentationHints) {
+        let first = true
+        for (const df of this.state.action.output.presentationHints.defaultFields) {
+          if (!first) {
+            query = query + ` or r["_field"] == "${df}"`
+          }
+          if (first) {
+            query = query + `|> filter(fn: (r) => r["_field"] == "${df}"`
+            first = false
+          } 
+        }
+        if (!first) {
+          query = query + ")\n"
+        }
+      }
+      return query
+    }
+
+    console.log("query",query)
+    // from bucket
+    // range lowest to highest time range from activity
+    // filter measurement name
+    // filter result fields  
   }
 
   private handleClickOutsideTitle = (e: MouseEvent<HTMLElement>) => {

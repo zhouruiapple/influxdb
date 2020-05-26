@@ -74,14 +74,14 @@ export const getInstance = async (instance) => {
   return await instanceResponse.json()
 }
 
-export const startForecasting = async (instanceId, inputQuery) => {
+export const startForecasting = async (instanceId, inputQuery, obj: any) => {
   const body = {
     instanceId,
     operationName: 'Forecast',
-    inputQuery,
-    outputDatabase: 'forecasting-bucket',
-    outputMeasurement: 'forecast',
-    params: {Days: '365'},
+    inputQuery: inputQuery,
+    outputDatabase: obj.destinationBucket, // 'forecasting-bucket',
+    outputMeasurement: obj.destinationMeasurement, // 'forecast',
+    params: obj.parameterValues, // {Days: '365'},
   }
 
   let activitiesResponse
@@ -123,7 +123,8 @@ export const runWhenComplete = async (activityId, callback) => {
 
   // task is complete, run our callback function
   if (targetActivity.status === 'Completed') {
-    callback()
+    console.log("targetActivity",targetActivity)
+    callback(targetActivity)
     return
   }
 
