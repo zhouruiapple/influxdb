@@ -4,8 +4,6 @@ import React, {Component,PureComponent, RefObject, createRef} from 'react'
 import {Page, Tabs, Table, Orientation, ComponentSize, IndexList, Alignment, SquareButton, IconFont, ConfirmationButton, ComponentColor, Appearance, Popover, PopoverPosition, Button, ButtonRef} from '@influxdata/clockface'
 
 import {listServices,listInstances,listActivities} from 'src/dashboards/utils/ragnarok'
-import FunctionCategory from 'src/timeMachine/components/fluxFunctionsToolbar/FunctionCategory'
-import BucketAddDataButton from 'src/buckets/components/BucketAddDataButton'
 
 
 

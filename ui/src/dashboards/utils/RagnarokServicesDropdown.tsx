@@ -3,9 +3,11 @@ import {Dropdown, Popover, PopoverPosition, PopoverInteraction} from '@influxdat
 import { createGzip } from 'zlib'
 import { Proposed } from 'monaco-languageclient/lib/services'
 import { prependListener } from 'cluster'
+import THEME_NAME from 'src/external/monaco.flux.theme'
 
 export type Props = {
   services: any,
+  instances: any,
   onClick: (event:any) => void
 }
 
@@ -14,11 +16,13 @@ type NameIDPair = {
   name: string,
   id: string,
   service: any,
+  instance: any,
   action: any,
 }
 type CategorizedList = {
   name: string,
-  list: NameIDPair[]
+  list: NameIDPair[],
+ // instancesList: any
 }
 
 type CategoryOrService = {
@@ -26,10 +30,11 @@ type CategoryOrService = {
     name: string,
     id: string,
     service: any,
+    instance: any,
     action: any
 }
 
-export const RagnarokServicesDropdown = ({services,onClick}: Props) => {
+export const RagnarokServicesDropdown = ({services,instances,onClick}: Props) => {
 
   // categorize them here
   var categorizedServices: CategorizedList[] = []
@@ -50,7 +55,7 @@ export const RagnarokServicesDropdown = ({services,onClick}: Props) => {
                                 let added = false
                                 for (const cs of categorizedServices) {
                                     if (cs.name == cat) {
-                                        cs.list.push({name:s.name+":"+action.name,id:s.id,service:s,action:action})
+                                        cs.list.push({name:action.name + " new " + s.name,id:s.id,service:s,action:action,instance:null})
                                         added = true
                                         //console.log("added",s.name,"to",cs.name)
                                         break
@@ -60,7 +65,7 @@ export const RagnarokServicesDropdown = ({services,onClick}: Props) => {
                                 }
                                 if (!added) {
                                     //console.log("new category",cat)
-                                    categorizedServices.push({name:cat,list:[{name:s.name+":"+action.name,id:s.id,service:s,action:action}]})
+                                    categorizedServices.push({name:cat,list:[{name:action.name + " new " + s.name,id:s.id,service:s,action:action,instance:null}]})
                                 }
 
                            } else {
@@ -68,12 +73,54 @@ export const RagnarokServicesDropdown = ({services,onClick}: Props) => {
                            }
                         }
 
-                        
+                        if (instances != null) {
+                            for (const i of instances) {
+                                if (i.serviceId == s.id) {
+                                    for (const a of s.actions) {
+                                        if (a.enablingStatuses == null || 
+                                            a.enablingStatuses.length == 0 || 
+                                            a.enablingStatuses.includes(s.initialStatus)) {
+                                                // skip these 'static' initializer actions
+                                            } else if (a.enablingStatuses != null && a.enablingStatuses.includes(i.status)) {
+                                            // need to add this service,instance,action tuple
+                                            
+                                            let added = false
+                                            for (const cs of categorizedServices) {
+                                                if (cs.name == cat) {
+                                                    cs.list.push({name:a.name + " on '" + i.name + "' (" + s.name+")",id:s.id,service:s,action:a,instance:i})
+                                                    added = true
+                                                    //console.log("added",s.name,"to",cs.name)
+                                                    break
+                                                } else {
+                                                    //console.log("didn't add",s.name,"to",cs.name)
+                                                }
+                                            }
+                                            if (!added) {
+                                                //console.log("new category",cat)
+                                                categorizedServices.push({name:cat,list:[{name:a.name + " on '" + i.name + "' (" + s.name+")",id:s.id,service:s,action:a,instance:i}]})
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
     }
+
+
+
+   // I NEED TO SORT THEM
+   // I NEED TO REMOVE ACTIONS THAT INITIALIZER ACTIONS
+    
+    
+  if (instances != null) {
+    for (const i of instances) {
+    }    
+  }
+
 
   var toRender: CategoryOrService[] = []
   categorizedServices.map(cs=>{
@@ -83,6 +130,7 @@ export const RagnarokServicesDropdown = ({services,onClick}: Props) => {
         id: cs.name,
         service:null,
         action:null,
+        instance:null,
       })
       cs.list.map(m => {
           toRender.push({
@@ -91,6 +139,7 @@ export const RagnarokServicesDropdown = ({services,onClick}: Props) => {
               id: m.id,
               service:m.service,
               action:m.action,
+              instance:m.instance,
           })
       })
   })
@@ -113,7 +162,7 @@ export const RagnarokServicesDropdown = ({services,onClick}: Props) => {
         onCollapse={onCollapse}
         >
             {toRender.map(r => (
-              <RenderCategory key={r.name} text={r.name} name={r.name} category={r.category} id={r.id} service={r.service} action={r.action} onClick={onClick}/>
+              <RenderCategory key={r.name} text={r.name} name={r.name} category={r.category} id={r.id} service={r.service} action={r.action} instance={r.instance} onClick={onClick}/>
             ))}
         </Dropdown.Menu>)}
   />
@@ -128,7 +177,7 @@ function RenderCategory (props) {
             key={props.id}
             value={props.name}
             onClick={() => {
-                props.onClick({id: props.id, name: props.name, service:props.service, action:props.action})
+                props.onClick({id: props.id, name: props.name, service:props.service, action:props.action, instance:props.instance})
               }}
             >
                 {props.name}

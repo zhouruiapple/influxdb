@@ -74,14 +74,16 @@ export const getInstance = async (instance) => {
   return await instanceResponse.json()
 }
 
-export const startForecasting = async (instanceId, inputQuery, obj: any) => {
+export const executeAction = async (instanceId, actionName, inputQuery, obj: any) => {
   const body = {
     instanceId,
-    operationName: 'Forecast',
+    operationName: actionName,
     inputQuery: inputQuery,
     outputDatabase: obj.destinationBucket, // 'forecasting-bucket',
     outputMeasurement: obj.destinationMeasurement, // 'forecast',
+    outputTags: obj.outputTags,
     params: obj.parameterValues, // {Days: '365'},
+    executionPeriod: obj.repeat,
   }
 
   let activitiesResponse
