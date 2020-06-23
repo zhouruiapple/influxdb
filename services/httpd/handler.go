@@ -418,6 +418,8 @@ func (h *Handler) AddRoutes(routes ...Route) {
 		if r.Gzipped {
 			handler = gzipFilter(handler)
 		}
+
+		handler = h.SetHeadersHandler(handler)
 		handler = cors(handler)
 		handler = requestID(handler)
 		if h.Config.LogEnabled && r.LoggingEnabled {
@@ -1885,6 +1887,39 @@ func requestID(inner http.Handler) http.Handler {
 
 		inner.ServeHTTP(w, r)
 	})
+}
+
+func (h *Handler) SetHeadersHandler(handler http.Handler) http.Handler {
+	return http.HandlerFunc(h.SetHeadersWrapper(handler.ServeHTTP))
+}
+
+// wrapper that adds user supplied headers to the response.
+func (h *Handler) SetHeadersWrapper(f func(http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
+	if len(h.Config.HTTPHeaders) == 0 {
+		return f
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("attempting to set headers for request")
+		for _, kvp := range h.Config.HTTPHeaders {
+			if len(kvp) != 2 {
+				// NOTE(ayan): maybe this should be an error.  maybe we should ensure
+				// each each entry has two items earlier and have NewHandler() return
+				// an error value.
+				//
+				// i tried to mitigate this by specifying that kvp is an array of
+				// length 2.
+				//
+				// The TOML parser enforces that there are exactly two entries so if
+				// we've gotten to this point and there are not two entries, something
+				// is *really* wrong.
+				//
+				continue
+			}
+			w.Header().Add(kvp[0], kvp[1])
+		}
+		f(w, r)
+	}
 }
 
 func (h *Handler) logging(inner http.Handler, name string) http.Handler {
