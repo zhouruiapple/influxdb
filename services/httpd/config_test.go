@@ -1,11 +1,118 @@
 package httpd_test
 
 import (
+	"reflect"
+	"strings"
 	"testing"
+	"text/template"
 
 	"github.com/BurntSushi/toml"
 	"github.com/influxdata/influxdb/services/httpd"
 )
+
+// TestConfig_ParseHeaders tests our ability to parse a nested array (a
+// slice-of-slices).
+//
+// We start with a Go slice-of-slices that encodes a few header/value pairs.
+// Then it generates a a TOML snippet using those values.  Next we parse the
+// TOML.
+//
+// This test is a success if we get the data out as we put into the TOML
+// values.
+//
+func TestConfig_ParseHeaders(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Well Formed Configuration", func(t *testing.T) {
+		expectedHeaders := map[string]string{
+			"X-BestOperatingSystem": "FreeBSD",
+			"X-Hacker":              "If you're reading this, you're a hacker",
+			"X-PoweredBy":           "Nerd Rage",
+		}
+
+		// build a toml snippet that reflects the structure we have above
+		tomlData := func() (string, error) {
+			tmpl := template.New("default")
+			v := `
+http-headers = [
+	{{- range $hdr, $val := . -}}
+	["{{$hdr}}", "{{$val}}"],
+	{{- end -}}]
+`
+			if _, err := tmpl.Parse(v); err != nil {
+				return "", err
+			}
+			sb := &strings.Builder{}
+			tmpl.Execute(sb, expectedHeaders)
+			return sb.String(), nil
+		}
+
+		tomlConfig, err := tomlData()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		c := httpd.Config{}
+		if _, err := toml.Decode(tomlConfig, &c); err != nil {
+			t.Fatal(err)
+		}
+
+		// place results into a map so we check if it is DeepEqual() to
+		// expectedHeaders
+
+		gotHeaders := map[string]string{}
+
+		for _, v := range c.HTTPHeaders {
+			if len(v) != 2 {
+				t.Fatalf("expected value to have two items; got %d (%#v)", len(v), v)
+			}
+			gotHeaders[v[0]] = v[1]
+		}
+
+		if !reflect.DeepEqual(expectedHeaders, gotHeaders) {
+			t.Fatalf("could not properly marshal nested slices; got %#v, expected %#v", gotHeaders, expectedHeaders)
+		}
+	})
+
+	// The HTTPHeaders field is a slice of two item arrays.  Lets ensure that our
+	// TOML parser is enforcing this restriction of only Key and Value entries in
+	// this configuration section.
+	t.Run("Tuple Parsing", func(t *testing.T) {
+		// the following tests should yield an error.
+		tests := map[string]struct {
+			config    string
+			shoulderr bool
+			expected  string
+		}{
+			"Two Items Should Work": {
+				config:    `http-headers = [ [ "X-Awesome", "me" ] ]`,
+				shoulderr: false,
+				expected:  "",
+			},
+			"One Item Should Fail": {
+				config:    `http-headers = [ [ "X-Only-Header" ] ]`,
+				shoulderr: true,
+				expected:  "error parsing only one item when expecting array of size 2",
+			},
+			"Three Items Should Fail": {
+				config:    `http-headers = [ [ "X-Header", "Value", "This field doesn't belong!" ] ]`,
+				shoulderr: true,
+				expected:  "error parsing only one item when expecting array of size 3",
+			},
+		}
+
+		for name, test := range tests {
+			t.Run(name, func(t *testing.T) {
+				c := httpd.Config{}
+				if _, err := toml.Decode(test.config, &c); err != nil {
+					if test.shoulderr && err == nil {
+						t.Fatalf("parsing %q did not result in an error.  it should have caused an error related to %q", test.config, test.expected)
+					}
+				}
+			})
+		}
+	})
+}
 
 func TestConfig_Parse(t *testing.T) {
 	// Parse configuration.
