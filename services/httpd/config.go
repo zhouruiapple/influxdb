@@ -44,6 +44,7 @@ type Config struct {
 	PprofAuthEnabled        bool           `toml:"pprof-auth-enabled"`
 	DebugPprofEnabled       bool           `toml:"debug-pprof-enabled"`
 	PingAuthEnabled         bool           `toml:"ping-auth-enabled"`
+	HTTPHeaders             [][2]string    `toml:"http-headers"`
 	HTTPSEnabled            bool           `toml:"https-enabled"`
 	HTTPSCertificate        string         `toml:"https-certificate"`
 	HTTPSPrivateKey         string         `toml:"https-private-key"`
