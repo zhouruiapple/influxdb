@@ -932,7 +932,7 @@ func (e *Engine) Backup(w io.Writer, basePath string, since time.Time) error {
 	// Remove the temporary snapshot dir
 	defer func() {
 		if err := os.RemoveAll(path); err != nil {
-			e.logger.Warn("backup could not remove temporary snapshot directory", zap.String("path", path), zap.Error(err))
+			e.logger.Info("backup could not remove temporary snapshot directory", zap.String("path", path), zap.Error(err))
 		}
 	}()
 
@@ -1002,7 +1002,7 @@ func (e *Engine) Export(w io.Writer, basePath string, start time.Time, end time.
 	// Remove the temporary snapshot dir
 	defer func() {
 		if err := os.RemoveAll(path); err != nil {
-			e.logger.Warn("export could not remove temporary snapshot directory", zap.String("path", path), zap.Error(err))
+			e.logger.Info("export could not remove temporary snapshot directory", zap.String("path", path), zap.Error(err))
 		}
 	}()
 
