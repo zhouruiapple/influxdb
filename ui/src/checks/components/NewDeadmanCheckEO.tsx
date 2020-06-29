@@ -55,7 +55,7 @@ const NewCheckOverlay: FunctionComponent<Props> = ({
     onSetActiveTimeMachine('alerting', {
       view,
     })
-  }, [])
+  }, [onInitializeAlertBuilder, onSetActiveTimeMachine])
 
   const handleClose = () => {
     router.push(`/orgs/${orgID}/alerting`)
