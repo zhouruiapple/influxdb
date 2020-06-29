@@ -44,65 +44,65 @@ const CheckMatchingRulesCard: FC<StateProps> = ({
   tags,
   queryResults,
 }) => {
-  const getMatchingRules = async (): Promise<NotificationRule[]> => {
-    const checkTags = tags
-      .filter(t => t.key && t.value)
-      .map(t => [t.key, t.value])
-
-    const queryTags = []
-
-    if (queryResults) {
-      const joined = queryResults.join('\n\n')
-      const table = fromFlux(joined).table
-      const fluxGroupKeyUnion = fromFlux(joined).fluxGroupKeyUnion.filter(
-        v => v !== '_start' && v !== '_stop'
-      )
-
-      fluxGroupKeyUnion.forEach(gk => {
-        const values = uniq(table.getColumn(gk, 'string'))
-        values.forEach(v => {
-          queryTags.push([gk, v])
-        })
-      })
-    }
-
-    const tagsList = [...checkTags, ...queryTags].map(t => [
-      'tag',
-      `${t[0].trim()}:${t[1].trim()}`,
-    ])
-
-    const resp = await apiGetNotificationRules({
-      query: [['orgID', orgID], ...tagsList] as any,
-    })
-
-    if (resp.status !== 200) {
-      setMatchingRules({matchingRules: [], status: RemoteDataState.Error})
-      return
-    }
-
-    const matchingRules: NotificationRuleDraft[] = resp.data.notificationRules.map(
-      (r: GenRule) => ruleToDraftRule(r)
-    )
-
-    setMatchingRules({
-      matchingRules,
-      status: RemoteDataState.Done,
-    })
-  }
-
   const [{matchingRules, status}, setMatchingRules] = useState<{
     matchingRules: NotificationRuleDraft[]
     status: RemoteDataState
   }>({matchingRules: [], status: RemoteDataState.NotStarted})
 
   useEffect(() => {
-    setMatchingRules({
+    setMatchingRules(({matchingRules}) => ({
       matchingRules,
       status: RemoteDataState.Loading,
-    })
+    }))
+
+    const getMatchingRules = async (): Promise<NotificationRule[]> => {
+      const checkTags = tags
+        .filter(t => t.key && t.value)
+        .map(t => [t.key, t.value])
+
+      const queryTags = []
+
+      if (queryResults) {
+        const joined = queryResults.join('\n\n')
+        const table = fromFlux(joined).table
+        const fluxGroupKeyUnion = fromFlux(joined).fluxGroupKeyUnion.filter(
+          v => v !== '_start' && v !== '_stop'
+        )
+
+        fluxGroupKeyUnion.forEach(gk => {
+          const values = uniq(table.getColumn(gk, 'string'))
+          values.forEach(v => {
+            queryTags.push([gk, v])
+          })
+        })
+      }
+
+      const tagsList = [...checkTags, ...queryTags].map(t => [
+        'tag',
+        `${t[0].trim()}:${t[1].trim()}`,
+      ])
+
+      const resp = await apiGetNotificationRules({
+        query: [['orgID', orgID], ...tagsList] as any,
+      })
+
+      if (resp.status !== 200) {
+        setMatchingRules({matchingRules: [], status: RemoteDataState.Error})
+        return
+      }
+
+      const matchingRules: NotificationRuleDraft[] = resp.data.notificationRules.map(
+        (r: GenRule) => ruleToDraftRule(r)
+      )
+
+      setMatchingRules({
+        matchingRules,
+        status: RemoteDataState.Done,
+      })
+    }
 
     getMatchingRules()
-  }, [tags, queryResults])
+  }, [tags, queryResults, orgID])
 
   let contents: JSX.Element
 
