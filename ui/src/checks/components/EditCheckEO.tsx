@@ -57,11 +57,13 @@ const EditCheckEditorOverlay: FunctionComponent<Props> = ({
 }) => {
   useEffect(() => {
     onGetCheckForTimeMachine(checkID)
-  }, [checkID])
+  }, [onGetCheckForTimeMachine, checkID])
+
+  const query = get(view, 'properties.queries[0].text', null)
 
   useEffect(() => {
     onExecuteQueries()
-  }, [get(view, 'properties.queries[0]', null)])
+  }, [onExecuteQueries, query])
 
   const handleClose = () => {
     router.push(`/orgs/${orgID}/alerting`)
