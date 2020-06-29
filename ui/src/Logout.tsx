@@ -1,5 +1,5 @@
 // Libraries
-import {FC, useEffect} from 'react'
+import {FC, useEffect, useCallback} from 'react'
 import {connect} from 'react-redux'
 import {withRouter, WithRouterProps} from 'react-router'
 
@@ -19,7 +19,7 @@ interface DispatchProps {
 
 type Props = DispatchProps & WithRouterProps
 const Logout: FC<Props> = ({router, resetFeatureFlags}) => {
-  const handleSignOut = async () => {
+  const handleSignOut = useCallback(async () => {
     if (CLOUD) {
       window.location.href = `${CLOUD_URL}${CLOUD_LOGOUT_PATH}`
       return
@@ -32,12 +32,13 @@ const Logout: FC<Props> = ({router, resetFeatureFlags}) => {
 
       router.push(`/signin`)
     }
-  }
+  }, [router])
 
   useEffect(() => {
     resetFeatureFlags()
     handleSignOut()
-  }, [])
+  }, [resetFeatureFlags, handleSignOut])
+
   return null
 }
 

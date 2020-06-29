@@ -3,6 +3,7 @@ import React, {
   FunctionComponent,
   useEffect,
   useState,
+  useCallback,
   ChangeEvent,
   FormEvent,
 } from 'react'
@@ -52,6 +53,10 @@ const UpdateBucketOverlay: FunctionComponent<Props> = ({
 
   const [retentionSelection, setRetentionSelection] = useState(DEFAULT_SECONDS)
 
+  const handleClose = useCallback(() => {
+    router.push(`/orgs/${orgID}/load-data/buckets`)
+  }, [orgID, router])
+
   useEffect(() => {
     const fetchBucket = async () => {
       const resp = await api.getBucket({bucketID})
@@ -71,8 +76,9 @@ const UpdateBucketOverlay: FunctionComponent<Props> = ({
 
       setLoadingStatus(RemoteDataState.Done)
     }
+
     fetchBucket()
-  }, [bucketID])
+  }, [bucketID, onNotify, handleClose])
 
   const handleChangeRetentionRule = (everySeconds: number): void => {
     setBucketDraft({
@@ -108,10 +114,6 @@ const UpdateBucketOverlay: FunctionComponent<Props> = ({
     const key = e.target.name
     const value = e.target.value
     setBucketDraft({...bucketDraft, [key]: value})
-  }
-
-  const handleClose = () => {
-    router.push(`/orgs/${orgID}/load-data/buckets`)
   }
 
   const handleClickRename = () => {

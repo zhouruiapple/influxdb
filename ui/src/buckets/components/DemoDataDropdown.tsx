@@ -35,7 +35,7 @@ const DemoDataDropdown: FC<Props> = ({
 }) => {
   useEffect(() => {
     getDemoDataBuckets()
-  }, [])
+  }, [getDemoDataBuckets])
 
   if (!demoDataBuckets.length) {
     return null
