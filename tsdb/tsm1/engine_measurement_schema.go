@@ -7,12 +7,14 @@ import (
 	"strings"
 
 	"github.com/influxdata/influxdb/v2"
+	"github.com/influxdata/influxdb/v2/kit/tracing"
 	"github.com/influxdata/influxdb/v2/models"
 	"github.com/influxdata/influxdb/v2/tsdb"
 	"github.com/influxdata/influxdb/v2/tsdb/cursors"
 	"github.com/influxdata/influxdb/v2/tsdb/seriesfile"
 	"github.com/influxdata/influxql"
-	"go.uber.org/zap"
+	"github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go/log"
 )
 
 // MeasurementNames returns an iterator which enumerates the measurements for the given
@@ -23,127 +25,24 @@ import (
 // If the context is canceled before MeasurementNames has finished processing, a non-nil
 // error will be returned along with statistics for the already scanned data.
 func (e *Engine) MeasurementNames(ctx context.Context, orgID, bucketID influxdb.ID, start, end int64, predicate influxql.Expr) (cursors.StringIterator, error) {
-	if predicate == nil {
-		return e.measurementNamesNoPredicate(ctx, orgID, bucketID, start, end)
-	}
-	return e.measurementNamesPredicate(ctx, orgID, bucketID, start, end, predicate)
+	span, ctx := tracing.StartSpanFromContext(ctx)
+	defer span.Finish()
+
+	return e.tagValuesFast(ctx, orgID, bucketID, nil, models.MeasurementTagKeyBytes, start, end, predicate)
 }
 
-func (e *Engine) measurementNamesNoPredicate(ctx context.Context, orgID, bucketID influxdb.ID, start, end int64) (cursors.StringIterator, error) {
-	orgBucket := tsdb.EncodeName(orgID, bucketID)
-	// TODO(edd): we need to clean up how we're encoding the prefix so that we
-	// don't have to remember to get it right everywhere we need to touch TSM data.
-	prefix := models.EscapeMeasurement(orgBucket[:])
+// tagValuesCheckInterval represents the period at which tagValuesFast function
+// will check for a canceled context. Specifically after every n series
+// scanned, the query context will be checked for cancellation, and if canceled,
+// the calls will immediately return.
+const tagValuesCheckInterval = 64
 
-	var (
-		tsmValues = make(map[string]struct{})
-		stats     cursors.CursorStats
-		canceled  bool
-	)
-
-	e.FileStore.ForEachFile(func(f TSMFile) bool {
-		// Check the context before accessing each tsm file
-		select {
-		case <-ctx.Done():
-			canceled = true
-			return false
-		default:
-		}
-		if f.OverlapsTimeRange(start, end) && f.OverlapsKeyPrefixRange(prefix, prefix) {
-			iter := f.TimeRangeIterator(prefix, start, end)
-			for i := 0; iter.Next(); i++ {
-				sfkey := iter.Key()
-				if !bytes.HasPrefix(sfkey, prefix) {
-					// end of org+bucket
-					break
-				}
-
-				key, _ := SeriesAndFieldFromCompositeKey(sfkey)
-				name, err := models.ParseMeasurement(key)
-				if err != nil {
-					e.logger.Error("Invalid series key in TSM index", zap.Error(err), zap.Binary("key", key))
-					continue
-				}
-
-				if _, ok := tsmValues[string(name)]; ok {
-					continue
-				}
-
-				if iter.HasData() {
-					tsmValues[string(name)] = struct{}{}
-				}
-			}
-			stats.Add(iter.Stats())
-		}
-		return true
-	})
-
-	if canceled {
-		return cursors.NewStringSliceIteratorWithStats(nil, stats), ctx.Err()
-	}
-
-	var ts cursors.TimestampArray
-
-	// With performance in mind, we explicitly do not check the context
-	// while scanning the entries in the cache.
-	prefixStr := string(prefix)
-	_ = e.Cache.ApplyEntryFn(func(sfkey string, entry *entry) error {
-		if !strings.HasPrefix(sfkey, prefixStr) {
-			return nil
-		}
-
-		// TODO(edd): consider the []byte() conversion here.
-		key, _ := SeriesAndFieldFromCompositeKey([]byte(sfkey))
-		name, err := models.ParseMeasurement(key)
-		if err != nil {
-			e.logger.Error("Invalid series key in cache", zap.Error(err), zap.Binary("key", key))
-			return nil
-		}
-
-		if _, ok := tsmValues[string(name)]; ok {
-			return nil
-		}
-
-		ts.Timestamps = entry.AppendTimestamps(ts.Timestamps[:0])
-		if ts.Len() == 0 {
-			return nil
-		}
-
-		sort.Sort(&ts)
-
-		stats.ScannedValues += ts.Len()
-		stats.ScannedBytes += ts.Len() * 8 // sizeof timestamp
-
-		if ts.Contains(start, end) {
-			tsmValues[string(name)] = struct{}{}
-		}
-		return nil
-	})
-
-	vals := make([]string, 0, len(tsmValues))
-	for val := range tsmValues {
-		vals = append(vals, val)
-	}
-	sort.Strings(vals)
-
-	return cursors.NewStringSliceIteratorWithStats(vals, stats), nil
-}
-
-func (e *Engine) measurementNamesPredicate(ctx context.Context, orgID, bucketID influxdb.ID, start, end int64, predicate influxql.Expr) (cursors.StringIterator, error) {
-	if err := ValidateMeasurementNamesTagPredicate(predicate); err != nil {
+func (e *Engine) tagValuesFast(ctx context.Context, orgID, bucketID influxdb.ID, measurement, tagKeyBytes []byte, start, end int64, predicate influxql.Expr) (cursors.StringIterator, error) {
+	if err := ValidateTagPredicate(predicate); err != nil {
 		return nil, err
 	}
 
 	orgBucket := tsdb.EncodeName(orgID, bucketID)
-
-	keys, err := e.findCandidateKeys(ctx, orgBucket[:], predicate)
-	if err != nil {
-		return cursors.EmptyStringIterator, err
-	}
-
-	if len(keys) == 0 {
-		return cursors.EmptyStringIterator, nil
-	}
 
 	var files []TSMFile
 	defer func() {
@@ -155,7 +54,15 @@ func (e *Engine) measurementNamesPredicate(ctx context.Context, orgID, bucketID 
 
 	// TODO(edd): we need to clean up how we're encoding the prefix so that we
 	// don't have to remember to get it right everywhere we need to touch TSM data.
-	tsmKeyPrefix := models.EscapeMeasurement(orgBucket[:])
+	orgBucketEsc := models.EscapeMeasurement(orgBucket[:])
+
+	tsmKeyPrefix := orgBucketEsc
+	if len(measurement) > 0 {
+		// append the measurement tag key to the prefix
+		mt := models.Tags{models.NewTag(models.MeasurementTagKeyBytes, measurement)}
+		tsmKeyPrefix = mt.AppendHashKey(tsmKeyPrefix)
+		tsmKeyPrefix = append(tsmKeyPrefix, ',')
+	}
 
 	var canceled bool
 
@@ -175,6 +82,13 @@ func (e *Engine) measurementNamesPredicate(ctx context.Context, orgID, bucketID 
 		return true
 	})
 
+	// fetch distinct values for tag key
+	itr, err := e.index.TagValueIterator(orgBucket[:], tagKeyBytes)
+	if err != nil {
+		return nil, err
+	}
+	defer itr.Close()
+
 	var stats cursors.CursorStats
 
 	if canceled {
@@ -182,19 +96,34 @@ func (e *Engine) measurementNamesPredicate(ctx context.Context, orgID, bucketID 
 		return cursors.NewStringSliceIteratorWithStats(nil, stats), ctx.Err()
 	}
 
-	tsmValues := make(map[string]struct{})
+	var (
+		vals        = make([]string, 0, 128)
+		scannedKeys = 0
+	)
+
+	span := opentracing.SpanFromContext(ctx)
+	if span != nil {
+		defer func() {
+			span.LogFields(
+				log.Int("files_count", len(files)),
+				log.Int("scanned_keys_count", scannedKeys),
+				log.Int("values_count", len(vals)),
+			)
+		}()
+	}
 
 	// reusable buffers
 	var (
 		tags   models.Tags
-		keybuf []byte
+		keyBuf []byte
 		sfkey  []byte
 		ts     cursors.TimestampArray
+		tagKey = string(tagKeyBytes)
 	)
 
-	for i := range keys {
-		// to keep cache scans fast, check context every 'cancelCheckInterval' iteratons
-		if i%cancelCheckInterval == 0 {
+	for i := 0; ; i++ {
+		// to keep cache scans fast, check context every 'cancelCheckInterval' iterations
+		if i%tagValuesCheckInterval == 0 {
 			select {
 			case <-ctx.Done():
 				stats = statsFromIters(stats, iters)
@@ -203,57 +132,101 @@ func (e *Engine) measurementNamesPredicate(ctx context.Context, orgID, bucketID 
 			}
 		}
 
-		_, tags = seriesfile.ParseSeriesKeyInto(keys[i], tags[:0])
-
-		// orgBucketEsc is already escaped, so no need to use models.AppendMakeKey, which
-		// unescapes and escapes the value again. The degenerate case is if the orgBucketEsc
-		// has escaped values, causing two allocations per key
-		keybuf = append(keybuf[:0], tsmKeyPrefix...)
-		keybuf = tags.AppendHashKey(keybuf)
-		sfkey = AppendSeriesFieldKeyBytes(sfkey[:0], keybuf, tags.Get(models.FieldKeyTagKeyBytes))
-
-		key, _ := SeriesAndFieldFromCompositeKey(sfkey)
-		name, err := models.ParseMeasurement(key)
+		val, err := itr.Next()
 		if err != nil {
-			e.logger.Error("Invalid series key in TSM index", zap.Error(err), zap.Binary("key", key))
-			continue
+			stats = statsFromIters(stats, iters)
+			return cursors.NewStringSliceIteratorWithStats(nil, stats), err
+		} else if len(val) == 0 {
+			break
 		}
 
-		if _, ok := tsmValues[string(name)]; ok {
-			continue
+		// <tagKey> = val
+		var expr influxql.Expr = &influxql.BinaryExpr{
+			LHS: &influxql.VarRef{Val: tagKey, Type: influxql.Tag},
+			Op:  influxql.EQ,
+			RHS: &influxql.StringLiteral{Val: string(val)},
 		}
 
-		ts.Timestamps = e.Cache.AppendTimestamps(sfkey, ts.Timestamps[:0])
-		if ts.Len() > 0 {
-			sort.Sort(&ts)
-
-			stats.ScannedValues += ts.Len()
-			stats.ScannedBytes += ts.Len() * 8 // sizeof timestamp
-
-			if ts.Contains(start, end) {
-				tsmValues[string(name)] = struct{}{}
+		if predicate != nil {
+			// <tagKey> = val AND (expr)
+			expr = &influxql.BinaryExpr{
+				LHS: expr,
+				Op:  influxql.AND,
+				RHS: &influxql.ParenExpr{
+					Expr: predicate,
+				},
 			}
-			continue
 		}
 
-		for _, iter := range iters {
-			if exact, _ := iter.Seek(sfkey); !exact {
-				continue
+		if err := func() error {
+			sitr, err := e.index.MeasurementSeriesByExprIterator(orgBucket[:], expr)
+			if err != nil {
+				return err
 			}
+			defer sitr.Close()
 
-			if iter.HasData() {
-				tsmValues[string(name)] = struct{}{}
-				break
+			for {
+				elem, err := sitr.Next()
+				if err != nil {
+					return err
+				} else if elem.SeriesID.IsZero() {
+					return nil
+				}
+
+				scannedKeys++
+
+				seriesKey := e.sfile.SeriesKey(elem.SeriesID)
+				if len(seriesKey) == 0 {
+					continue
+				}
+
+				_, tags = seriesfile.ParseSeriesKeyInto(seriesKey, tags[:0])
+				if len(tags) < 2 {
+					// must contain at least models.MeasurementTagKey and models.FieldTagKey
+					continue
+				}
+
+				// last value is guaranteed to be field
+				fieldVal := tags[len(tags)-1].Value
+
+				// orgBucketEsc is already escaped, so no need to use models.AppendMakeKey, which
+				// unescapes and escapes the value again. The degenerate case is if the orgBucketEsc
+				// has escaped values, causing two allocations per key
+				keyBuf = append(keyBuf[:0], orgBucketEsc...)
+				keyBuf = tags.AppendHashKey(keyBuf)
+				sfkey = AppendSeriesFieldKeyBytes(sfkey[:0], keyBuf, fieldVal)
+
+				ts.Timestamps = e.Cache.AppendTimestamps(sfkey, ts.Timestamps[:0])
+				if ts.Len() > 0 {
+					sort.Sort(&ts)
+
+					stats.ScannedValues += ts.Len()
+					stats.ScannedBytes += ts.Len() * 8 // sizeof timestamp
+
+					if ts.Contains(start, end) {
+						vals = append(vals, string(val))
+						return nil
+					}
+				}
+
+				for _, iter := range iters {
+					if exact, _ := iter.Seek(sfkey); !exact {
+						continue
+					}
+
+					if iter.HasData() {
+						vals = append(vals, string(val))
+						return nil
+					}
+				}
 			}
+		}(); err != nil {
+			stats = statsFromIters(stats, iters)
+			return cursors.NewStringSliceIteratorWithStats(nil, stats), err
 		}
 	}
 
-	vals := make([]string, 0, len(tsmValues))
-	for val := range tsmValues {
-		vals = append(vals, val)
-	}
 	sort.Strings(vals)
-
 	stats = statsFromIters(stats, iters)
 	return cursors.NewStringSliceIteratorWithStats(vals, stats), err
 }
@@ -267,6 +240,10 @@ func (e *Engine) measurementNamesPredicate(ctx context.Context, orgID, bucketID 
 // If the context is canceled before TagValues has finished processing, a non-nil
 // error will be returned along with statistics for the already scanned data.
 func (e *Engine) MeasurementTagValues(ctx context.Context, orgID, bucketID influxdb.ID, measurement, tagKey string, start, end int64, predicate influxql.Expr) (cursors.StringIterator, error) {
+	predicate = AddMeasurementToExpr(measurement, predicate)
+
+	return e.tagValuesFast(ctx, orgID, bucketID, []byte(measurement), []byte(tagKey), start, end, predicate)
+
 	if predicate == nil {
 		return e.tagValuesNoPredicate(ctx, orgID, bucketID, []byte(measurement), []byte(tagKey), start, end)
 	}
@@ -304,6 +281,10 @@ func (e *Engine) MeasurementTagKeys(ctx context.Context, orgID, bucketID influxd
 // If the context is canceled before MeasurementFields has finished processing, a non-nil
 // error will be returned along with statistics for the already scanned data.
 func (e *Engine) MeasurementFields(ctx context.Context, orgID, bucketID influxdb.ID, measurement string, start, end int64, predicate influxql.Expr) (cursors.MeasurementFieldsIterator, error) {
+	predicate = AddMeasurementToExpr(measurement, predicate)
+
+	return e.fieldsFast(ctx, orgID, bucketID, []byte(measurement), start, end, predicate)
+
 	if predicate == nil {
 		return e.fieldsNoPredicate(ctx, orgID, bucketID, []byte(measurement), start, end)
 	}
@@ -314,8 +295,219 @@ func (e *Engine) MeasurementFields(ctx context.Context, orgID, bucketID influxdb
 }
 
 type fieldTypeTime struct {
+	key []byte
 	typ cursors.FieldType
 	max int64
+}
+
+func (e *Engine) fieldsFast(ctx context.Context, orgID, bucketID influxdb.ID, measurement []byte, start, end int64, predicate influxql.Expr) (cursors.MeasurementFieldsIterator, error) {
+	if err := ValidateTagPredicate(predicate); err != nil {
+		return nil, err
+	}
+
+	orgBucket := tsdb.EncodeName(orgID, bucketID)
+
+	var files []TSMFile
+	defer func() {
+		for _, f := range files {
+			f.Unref()
+		}
+	}()
+	var iters []*TimeRangeMaxTimeIterator
+
+	// TODO(edd): we need to clean up how we're encoding the prefix so that we
+	// don't have to remember to get it right everywhere we need to touch TSM data.
+	orgBucketEsc := models.EscapeMeasurement(orgBucket[:])
+
+	tsmKeyPrefix := orgBucketEsc
+	if len(measurement) > 0 {
+		// append the measurement tag key to the prefix
+		mt := models.Tags{models.NewTag(models.MeasurementTagKeyBytes, measurement)}
+		tsmKeyPrefix = mt.AppendHashKey(tsmKeyPrefix)
+		tsmKeyPrefix = append(tsmKeyPrefix, ',')
+	}
+
+	var canceled bool
+
+	e.FileStore.ForEachFile(func(f TSMFile) bool {
+		// Check the context before accessing each tsm file
+		select {
+		case <-ctx.Done():
+			canceled = true
+			return false
+		default:
+		}
+		if f.OverlapsTimeRange(start, end) && f.OverlapsKeyPrefixRange(tsmKeyPrefix, tsmKeyPrefix) {
+			f.Ref()
+			files = append(files, f)
+			iters = append(iters, f.TimeRangeMaxTimeIterator(tsmKeyPrefix, start, end))
+		}
+		return true
+	})
+
+	// fetch distinct values for field, which may be a superset of the measurement
+	itr, err := e.index.TagValueIterator(orgBucket[:], models.FieldKeyTagKeyBytes)
+	if err != nil {
+		return nil, err
+	}
+	defer itr.Close()
+
+	var stats cursors.CursorStats
+
+	if canceled {
+		stats = statsFromTimeRangeMaxTimeIters(stats, iters)
+		return cursors.NewMeasurementFieldsSliceIteratorWithStats(nil, stats), ctx.Err()
+	}
+
+	var (
+		fieldTypes  = make([]fieldTypeTime, 0, 128)
+		scannedKeys = 0
+	)
+
+	span := opentracing.SpanFromContext(ctx)
+	if span != nil {
+		defer func() {
+			span.LogFields(
+				log.Int("files_count", len(files)),
+				log.Int("scanned_keys_count", scannedKeys),
+				log.Int("values_count", len(fieldTypes)),
+			)
+		}()
+	}
+
+	// reusable buffers
+	var (
+		tags   models.Tags
+		keyBuf []byte
+		sfkey  []byte
+		ts     cursors.TimestampArray
+		tagKey = models.FieldKeyTagKey
+	)
+
+	for i := 0; ; i++ {
+		// to keep cache scans fast, check context every 'cancelCheckInterval' iterations
+		if i%tagValuesCheckInterval == 0 {
+			select {
+			case <-ctx.Done():
+				stats = statsFromTimeRangeMaxTimeIters(stats, iters)
+				return cursors.NewMeasurementFieldsSliceIteratorWithStats(nil, stats), ctx.Err()
+			default:
+			}
+		}
+
+		val, err := itr.Next()
+		if err != nil {
+			stats = statsFromTimeRangeMaxTimeIters(stats, iters)
+			return cursors.NewMeasurementFieldsSliceIteratorWithStats(nil, stats), err
+		} else if len(val) == 0 {
+			break
+		}
+
+		// <tagKey> = val
+		var expr influxql.Expr = &influxql.BinaryExpr{
+			LHS: &influxql.VarRef{Val: tagKey, Type: influxql.Tag},
+			Op:  influxql.EQ,
+			RHS: &influxql.StringLiteral{Val: string(val)},
+		}
+
+		if predicate != nil {
+			// <tagKey> = val AND (expr)
+			expr = &influxql.BinaryExpr{
+				LHS: expr,
+				Op:  influxql.AND,
+				RHS: &influxql.ParenExpr{
+					Expr: predicate,
+				},
+			}
+		}
+
+		if err := func() error {
+			sitr, err := e.index.MeasurementSeriesByExprIterator(orgBucket[:], expr)
+			if err != nil {
+				return err
+			}
+			defer sitr.Close()
+
+			for {
+				elem, err := sitr.Next()
+				if err != nil {
+					return err
+				} else if elem.SeriesID.IsZero() {
+					return nil
+				}
+
+				scannedKeys++
+
+				seriesKey := e.sfile.SeriesKey(elem.SeriesID)
+				if len(seriesKey) == 0 {
+					continue
+				}
+
+				_, tags = seriesfile.ParseSeriesKeyInto(seriesKey, tags[:0])
+				if len(tags) < 2 {
+					// must contain at least models.MeasurementTagKey and models.FieldTagKey
+					continue
+				}
+
+				// last value is guaranteed to be field
+				fieldVal := tags[len(tags)-1].Value
+
+				// orgBucketEsc is already escaped, so no need to use models.AppendMakeKey, which
+				// unescapes and escapes the value again. The degenerate case is if the orgBucketEsc
+				// has escaped values, causing two allocations per key
+				keyBuf = append(keyBuf[:0], orgBucketEsc...)
+				keyBuf = tags.AppendHashKey(keyBuf)
+				sfkey = AppendSeriesFieldKeyBytes(sfkey[:0], keyBuf, fieldVal)
+
+				cur := fieldTypeTime{key: fieldVal, max: InvalidMinNanoTime}
+
+				ts.Timestamps = e.Cache.AppendTimestamps(sfkey, ts.Timestamps[:0])
+				if ts.Len() > 0 {
+					sort.Sort(&ts)
+
+					stats.ScannedValues += ts.Len()
+					stats.ScannedBytes += ts.Len() * 8 // sizeof timestamp
+
+					if ts.Contains(start, end) {
+						max := ts.MaxTime()
+						if max > cur.max {
+							cur.max = max
+							cur.typ = BlockTypeToFieldType(e.Cache.BlockType(sfkey))
+						}
+					}
+				}
+
+				for _, iter := range iters {
+					if exact, _ := iter.Seek(sfkey); !exact {
+						continue
+					}
+
+					max := iter.MaxTime()
+					if max > cur.max {
+						cur.max = max
+						cur.typ = BlockTypeToFieldType(iter.Type())
+					}
+				}
+
+				if cur.max != InvalidMinNanoTime {
+					fieldTypes = append(fieldTypes, cur)
+					return nil
+				}
+			}
+		}(); err != nil {
+			stats = statsFromTimeRangeMaxTimeIters(stats, iters)
+			return cursors.NewMeasurementFieldsSliceIteratorWithStats(nil, stats), err
+		}
+	}
+
+	vals := make([]cursors.MeasurementField, 0, len(fieldTypes))
+	for i := range fieldTypes {
+		val := &fieldTypes[i]
+		vals = append(vals, cursors.MeasurementField{Key: string(val.key), Type: val.typ, Timestamp: val.max})
+	}
+
+	stats = statsFromTimeRangeMaxTimeIters(stats, iters)
+	return cursors.NewMeasurementFieldsSliceIteratorWithStats([]cursors.MeasurementFields{{Fields: vals}}, stats), nil
 }
 
 func (e *Engine) fieldsPredicate(ctx context.Context, orgID influxdb.ID, bucketID influxdb.ID, measurement []byte, start int64, end int64, predicate influxql.Expr) (cursors.MeasurementFieldsIterator, error) {

@@ -954,6 +954,18 @@ m10,foo=v barS="60" 501
 			expStats: makeStats(12),
 		},
 		{
+			name: "TSM and cache",
+			args: args{
+				org:  0,
+				m:    "m00",
+				min:  0,
+				max:  300,
+				expr: `tag00 = 'v00'`,
+			},
+			exp:      []cursors.MeasurementField{{Key: "i", Type: cursors.String, Timestamp: 209}, {Key: "f", Type: cursors.Float, Timestamp: 201}},
+			expStats: makeStats(12),
+		},
+		{
 			name: "m00 only TSM",
 			args: args{
 				org: 0,
