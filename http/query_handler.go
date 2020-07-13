@@ -657,5 +657,8 @@ func (s routingQueryService) Query(ctx context.Context, w io.Writer, req *query.
 	if req.Request.Compiler.CompilerType() == influxql.CompilerType {
 		return s.InfluxQLService.Query(ctx, w, req)
 	}
-	return s.DefaultService.Query(ctx, w, req)
+	stats, err := s.DefaultService.Query(ctx, w, req)
+	fmt.Println(time.Now(), "PUSH DOWNS EXECUTED: ", stats.Metadata["push-downs-executed"])
+	fmt.Println(time.Now(), "root query plan:\n", stats.Metadata["root-query-plan"])
+	return stats, err
 }
