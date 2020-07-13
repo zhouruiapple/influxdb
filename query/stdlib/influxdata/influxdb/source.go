@@ -9,6 +9,7 @@ import (
 	"github.com/influxdata/flux/codes"
 	"github.com/influxdata/flux/execute"
 	"github.com/influxdata/flux/memory"
+	"github.com/influxdata/flux/metadata"
 	"github.com/influxdata/flux/plan"
 	platform "github.com/influxdata/influxdb/v2"
 	"github.com/influxdata/influxdb/v2/kit/tracing"
@@ -63,8 +64,8 @@ func (s *Source) AddTransformation(t execute.Transformation) {
 	s.ts = append(s.ts, t)
 }
 
-func (s *Source) Metadata() flux.Metadata {
-	return flux.Metadata{
+func (s *Source) Metadata() metadata.Metadata {
+	return metadata.Metadata{
 		"influxdb/scanned-bytes":  []interface{}{s.stats.ScannedBytes},
 		"influxdb/scanned-values": []interface{}{s.stats.ScannedValues},
 	}
@@ -136,6 +137,12 @@ func ReadFilterSource(id execute.DatasetID, r query.StorageReader, readSpec quer
 
 	src.runner = src
 	return src
+}
+
+func (s *readFilterSource) Metadata() metadata.Metadata {
+	metadata := s.Source.Metadata()
+	metadata.Add("influxdb/push-downs-executed", "read-filter")
+	return metadata
 }
 
 func (s *readFilterSource) run(ctx context.Context) error {
@@ -217,6 +224,12 @@ func ReadGroupSource(id execute.DatasetID, r query.StorageReader, readSpec query
 	return src
 }
 
+func (s *readGroupSource) Metadata() metadata.Metadata {
+	metadata := s.Source.Metadata()
+	metadata.Add("influxdb/push-downs-executed", "read-group")
+	return metadata
+}
+
 func (s *readGroupSource) run(ctx context.Context) error {
 	stop := s.readSpec.Bounds.Stop
 	tables, err := s.reader.ReadGroup(
@@ -293,6 +306,12 @@ func ReadWindowAggregateSource(id execute.DatasetID, r query.WindowAggregateRead
 
 	src.runner = src
 	return src
+}
+
+func (s *readWindowAggregateSource) Metadata() metadata.Metadata {
+	metadata := s.Source.Metadata()
+	metadata.Add("influxdb/push-downs-executed", "read-window-aggregate")
+	return metadata
 }
 
 func (s *readWindowAggregateSource) run(ctx context.Context) error {
@@ -414,6 +433,12 @@ func ReadTagKeysSource(id execute.DatasetID, r query.StorageReader, readSpec que
 	return src
 }
 
+func (s *readTagKeysSource) Metadata() metadata.Metadata {
+	metadata := s.Source.Metadata()
+	metadata.Add("influxdb/push-downs-executed", "read-tag-keys")
+	return metadata
+}
+
 func (s *readTagKeysSource) run(ctx context.Context) error {
 	ti, err := s.reader.ReadTagKeys(ctx, s.readSpec, s.alloc)
 	if err != nil {
@@ -477,6 +502,12 @@ func ReadTagValuesSource(id execute.DatasetID, r query.StorageReader, readSpec q
 
 	src.runner = src
 	return src
+}
+
+func (s *readTagValuesSource) Metadata() metadata.Metadata {
+	metadata := s.Source.Metadata()
+	metadata.Add("influxdb/push-downs-executed", "read-tag-values")
+	return metadata
 }
 
 func (s *readTagValuesSource) run(ctx context.Context) error {
