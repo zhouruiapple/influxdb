@@ -1,5 +1,5 @@
 // Libraries
-import React, {FC, useEffect, useContext, useCallback} from 'react'
+import React, {FC, useContext} from 'react'
 
 // Components
 import {
@@ -10,31 +10,20 @@ import {
 } from '@influxdata/clockface'
 import SelectorListItem from 'src/notebooks/pipes/Data/SelectorListItem'
 import {BucketContext} from 'src/notebooks/context/buckets'
-import {PipeContext} from 'src/notebooks/context/pipe'
-
-// Types
-import {Bucket} from 'src/types'
 
 const BucketSelector: FC = () => {
-  const {data, update} = useContext(PipeContext)
-  const {buckets, loading} = useContext(BucketContext)
+  const {
+    buckets,
+    loading,
+    selectedBucketName,
+    setSelectedBucketName,
+  } = useContext(BucketContext)
 
-  const selectedBucketName = data.bucketName
+  const handleItemClick = (bucket: Bucket): void => {
+    const bucketName = bucket.name
 
-  const updateBucket = useCallback(
-    (updatedBucket: Bucket): void => {
-      update({bucketName: updatedBucket.name})
-    },
-    [update]
-  )
-
-  useEffect(() => {
-    // selectedBucketName will only evaluate false on the initial render
-    // because there is no default value
-    if (!!buckets.length && !selectedBucketName) {
-      updateBucket(buckets[0])
-    }
-  }, [buckets, selectedBucketName, updateBucket])
+    setSelectedBucketName(bucketName)
+  }
 
   let body
 
@@ -61,7 +50,7 @@ const BucketSelector: FC = () => {
           <SelectorListItem
             key={bucket.name}
             value={bucket}
-            onClick={updateBucket}
+            onClick={handleItemClick}
             selected={bucket.name === selectedBucketName}
             text={bucket.name}
           />
@@ -69,6 +58,8 @@ const BucketSelector: FC = () => {
       </DapperScrollbars>
     )
   }
+
+  console.log(selectedBucketName)
 
   return (
     <div className="data-source--block">
