@@ -2,7 +2,7 @@
 import React, {FC, useContext} from 'react'
 
 // Components
-import {Button, ComponentColor, ComponentStatus} from '@influxdata/clockface'
+import {Button, ComponentColor} from '@influxdata/clockface'
 
 // Constants
 import {NotebookContext} from 'src/notebooks/context/notebook.current'
@@ -19,10 +19,8 @@ interface Props {
 }
 
 const AddButtons: FC<Props> = ({index, onInsert, eventName}) => {
-  const {add, notebook} = useContext(NotebookContext)
+  const {add} = useContext(NotebookContext)
   const results = useContext(ResultsContext)
-
-  const dataSourceExistsInPipes = notebook.data.all.find(p => p.type === 'data')
 
   const pipes = Object.entries(PIPE_DEFINITIONS)
     .filter(
@@ -40,16 +38,10 @@ const AddButtons: FC<Props> = ({index, onInsert, eventName}) => {
       return bPriority - aPriority
     })
     .map(([type, def]) => {
-      const buttonStatus =
-        type === 'data' && dataSourceExistsInPipes
-          ? ComponentStatus.Disabled
-          : ComponentStatus.Default
-
       return (
         <Button
           key={def.type}
           text={def.button}
-          status={buttonStatus}
           onClick={() => {
             let data = def.initial
             if (typeof data === 'function') {

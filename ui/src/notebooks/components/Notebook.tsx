@@ -10,7 +10,6 @@ import {ScrollProvider} from 'src/notebooks/context/scroll'
 import Header from 'src/notebooks/components/header'
 import PipeList from 'src/notebooks/components/PipeList'
 import MiniMap from 'src/notebooks/components/minimap/MiniMap'
-import BucketProvider from 'src/notebooks/context/buckets'
 
 // NOTE: uncommon, but using this to scope the project
 // within the page and not bleed it's dependancies outside
@@ -23,21 +22,19 @@ const NotebookPage: FC = () => {
       <ResultsProvider>
         <RefProvider>
           <ScrollProvider>
-            <BucketProvider>
-              <Page titleTag="Flows">
-                <Header />
-                <Page.Contents
-                  fullWidth={true}
-                  scrollable={false}
-                  className="notebook-page"
-                >
-                  <div className="notebook">
-                    <MiniMap />
-                    <PipeList />
-                  </div>
-                </Page.Contents>
-              </Page>
-            </BucketProvider>
+            <Page titleTag="Flows">
+              <Header />
+              <Page.Contents
+                fullWidth={true}
+                scrollable={false}
+                className="notebook-page"
+              >
+                <div className="notebook">
+                  <MiniMap />
+                  <PipeList />
+                </div>
+              </Page.Contents>
+            </Page>
           </ScrollProvider>
         </RefProvider>
       </ResultsProvider>

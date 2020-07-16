@@ -8,5 +8,7 @@ register({
   featureFlag: 'notebook-panel--data-source',
   component: View,
   button: 'Data Source',
-  initial: {},
+  initial: {
+    bucketName: '',
+  },
 })

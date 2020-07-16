@@ -1,4 +1,4 @@
-import React, {FC, useEffect, useState, useCallback} from 'react'
+import React, {FC, useEffect} from 'react'
 import {connect, ConnectedProps} from 'react-redux'
 
 // Actions
@@ -17,15 +17,11 @@ export type Props = ReduxProps
 export interface BucketContextType {
   loading: RemoteDataState
   buckets: Bucket[]
-  selectedBucketName: string
-  setSelectedBucketName: (bucketName: string) => void
 }
 
 export const DEFAULT_CONTEXT: BucketContextType = {
   loading: RemoteDataState.NotStarted,
   buckets: [],
-  selectedBucketName: '',
-  setSelectedBucketName: () => {},
 }
 
 export const BucketContext = React.createContext<BucketContextType>(
@@ -40,49 +36,32 @@ const lockAndLoad = async grabber => {
   GLOBAL_LOADING = false
 }
 
-export const BucketProvider: FC<Props> = ({
-  loading,
-  getBuckets,
-  buckets,
-  children,
-}) => {
-  const [selectedBucketName, setSelectedBucketName] = useState<string>('')
+export const BucketProvider: FC<Props> = React.memo(
+  ({loading, getBuckets, buckets, children}) => {
+    useEffect(() => {
+      if (loading !== RemoteDataState.NotStarted) {
+        return
+      }
 
-  useEffect(() => {
-    if (loading !== RemoteDataState.NotStarted) {
-      return
-    }
+      if (GLOBAL_LOADING) {
+        return
+      }
 
-    if (GLOBAL_LOADING) {
-      return
-    }
+      lockAndLoad(getBuckets)
+    }, [loading, getBuckets])
 
-    lockAndLoad(getBuckets)
-  }, [loading, getBuckets])
-
-  useEffect(() => {
-    if (buckets.length && !selectedBucketName) {
-      setSelectedBucketName(buckets[0].name)
-    }
-  }, [buckets, selectedBucketName])
-
-  const setBucketName = useCallback((bucketName: string) => {
-    setSelectedBucketName(bucketName)
-  }, [])
-
-  return (
-    <BucketContext.Provider
-      value={{
-        loading,
-        buckets,
-        selectedBucketName,
-        setSelectedBucketName: setBucketName,
-      }}
-    >
-      {children}
-    </BucketContext.Provider>
-  )
-}
+    return (
+      <BucketContext.Provider
+        value={{
+          loading,
+          buckets,
+        }}
+      >
+        {children}
+      </BucketContext.Provider>
+    )
+  }
+)
 
 const mstp = (state: AppState) => {
   const buckets = getSortedBuckets(state)
