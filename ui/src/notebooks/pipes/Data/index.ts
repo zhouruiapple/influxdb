@@ -10,7 +10,5 @@ register({
   button: 'Data Source',
   initial: {
     bucketName: '',
-    timeStart: '-1h',
-    timeStop: 'now()',
   },
 })
