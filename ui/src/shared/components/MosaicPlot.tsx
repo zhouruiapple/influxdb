@@ -71,19 +71,19 @@ const MosaicPlot: FunctionComponent<Props> = ({
 
   const [yDomain, onSetYDomain, onResetYDomain] = useVisYDomainSettings(
     storedYDomain,
-    table.getColumn(yColumn, 'number')
+    table.getColumn(yColumn, 'string')
   )
 
-  const isValidView =
-    xColumn &&
-    columnKeys.includes(xColumn) &&
-    yColumn &&
-    columnKeys.includes(yColumn) &&
-    fillColumns.every(col => columnKeys.includes(col))
+  // const isValidView =
+  //   xColumn &&
+  //   columnKeys.includes(xColumn) &&
+  //   yColumn &&
+  //   columnKeys.includes(yColumn) &&
+  //   fillColumns.every(col => columnKeys.includes(col))
 
-  if (!isValidView) {
-    return <EmptyGraphMessage message={INVALID_DATA_COPY} />
-  }
+  // if (!isValidView) {
+  //   return <EmptyGraphMessage message={INVALID_DATA_COPY} />
+  // }
 
   const colorHexes =
     colors && colors.length ? colors : DEFAULT_LINE_COLORS.map(c => c.hex)
