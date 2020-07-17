@@ -192,6 +192,7 @@ export const executeQueries = (abortController?: AbortController) => async (
   )
 
   if (!queries.length) {
+    console.log('no queries', queries)
     dispatch(setQueryResults(RemoteDataState.Done, [], null))
   }
 
