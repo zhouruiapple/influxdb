@@ -4,7 +4,13 @@ package readback_test
 //
 // go test -c query/stdlib/readback
 //
-// 2. Run many in parallel:
+// 2. Run until it fails:
+//
+// while true; do ./readback.test; done
+//
+// OR if you are less patient: run many in parallel. Leftover log files with
+// "FAIL" in them represent failures. You may see issues related to NAT, this
+// is a separate problem that the sleep below tries to address (see launcher).
 //
 // # How many test case processes to run in parallel.
 // PARALLEL=16
@@ -37,7 +43,6 @@ import (
 	"fmt"
 	"bytes"
 	"context"
-	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -45,7 +50,6 @@ import (
 	"github.com/influxdata/flux/ast"
 	"github.com/influxdata/flux/execute"
 	"github.com/influxdata/flux/lang"
-	"github.com/influxdata/flux/parser"
 	"github.com/influxdata/flux/runtime"
 	"github.com/influxdata/flux/stdlib"
 
@@ -56,57 +60,9 @@ import (
 	"github.com/influxdata/influxdb/v2/query"
 	"github.com/influxdata/influxdb/v2/http"
 	_ "github.com/influxdata/influxdb/v2/query/stdlib"
-	itesting "github.com/influxdata/influxdb/v2/query/stdlib/readback"
+	"github.com/influxdata/influxdb/v2/query/stdlib/readback"
 	"github.com/influxdata/influxdb/v2/kit/feature"
 )
-
-func genCalls(pkg *ast.Package, fn string) *ast.File {
-	callFile := new(ast.File)
-	callFile.Imports = []*ast.ImportDeclaration{{
-		Path: &ast.StringLiteral{Value: "testing"},
-	}}
-	visitor := testStmtVisitor{
-		fn: func(tc *ast.TestStatement) {
-			callFile.Body = append(callFile.Body, &ast.ExpressionStatement{
-				Expression: &ast.CallExpression{
-					Callee: &ast.Identifier{
-                         Name:     fn,
-                    },
-					Arguments: []ast.Expression{
-						&ast.ObjectExpression{
-							Properties: []*ast.Property{{
-								Key:   &ast.Identifier{Name: "case"},
-								Value: tc.Assignment.ID,
-							}},
-						},
-					},
-				},
-			})
-		},
-	}
-	ast.Walk(visitor, pkg)
-	return callFile
-}
-
-type testStmtVisitor struct {
-	fn func(*ast.TestStatement)
-}
-
-func (v testStmtVisitor) Visit(node ast.Node) ast.Visitor {
-	switch n := node.(type) {
-	case *ast.TestStatement:
-		v.fn(n)
-		return nil
-	}
-	return v
-}
-
-func (v testStmtVisitor) Done(node ast.Node) {}
-
-// TestingInspectCalls constructs an ast.File that calls testing.inspect for each test case within the package.
-func TestingTcCall(pkg *ast.Package) *ast.File {
-	return genCalls(pkg, "tc_call")
-}
 
 // Default context.
 var ctx = influxdbcontext.SetAuthorizer(context.Background(), mock.NewMockAuthorizer(true, nil))
@@ -115,245 +71,22 @@ func init() {
 	runtime.FinalizeBuiltIns()
 }
 
-func TestFluxEndToEnd(t *testing.T) {
-	runEndToEnd(t, stdlib.FluxTestPackages)
+type variableAssignmentVisitor struct {
+	fn func(*ast.VariableAssignment)
 }
 
-func runEndToEnd(t *testing.T, pkgs []*ast.Package) {
-	flagger := feature.DefaultFlagger()
-	l := launcher.RunTestLauncherOrFail(t, ctx, flagger)
-	l.SetupOrFail(t)
-	bs := l.BucketService(t)
-	defer l.ShutdownOrFail(t, ctx)
-	for _, pkg := range pkgs {
-		test := func(t *testing.T, f func(t *testing.T)) {
-			t.Run(pkg.Path, f)
-		}
-		if pkg.Path == "universe" {
-			test = func(t *testing.T, f func(t *testing.T)) {
-				f(t)
-			}
-		}
-
-		test(t, func(t *testing.T) {
-			for _, file := range pkg.Files {
-				name := strings.TrimSuffix(file.Name, "_test.flux")
-				t.Run(name, func(t *testing.T) {
-					if reason, ok := itesting.FluxEndToEndSkipList[pkg.Path][name]; ok {
-						t.Skip(reason)
-					}
-
-					testFlux(t, l, file, bs)
-				})
-			}
-		})
+func (v variableAssignmentVisitor) Visit(node ast.Node) ast.Visitor {
+	switch n := node.(type) {
+	case *ast.VariableAssignment:
+		v.fn(n)
+		return nil
 	}
+	return v
 }
 
-func makeTestPackage(file *ast.File) *ast.Package {
-	file = file.Copy().(*ast.File)
-	file.Package.Name.Name = "main"
-	pkg := &ast.Package{
-		Package: "main",
-		Files:   []*ast.File{file},
-	}
-	return pkg
-}
+func (v variableAssignmentVisitor) Done(node ast.Node) {}
 
-var common = `
-import "testing"
-import c "csv"
-import "experimental"
-
-tc_call = (case) => {
-    tc = case()
-    return tc.input 
-}
-`
-
-var optionsSource1 = `
-option testing.loadStorage = (csv) => {
-	return c.from( csv: csv ) |> to( bucket: bucket, org: org )
-}
-`
-
-var optionsSource2 = `
-option testing.loadStorage = (csv) => {
-	return from( bucket: bucket ) |> range( start: 0 ) |> yield( name: "fresh" )
-}
-`
-
-func testFluxWrite(t testing.TB, l *launcher.TestLauncher, file *ast.File, b *platform.Bucket ) {
-
-	//fmt.Println("test case A: ", t.Name())
-
-	optionsPkg := parser.ParseSource(common + optionsSource1)
-	if ast.Check(optionsPkg) > 0 {
-		panic(ast.GetError(optionsPkg))
-	}
-	optionsAST := optionsPkg.Files[0]
-
-	// Define bucket and org options
-	bucketOpt := &ast.OptionStatement{
-		Assignment: &ast.VariableAssignment{
-			ID:   &ast.Identifier{Name: "bucket"},
-			Init: &ast.StringLiteral{Value: b.Name},
-		},
-	}
-	orgOpt := &ast.OptionStatement{
-		Assignment: &ast.VariableAssignment{
-			ID:   &ast.Identifier{Name: "org"},
-			Init: &ast.StringLiteral{Value: l.Org.Name},
-		},
-	}
-	options := optionsAST.Copy().(*ast.File)
-	options.Body = append([]ast.Statement{bucketOpt, orgOpt}, options.Body...)
-
-	// Add options to pkg
-	pkg := makeTestPackage(file)
-	pkg.Files = append(pkg.Files, options)
-
-	// Use testing.inspect call to get all of diff, want, and got
-	inspectCalls := TestingTcCall(pkg)
-	pkg.Files = append(pkg.Files, inspectCalls)
-
-	bs, err := json.Marshal(pkg)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	req := &query.Request{
-		OrganizationID: l.Org.ID,
-		Compiler:       lang.ASTCompiler{AST: bs},
-	}
-
-	if r, err := l.FluxQueryService().Query(ctx, req); err != nil {
-		t.Fatal(err)
-	} else {
-		results := make( map[string]*bytes.Buffer )
-
-		for r.More() {
-			v := r.Next()
-
-			//fmt.Println("e2e results: ", v.Name())
-			if _, ok := results[v.Name()]; !ok {
-				results[v.Name()] = &bytes.Buffer{}
-			}
-			err := execute.FormatResult(results[v.Name()], v)
-			if err != nil {
-				t.Error(err)
-			}
-		}
-		if err := r.Err(); err != nil {
-			t.Error(err)
-		}
-
-//		logFormatted := func( name string, results map[string]*bytes.Buffer ) {
-//			if _, ok := results[name]; ok {
-//				scanner := bufio.NewScanner(results[name])
-//				for scanner.Scan() {
-//					t.Log( scanner.Text())
-//				}
-//			} else {
-//				t.Log( "table ", name, " not present in results" )
-//			}
-//		}
-//		if _, ok := results["diff"]; ok {
-//			fmt.Println("FAILURE: ", t.Name())
-//			t.Error("diff table was not empty")
-//			logFormatted("diff", results)
-//			logFormatted("want", results)
-//			logFormatted("got", results)
-//		}
-	}
-}
-
-func testFluxRead(t testing.TB, l *launcher.TestLauncher, file *ast.File, b *platform.Bucket ) bool {
-	pass := false
-	//fmt.Println("test case B: ", t.Name())
-
-	optionsPkg := parser.ParseSource(common + optionsSource2)
-	if ast.Check(optionsPkg) > 0 {
-		panic(ast.GetError(optionsPkg))
-	}
-	optionsAST := optionsPkg.Files[0]
-
-	// Define bucket and org options
-	bucketOpt := &ast.OptionStatement{
-		Assignment: &ast.VariableAssignment{
-			ID:   &ast.Identifier{Name: "bucket"},
-			Init: &ast.StringLiteral{Value: b.Name},
-		},
-	}
-	orgOpt := &ast.OptionStatement{
-		Assignment: &ast.VariableAssignment{
-			ID:   &ast.Identifier{Name: "org"},
-			Init: &ast.StringLiteral{Value: l.Org.Name},
-		},
-	}
-	options := optionsAST.Copy().(*ast.File)
-	options.Body = append([]ast.Statement{bucketOpt, orgOpt}, options.Body...)
-
-	// Add options to pkg
-	pkg := makeTestPackage(file)
-	pkg.Files = append(pkg.Files, options)
-
-	// Use testing.inspect call to get all of diff, want, and got
-	inspectCalls := TestingTcCall(pkg)
-	pkg.Files = append(pkg.Files, inspectCalls)
-
-	bs, err := json.Marshal(pkg)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	req := &query.Request{
-		OrganizationID: l.Org.ID,
-		Compiler:       lang.ASTCompiler{AST: bs},
-	}
-
-	if r, err := l.FluxQueryService().Query(ctx, req); err != nil {
-		t.Fatal(err)
-	} else {
-		results := make( map[string]*bytes.Buffer )
-
-		for r.More() {
-			v := r.Next()
-
-			if _, ok := results[v.Name()]; !ok {
-				results[v.Name()] = &bytes.Buffer{}
-			}
-			err := execute.FormatResult(results[v.Name()], v)
-			if err != nil {
-				t.Error(err)
-			}
-		}
-		if err := r.Err(); err != nil {
-			t.Error(err)
-		}
-
-		if _, ok := results["fresh"]; ok {
-			pass = true
-		} else {
-			fmt.Println("fresh was empty")
-			t.Error("fresh was empty")
-		}
-	}
-	return pass
-}
-
-func testFlux(t testing.TB, l *launcher.TestLauncher, file *ast.File, bs *http.BucketService) {
-	b := &platform.Bucket{
-		OrgID:           l.Org.ID,
-		Name:            t.Name(),
-		RetentionPeriod: 0,
-	}
-
-	if err := bs.CreateBucket(context.Background(), b); err != nil {
-		t.Fatal(err)
-	}
-
-	// time.Sleep( 10 * time.Millisecond )
+func makeFluxTest(t testing.TB, file *ast.File ) {
 
 	if t.Name() == "TestFluxEndToEnd/difference_panic" {
 		return
@@ -377,20 +110,178 @@ func testFlux(t testing.TB, l *launcher.TestLauncher, file *ast.File, bs *http.B
 		return
 	}
 
-	testFluxWrite(t, l, file, b)
-	pass := testFluxRead(t, l, file, b)
+	found := false
+	inData := ""
+	visitor := variableAssignmentVisitor{
+		fn: func(va *ast.VariableAssignment) {
+			if !found && va.ID.Name == "inData" {
+				inData = "inData = " + string(ast.Format(va.Init)) + "\n"
+				found = true
+			}
+		},
+	}
+
+	ast.Walk(visitor, file)
+
+	if found {
+		fmt.Println( "[]string {" )
+		fmt.Println( fmt.Sprintf("\"%s\",", t.Name() ) )
+	    fmt.Println( "`", inData, "`," )
+		fmt.Println( "}," )
+	}
+}
+
+func makeTestCases(t *testing.T, pkgs []*ast.Package) {
+	fmt.Println( "package readback" )
+	fmt.Println( "var Cases [][]string = [][]string {" )
+
+	for _, pkg := range pkgs {
+		test := func(t *testing.T, f func(t *testing.T)) {
+			t.Run(pkg.Path, f)
+		}
+		if pkg.Path == "universe" {
+			test = func(t *testing.T, f func(t *testing.T)) {
+				f(t)
+			}
+		}
+
+		test(t, func(t *testing.T) {
+			for _, file := range pkg.Files {
+				name := strings.TrimSuffix(file.Name, "_test.flux")
+				t.Run(name, func(t *testing.T) {
+					if reason, ok := readback.FluxEndToEndSkipList[pkg.Path][name]; ok {
+						t.Skip(reason)
+					}
+
+					makeFluxTest(t, file)
+				})
+			}
+		})
+	}
+
+	// Little hack to ignore the PASS printed by the test. Could just make a command, but meh.
+	fmt.Println( "}" )
+	fmt.Print( "//" )
+}
+
+
+func testFluxWrite(t testing.TB, l *launcher.TestLauncher, name string, write string, b *platform.Bucket ) {
+
+	//fmt.Println("test case A: ", name )
+
+	req := &query.Request{
+		OrganizationID: l.Org.ID,
+		Compiler:       lang.FluxCompiler{
+			Query: write,
+		},
+	}
+
+	if r, err := l.FluxQueryService().Query(ctx, req); err != nil {
+		t.Fatal(err)
+	} else {
+		results := make( map[string]*bytes.Buffer )
+
+		for r.More() {
+			v := r.Next()
+
+			//fmt.Println("e2e results: ", v.Name())
+			if _, ok := results[v.Name()]; !ok {
+				results[v.Name()] = &bytes.Buffer{}
+			}
+			err := execute.FormatResult(results[v.Name()], v)
+			if err != nil {
+				t.Error(err)
+			}
+		}
+		if err := r.Err(); err != nil {
+			t.Error(err)
+		}
+	}
+}
+
+func testFluxRead(t testing.TB, l *launcher.TestLauncher, name string, read string, b *platform.Bucket ) bool {
+	pass := false
+
+	req := &query.Request{
+		OrganizationID: l.Org.ID,
+		Compiler:       lang.FluxCompiler{Query: read},
+	}
+
+	if r, err := l.FluxQueryService().Query(ctx, req); err != nil {
+		t.Fatal(err)
+	} else {
+		results := make( map[string]*bytes.Buffer )
+
+		for r.More() {
+			v := r.Next()
+
+			if _, ok := results[v.Name()]; !ok {
+				results[v.Name()] = &bytes.Buffer{}
+			}
+			err := execute.FormatResult(results[v.Name()], v)
+			if err != nil {
+				t.Error(err)
+			}
+		}
+		if err := r.Err(); err != nil {
+			t.Error(err)
+		}
+
+		if _, ok := results["readback"]; ok {
+			pass = true
+		} else {
+			fmt.Println("readback was empty")
+			t.Error("readback was empty")
+		}
+	}
+	return pass
+}
+
+func testFlux(t testing.TB, l *launcher.TestLauncher, bs *http.BucketService, name string, inData string ) {
+	b := &platform.Bucket{
+		OrgID:           l.Org.ID,
+		Name:            name,
+		RetentionPeriod: 0,
+	}
+
+	// fmt.Println("creating bucket", name)
+	if err := bs.CreateBucket(ctx, b); err != nil {
+		t.Fatal(err)
+	}
+
+	found, err := bs.FindBucketByName( ctx, l.Org.ID, name )
+	if err != nil || found == nil {
+		fmt.Println( "immediate bucket find failed" )
+		t.Error("immediate bucket find failed")
+	}
+
+	bucket := name
+	org := l.Org.Name
+
+	write :=
+		"import \"csv\"" +
+		inData +
+		"csv.from( csv: inData ) |> to( bucket: \"" + bucket + "\", org: \"" + org + "\" )\n"
+
+	// fmt.Println( write )
+
+	read :=
+		"from( bucket: \"" + bucket + "\" ) |> range( start: 0 ) |> yield( name: \"readback\" )\n"
+
+	testFluxWrite(t, l, name, write, b)
+	pass := testFluxRead(t, l, name, read, b)
 
 	if !pass {
 		retry := func() {
 			retries := 0
 			for !pass && retries < 5 {
-				fmt.Println( "retrying with delays", t.Name() )
+				fmt.Println( "retrying with delays", name )
 
 				time.Sleep( 1000 * time.Millisecond )
-				testFluxWrite(t, l, file, b)
+				testFluxWrite(t, l, name, write, b)
 
 				time.Sleep( 1000 * time.Millisecond )
-				pass = testFluxRead(t, l, file, b)
+				pass = testFluxRead(t, l, name, read, b)
 				retries += 1
 			}
 		}
@@ -399,13 +290,28 @@ func testFlux(t testing.TB, l *launcher.TestLauncher, file *ast.File, bs *http.B
 
 		// Remake the bucket.
 		fmt.Println("remaking the bucket")
-		if err := bs.CreateBucket(context.Background(), b); err != nil {
+		if err := bs.CreateBucket(ctx, b); err != nil {
 			t.Error(err)
 			fmt.Println( "bucket creation failed: ", err )
 		}
 		time.Sleep( 1000 * time.Millisecond )
 
 		retry()
-
 	}
+
+}
+func runReadBack(t *testing.T, pkgs []*ast.Package) {
+	flagger := feature.DefaultFlagger()
+	l := launcher.RunTestLauncherOrFail(t, ctx, flagger)
+	l.SetupOrFail(t)
+	bs := l.BucketService(t)
+	defer l.ShutdownOrFail(t, ctx)
+
+	for i, _ := range readback.Cases {
+		testFlux(t, l, bs, readback.Cases[i][0], readback.Cases[i][1])
+	}
+}
+
+func TestFluxEndToEnd(t *testing.T) {
+	runReadBack(t, stdlib.FluxTestPackages)
 }
