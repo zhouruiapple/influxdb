@@ -212,6 +212,20 @@ export const getNumberColumns = (table: Table): string[] => {
   return numberColumnKeys
 }
 
+export const getStringColumns = (table: Table): string[] => {
+  const stringColumnKeys = table.columnKeys.filter(k => {
+    if (k === 'result' || k === 'table') {
+      return false
+    }
+
+    const columnType = table.getColumnType(k)
+
+    return columnType === 'string'
+  })
+
+  return stringColumnKeys
+}
+
 export const getGroupableColumns = (table: Table): string[] => {
   const invalidGroupColumns = new Set(['_value', '_time', 'table'])
   const groupableColumns = table.columnKeys.filter(
@@ -267,9 +281,18 @@ export const defaultYColumn = (
   table: Table,
   preferredColumnKey?: string
 ): string | null => {
+  // console.log('preferred Column key', preferredColumnKey)
   const validColumnKeys = getNumberColumns(table)
+  const stringColumnKeys = getStringColumns(table)
+
+  // console.log('validcolumnkeys', validColumnKeys)
+  // console.log('stringColumnKeys', stringColumnKeys)
 
   if (validColumnKeys.includes(preferredColumnKey)) {
+    return preferredColumnKey
+  }
+
+  if (stringColumnKeys.includes(preferredColumnKey)) {
     return preferredColumnKey
   }
 
@@ -277,6 +300,10 @@ export const defaultYColumn = (
     if (key.startsWith('_value')) {
       return key
     }
+  }
+
+  if (stringColumnKeys.length) {
+    return 'taskID'
   }
 
   if (validColumnKeys.length) {

@@ -3,7 +3,7 @@ import React, {FunctionComponent} from 'react'
 import {Config, Table} from '@influxdata/giraffe'
 
 // Components
-import EmptyGraphMessage from 'src/shared/components/EmptyGraphMessage'
+// import EmptyGraphMessage from 'src/shared/components/EmptyGraphMessage'
 
 // Utils
 import {
@@ -19,7 +19,7 @@ import {
 // Constants
 import {VIS_THEME, VIS_THEME_LIGHT} from 'src/shared/constants'
 import {DEFAULT_LINE_COLORS} from 'src/shared/constants/graphColorPalettes'
-import {INVALID_DATA_COPY} from 'src/shared/copy/cell'
+// import {INVALID_DATA_COPY} from 'src/shared/copy/cell'
 
 // Types
 import {MosaicViewProperties, TimeZone, TimeRange, Theme} from 'src/types'
@@ -58,6 +58,8 @@ const MosaicPlot: FunctionComponent<Props> = ({
 }) => {
   const fillColumns = storedFill || []
 
+  console.log('table', table)
+  console.log('storedYColumn', storedYColumn)
   const xColumn = storedXColumn || defaultXColumn(table)
   const yColumn = storedYColumn || defaultYColumn(table)
 
@@ -69,10 +71,14 @@ const MosaicPlot: FunctionComponent<Props> = ({
     timeRange
   )
 
+  console.log('storedYDomain', storedYDomain)
+  console.log('yColumn', yColumn)
   const [yDomain, onSetYDomain, onResetYDomain] = useVisYDomainSettings(
     storedYDomain,
     table.getColumn(yColumn, 'string')
   )
+
+  console.log('yDomain', yDomain)
 
   // const isValidView =
   //   xColumn &&
