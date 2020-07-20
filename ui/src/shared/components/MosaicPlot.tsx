@@ -46,7 +46,7 @@ const MosaicPlot: FunctionComponent<Props> = ({
     xSuffix,
     yPrefix,
     ySuffix,
-    // fillColumns: storedFill,
+    fillColumns: storedFill,
     colors,
     xDomain: storedXDomain,
     yDomain: storedYDomain,
@@ -56,7 +56,8 @@ const MosaicPlot: FunctionComponent<Props> = ({
   },
   theme,
 }) => {
-  // const fillColumns = storedFill || []
+  const fillColumns = storedFill || []
+  console.log('children', children, 'table', table)
 
   console.log('table', table)
   console.log('storedYColumn', storedYColumn)
@@ -71,7 +72,7 @@ const MosaicPlot: FunctionComponent<Props> = ({
     timeRange
   )
 
-  console.log('storedYDomain', storedYDomain)
+  console.log('storedXDomain', storedXDomain)
   console.log('yColumn', yColumn)
   const [yDomain, onSetYDomain, onResetYDomain] = useVisYDomainSettings(
     storedYDomain,
@@ -131,10 +132,11 @@ const MosaicPlot: FunctionComponent<Props> = ({
         x: xColumn,
         y: yColumn,
         colors: colorHexes,
-        // fill: fillColumns,
+        fill: fillColumns,
       },
     ],
   }
+  console.log('children(config)', children(config))
   return children(config)
 }
 console.log('mosaic plot', MosaicPlot)
