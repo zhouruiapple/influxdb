@@ -8,36 +8,9 @@ package readback_test
 //
 // while true; do ./readback.test; done
 //
-// OR if you are less patient: run many in parallel. Leftover log files with
-// "FAIL" in them represent failures. You may see issues related to NAT, this
-// is a separate problem that the sleep below tries to address (see launcher).
+//    OR if you are less patient:
 //
-// # How many test case processes to run in parallel.
-// PARALLEL=16
-// 
-// # How many iterations of of parallel runs to make.
-// ITERATIONS=16
-// 
-// logfn() {
-// 	printf "log-%02d-%02d.txt" $1 $2
-// }
-// 
-// for run in `seq 1 $ITERATIONS`; do
-// 		for i in `seq 1 $PARALLEL`; do
-// 				LOG=`logfn $run $i`
-// 				./readback.test >$LOG &
-// 				sleep 0.5
-// 		done
-// 
-// 		for i in `seq 1 $PARALLEL`; do
-// 				wait
-// 		done
-// 
-// 		for i in `seq 1 $PARALLEL`; do
-// 			LOG=`logfn $run $i`
-// 			grep -q ^FAIL $LOG || rm $LOG 
-// 		done
-// done
+// bash ./query/stdlib/readback/load.sh
 
 import (
 	"fmt"
@@ -45,7 +18,9 @@ import (
 	"context"
 	"strings"
 	"testing"
-	"time"
+
+	"encoding/binary"
+	"github.com/influxdata/influxdb/v2"
 
 	"github.com/influxdata/flux/ast"
 	"github.com/influxdata/flux/execute"
@@ -164,6 +139,16 @@ func makeTestCases(t *testing.T, pkgs []*ast.Package) {
 	fmt.Print( "//" )
 }
 
+func checkID(id influxdb.ID, check byte) bool {
+	b := make([]byte, 8)
+	binary.BigEndian.PutUint64(b, uint64(id))
+	for i := range b {
+		if b[i] == check {
+			return false
+		}
+	}
+	return true
+}
 
 func testFluxWrite(t testing.TB, l *launcher.TestLauncher, name string, write string, b *platform.Bucket ) {
 
@@ -230,7 +215,6 @@ func testFluxRead(t testing.TB, l *launcher.TestLauncher, name string, read stri
 		if _, ok := results["readback"]; ok {
 			pass = true
 		} else {
-			fmt.Println("readback was empty")
 			t.Error("readback was empty")
 		}
 	}
@@ -243,6 +227,8 @@ func testFlux(t testing.TB, l *launcher.TestLauncher, bs *http.BucketService, na
 		Name:            name,
 		RetentionPeriod: 0,
 	}
+
+	println( fmt.Sprint( "test name: ", name ) )
 
 	// fmt.Println("creating bucket", name)
 	if err := bs.CreateBucket(ctx, b); err != nil {
@@ -263,8 +249,6 @@ func testFlux(t testing.TB, l *launcher.TestLauncher, bs *http.BucketService, na
 		inData +
 		"csv.from( csv: inData ) |> to( bucket: \"" + bucket + "\", org: \"" + org + "\" )\n"
 
-	// fmt.Println( write )
-
 	read :=
 		"from( bucket: \"" + bucket + "\" ) |> range( start: 0 ) |> yield( name: \"readback\" )\n"
 
@@ -272,33 +256,24 @@ func testFlux(t testing.TB, l *launcher.TestLauncher, bs *http.BucketService, na
 	pass := testFluxRead(t, l, name, read, b)
 
 	if !pass {
-		retry := func() {
-			retries := 0
-			for !pass && retries < 5 {
-				fmt.Println( "retrying with delays", name )
-
-				time.Sleep( 1000 * time.Millisecond )
-				testFluxWrite(t, l, name, write, b)
-
-				time.Sleep( 1000 * time.Millisecond )
-				pass = testFluxRead(t, l, name, read, b)
-				retries += 1
-			}
-		}
-
-		retry()
-
-		// Remake the bucket.
-		fmt.Println("remaking the bucket")
-		if err := bs.CreateBucket(ctx, b); err != nil {
-			t.Error(err)
-			fmt.Println( "bucket creation failed: ", err )
-		}
-		time.Sleep( 1000 * time.Millisecond )
-
-		retry()
+		fmt.Println( "readback was empty:", b.ID.String() )
 	}
 
+	if pass && !checkID( b.ID, 0x20 ) {
+		fmt.Println( "test passed but checkid 20 failed:", b.ID.String() )
+	}
+
+	if pass && !checkID( b.ID, 0x2c ) {
+		fmt.Println( "test passed but checkid 2c failed:", b.ID.String() )
+	}
+
+	if pass && !checkID( b.ID, 0x5c ) {
+		fmt.Println( "test passed but checkid 5c failed:", b.ID.String() )
+	}
+
+	if !pass && ( checkID( b.ID, 0x20 ) && checkID( b.ID, 0x2c ) && checkID( b.ID, 0x5c ) ) {
+		fmt.Println( "test failed but checkid passed:", b.ID.String() )
+	}
 }
 func runReadBack(t *testing.T, pkgs []*ast.Package) {
 	flagger := feature.DefaultFlagger()
