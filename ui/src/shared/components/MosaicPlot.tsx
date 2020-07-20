@@ -46,7 +46,7 @@ const MosaicPlot: FunctionComponent<Props> = ({
     xSuffix,
     yPrefix,
     ySuffix,
-    fillColumns: storedFill,
+    // fillColumns: storedFill,
     colors,
     xDomain: storedXDomain,
     yDomain: storedYDomain,
@@ -56,7 +56,7 @@ const MosaicPlot: FunctionComponent<Props> = ({
   },
   theme,
 }) => {
-  const fillColumns = storedFill || []
+  // const fillColumns = storedFill || []
 
   console.log('table', table)
   console.log('storedYColumn', storedYColumn)
@@ -131,11 +131,11 @@ const MosaicPlot: FunctionComponent<Props> = ({
         x: xColumn,
         y: yColumn,
         colors: colorHexes,
-        fill: fillColumns,
+        // fill: fillColumns,
       },
     ],
   }
   return children(config)
 }
-
+console.log('mosaic plot', MosaicPlot)
 export default MosaicPlot
