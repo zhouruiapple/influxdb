@@ -57,9 +57,10 @@ const MosaicPlot: FunctionComponent<Props> = ({
   theme,
 }) => {
   const fillColumns = storedFill || []
-  console.log('children', children, 'table', table)
+  // console.log('children', children, 'table', table)
 
   console.log('table', table)
+  console.log('timeRange', timeRange)
   console.log('storedYColumn', storedYColumn)
   const xColumn = storedXColumn || defaultXColumn(table)
   const yColumn = storedYColumn || defaultYColumn(table)
@@ -136,8 +137,8 @@ const MosaicPlot: FunctionComponent<Props> = ({
       },
     ],
   }
-  console.log('children(config)', children(config))
+  // console.log('children(config)', children(config))
   return children(config)
 }
-console.log('mosaic plot', MosaicPlot)
+// console.log('mosaic plot', MosaicPlot)
 export default MosaicPlot

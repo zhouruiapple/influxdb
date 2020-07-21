@@ -281,7 +281,7 @@ export const defaultYColumn = (
   table: Table,
   preferredColumnKey?: string
 ): string | null => {
-  console.log('preferred Column key', preferredColumnKey)
+  // console.log('preferred Column key', preferredColumnKey)
   const validColumnKeys = getNumberColumns(table)
   const stringColumnKeys = getStringColumns(table)
 

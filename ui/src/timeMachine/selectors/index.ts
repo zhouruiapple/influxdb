@@ -98,10 +98,10 @@ const getGroupableColumnsMemoized = memoizeOne(getGroupableColumnsUtil)
 
 export const getGroupableColumns = (state: AppState): string[] => {
   const {table} = getVisTable(state)
-  console.log(
-    'getGroupableColumnsMemoized(table)',
-    getGroupableColumnsMemoized(table)
-  )
+  // console.log(
+  //   'getGroupableColumnsMemoized(table)',
+  //   getGroupableColumnsMemoized(table)
+  // )
   return getGroupableColumnsMemoized(table)
 }
 
@@ -146,7 +146,7 @@ const getSymbolColumnsSelectionMemoized = memoizeOne(
 export const getFillColumnsSelection = (state: AppState): string[] => {
   //console.log('state', state)
   const validFillColumns = getGroupableColumns(state)
-  console.log('validFillColumns', validFillColumns)
+  // console.log('validFillColumns', validFillColumns)
   const preference = get(
     getActiveTimeMachine(state),
     'view.properties.fillColumns'
