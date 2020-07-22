@@ -1,7 +1,8 @@
 import {mocked} from 'ts-jest/utils'
 
 import {executeQueries} from 'src/timeMachine/actions/queries'
-import configureStore from 'src/store/configureStore'
+import {initialStateHelper} from 'src/timeMachine/reducers/'
+import configureStore, {clearStore} from 'src/store/configureStore'
 import {localState} from 'src/mockState'
 
 const emptyResults = {
@@ -15,30 +16,69 @@ const emptyResults = {
   },
 }
 
+let dispatchMock
+
 describe('executing queries', () => {
   describe('executing an empty list of queries', () => {
     const dispatchExecuteQueries = executeQueries()
     const store = configureStore(localState)
     const {dispatch} = store
-    const dispatchMock = jest.spyOn(store, 'dispatch')
+    dispatchMock = jest.spyOn(store, 'dispatch')
 
-    dispatchExecuteQueries(dispatchMock, store.getState)
-    const [
-      noQueriesDispatch,
-      loadingDispatch,
-      hydrateVars,
-    ] = dispatchMock.mock.calls
+    it('dispatches setQueryResults to Done when there are no queries', async () => {
+      await dispatchExecuteQueries(dispatchMock, store.getState)
+      const [
+        noQueriesDispatch,
+        loadingDispatch,
+        hydrateVars,
+        filesDispatch,
+      ] = dispatchMock.mock.calls
 
-    it('dispatches setQueryResults to Done when there are no queries', () => {
-      expect(dispatchMock.mock.calls.length).toBe(3)
+      console.log(dispatchMock.mock.calls)
+      expect(dispatchMock.mock.calls.length).toBe(4)
 
       expect(noQueriesDispatch[0].type).toBe('SET_QUERY_RESULTS')
       expect(noQueriesDispatch[0].payload.status).toBe('Done')
       expect(noQueriesDispatch[0].payload.files).toEqual([])
-    })
 
-    it('does something with loadingDispatch next', () => {
-      console.error('loadingDispatch: ', loadingDispatch)
+      expect(filesDispatch[0].type).toBe('SET_QUERY_RESULTS')
+      expect(filesDispatch[0].payload.status).toBe('Done')
+      expect(filesDispatch[0].payload.files).toEqual([])
     })
+  })
+
+  describe('executing a single query', () => {
+    const localStateCopy = {
+      ...localState,
+      timeMachines: {
+        activeTimeMachineID: 'yourmom',
+        yourmom: {...initialStateHelper()},
+      },
+    } as any
+
+    const queryText = `from(bucket: v.bucket)
+      |> range(start: v.timeRangeStart)
+      |> filter(fn: (r) => r._measurement == "system")
+      |> filter(fn: (r) => r._field == "load1" or r._field == "load5" or r._field == "load15")
+      |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)
+      |> yield(name: "mean")`
+
+    localStateCopy.timeMachines.yourmom.view.properties.queries = [queryText]
+
+    console.log('localStateCopy.timeMachines: ', localStateCopy.timeMachines)
+
+    const dispatchExecuteQueries = executeQueries()
+    const store = configureStore(localStateCopy)
+    const {dispatch} = store
+    const dispatchMock = jest.spyOn(store, 'dispatch')
+
+    it('dispatches setQueryResults to Done when there are no queries', async () => {
+      console.log('hi')
+      await dispatchExecuteQueries(dispatchMock, store.getState)
+      console.log('ok')
+      const [loadingDispatch, hydrateVars] = dispatchMock.mock.calls
+      expect(true).toEqual(true)
+    })
+    // dispatchMock.mockReset()
   })
 })

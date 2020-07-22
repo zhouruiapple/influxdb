@@ -192,18 +192,19 @@ export const executeQueries = (abortController?: AbortController) => async (
   )
 
   if (!queries.length) {
-    console.log('no queries', queries)
     dispatch(setQueryResults(RemoteDataState.Done, [], null))
   }
 
   try {
     dispatch(setQueryResults(RemoteDataState.Loading, [], null))
-
+    // console.log('should be here')
     await dispatch(hydrateVariables())
+    // console.log('hydrate?')
 
     const variableAssignments = getAllVariables(state)
       .map(v => asAssignment(v))
       .filter(v => !!v)
+    // console.log('variableAssignment: ', variableAssignments)
 
     // keeping getState() here ensures that the state we are working with
     // is the most current one. By having this set to state, we were creating a race
