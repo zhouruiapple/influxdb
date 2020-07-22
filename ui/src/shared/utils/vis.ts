@@ -296,10 +296,10 @@ export const defaultYColumn = (
     return preferredColumnKey
   }
 
-  if (stringColumnKeys.length) {
-    console.log('reached hard coding case')
-    return 'name'
-  }
+  // if (stringColumnKeys.length) {
+  //   console.log('reached hard coding case')
+  //   return 'taskID'
+  // }
 
   for (const key of validColumnKeys) {
     if (key.startsWith('_value')) {
@@ -312,6 +312,30 @@ export const defaultYColumn = (
   }
 
   return null
+}
+
+export const mosaicYcolumn = (
+  table: Table,
+  preferredColumnKey?: string
+): string | null => {
+  const validColumnKeys = getStringColumns(table)
+
+  if (validColumnKeys.includes(preferredColumnKey)) {
+    console.log('prefered key case')
+    return preferredColumnKey
+  }
+
+  // for (const key of validColumnKeys) {
+  //   if (!key.startsWith('_value')) {
+  //     console.log('entered _value case with ', key)
+  //     return key
+  //   }
+  // }
+
+  if (validColumnKeys.length) {
+    console.log('entered final case', validColumnKeys[0])
+    return validColumnKeys[0]
+  }
 }
 
 export const isInDomain = (value: number, domain: number[]) =>

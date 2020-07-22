@@ -28,6 +28,7 @@ import {
   getXColumnSelection,
   getYColumnSelection,
   getNumericColumns,
+  getStringColumns,
   getActiveTimeMachine,
 } from 'src/timeMachine/selectors'
 
@@ -79,7 +80,7 @@ const MosaicOptions: SFC<Props> = props => {
     onSetYDomain,
     xColumn,
     yColumn,
-    numericColumns,
+    stringColumns,
     onSetXColumn,
     onSetYColumn,
     onSetTimeFormat,
@@ -118,13 +119,13 @@ const MosaicOptions: SFC<Props> = props => {
       <ColumnSelector
         selectedColumn={xColumn}
         onSelectColumn={onSetXColumn}
-        availableColumns={numericColumns}
+        availableColumns={stringColumns}
         axisName="x"
       />
       <ColumnSelector
         selectedColumn={yColumn}
         onSelectColumn={onSetYColumn}
-        availableColumns={numericColumns}
+        availableColumns={stringColumns}
         axisName="y"
       />
       <Form.Element label="Time Format">
@@ -178,7 +179,7 @@ const mstp = (state: AppState) => {
   const fillColumns = getFillColumnsSelection(state)
   const xColumn = getXColumnSelection(state)
   const yColumn = getYColumnSelection(state)
-  const numericColumns = getNumericColumns(state)
+  const stringColumns = getStringColumns(state)
   const view = getActiveTimeMachine(state).view as NewView<MosaicViewProperties>
   const {timeFormat} = view.properties
 
@@ -187,7 +188,7 @@ const mstp = (state: AppState) => {
     fillColumns,
     xColumn,
     yColumn,
-    numericColumns,
+    stringColumns,
     timeFormat,
   }
 }

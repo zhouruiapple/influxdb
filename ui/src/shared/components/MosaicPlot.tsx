@@ -13,7 +13,7 @@ import {
 import {
   getFormatter,
   defaultXColumn,
-  defaultYColumn,
+  mosaicYcolumn,
 } from 'src/shared/utils/vis'
 
 // Constants
@@ -63,7 +63,7 @@ const MosaicPlot: FunctionComponent<Props> = ({
   console.log('timeRange', timeRange)
   console.log('storedYColumn', storedYColumn)
   const xColumn = storedXColumn || defaultXColumn(table)
-  const yColumn = storedYColumn || defaultYColumn(table)
+  const yColumn = storedYColumn || mosaicYcolumn(table)
 
   const columnKeys = table.columnKeys
 

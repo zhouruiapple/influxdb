@@ -11,6 +11,7 @@ import {
   defaultYColumn,
   getNumericColumns as getNumericColumnsUtil,
   getGroupableColumns as getGroupableColumnsUtil,
+  getStringColumns as getStringColumnsUtil,
 } from 'src/shared/utils/vis'
 import {getAllVariables, asAssignment} from 'src/variables/selectors'
 import {getWindowPeriod} from 'src/variables/utils/getWindowVars'
@@ -87,11 +88,18 @@ export const getVisTable = (
 }
 
 const getNumericColumnsMemoized = memoizeOne(getNumericColumnsUtil)
+const getStringColumnsMemoized = memoizeOne(getStringColumnsUtil)
 
 export const getNumericColumns = (state: AppState): string[] => {
   const {table} = getVisTable(state)
 
   return getNumericColumnsMemoized(table)
+}
+
+export const getStringColumns = (state: AppState): string[] => {
+  const {table} = getVisTable(state)
+
+  return getStringColumnsMemoized(table)
 }
 
 const getGroupableColumnsMemoized = memoizeOne(getGroupableColumnsUtil)
