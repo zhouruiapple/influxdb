@@ -336,6 +336,8 @@ export const mosaicYcolumn = (
     console.log('entered final case', validColumnKeys[0])
     return validColumnKeys[0]
   }
+
+  return null
 }
 
 export const isInDomain = (value: number, domain: number[]) =>

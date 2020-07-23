@@ -9,6 +9,7 @@ import {parseResponse} from 'src/shared/parsing/flux/response'
 import {
   defaultXColumn,
   defaultYColumn,
+  mosaicYcolumn,
   getNumericColumns as getNumericColumnsUtil,
   getGroupableColumns as getGroupableColumnsUtil,
   getStringColumns as getStringColumnsUtil,
@@ -129,8 +130,20 @@ export const getYColumnSelection = (state: AppState): string => {
     getActiveTimeMachine(state),
     'view.properties.yColumn'
   )
+  console.log('state', state)
 
   return defaultYColumn(table, preferredYColumnKey)
+}
+
+export const getMosaicYColumnSelection = (state: AppState): string => {
+  const {table} = getVisTable(state)
+  const preferredYColumnKey = get(
+    getActiveTimeMachine(state),
+    'view.properties.yColumn'
+  )
+  console.log('state', state)
+
+  return mosaicYcolumn(table, preferredYColumnKey)
 }
 
 const getGroupableColumnSelection = (

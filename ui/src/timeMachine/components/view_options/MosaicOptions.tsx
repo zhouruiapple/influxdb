@@ -26,7 +26,8 @@ import {
   getGroupableColumns,
   getFillColumnsSelection,
   getXColumnSelection,
-  getYColumnSelection,
+  //getYColumnSelection,
+  getMosaicYColumnSelection,
   getNumericColumns,
   getStringColumns,
   getActiveTimeMachine,
@@ -81,6 +82,7 @@ const MosaicOptions: SFC<Props> = props => {
     xColumn,
     yColumn,
     stringColumns,
+    numericColumns,
     onSetXColumn,
     onSetYColumn,
     onSetTimeFormat,
@@ -102,24 +104,30 @@ const MosaicOptions: SFC<Props> = props => {
 
     onSetFillColumns(updatedFillColumns)
   }
+  console.log('xcol', xColumn)
 
   return (
     <Grid.Column>
       <h4 className="view-options--header">Customize Mosaic Plot</h4>
       <h5 className="view-options--header">Data</h5>
-
-      <Form.Element label="Fill Column">
+      {/* <Form.Element label="Fill Column">
         <MultiSelectDropdown
           options={availableGroupColumns}
           selectedOptions={fillColumns}
           onSelect={handleFillColumnSelect}
           buttonStatus={groupDropdownStatus}
         />
-      </Form.Element>
+      </Form.Element> */}
+      <ColumnSelector
+        selectedColumn={'_value'}
+        onSelectColumn={handleFillColumnSelect}
+        availableColumns={stringColumns}
+        axisName="fill"
+      />
       <ColumnSelector
         selectedColumn={xColumn}
         onSelectColumn={onSetXColumn}
-        availableColumns={stringColumns}
+        availableColumns={numericColumns}
         axisName="x"
       />
       <ColumnSelector
@@ -178,8 +186,10 @@ const mstp = (state: AppState) => {
   const availableGroupColumns = getGroupableColumns(state)
   const fillColumns = getFillColumnsSelection(state)
   const xColumn = getXColumnSelection(state)
-  const yColumn = getYColumnSelection(state)
+  //const yColumn = getYColumnSelection(state)
+  const yColumn = getMosaicYColumnSelection(state)
   const stringColumns = getStringColumns(state)
+  const numericColumns = getNumericColumns(state)
   const view = getActiveTimeMachine(state).view as NewView<MosaicViewProperties>
   const {timeFormat} = view.properties
 
@@ -189,6 +199,7 @@ const mstp = (state: AppState) => {
     xColumn,
     yColumn,
     stringColumns,
+    numericColumns,
     timeFormat,
   }
 }

@@ -101,5 +101,4 @@ export const useVisYDomainSettings = (
   const resetDomain = () => setDomain(initialDomain)
   console.log('setDomain', setDomain, 'resetDomain', resetDomain)
   return [domain, setDomain, resetDomain]
-  //return [[0, 5], setDomain, resetDomain]
 }

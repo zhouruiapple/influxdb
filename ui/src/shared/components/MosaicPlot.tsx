@@ -10,11 +10,7 @@ import {
   useVisXDomainSettings,
   useVisYDomainSettings,
 } from 'src/shared/utils/useVisDomainSettings'
-import {
-  getFormatter,
-  defaultXColumn,
-  mosaicYcolumn,
-} from 'src/shared/utils/vis'
+import {getFormatter, defaultXColumn, mosaicYcolumn} from 'src/shared/utils/vis'
 
 // Constants
 import {VIS_THEME, VIS_THEME_LIGHT} from 'src/shared/constants'
@@ -63,7 +59,8 @@ const MosaicPlot: FunctionComponent<Props> = ({
   console.log('timeRange', timeRange)
   console.log('storedYColumn', storedYColumn)
   const xColumn = storedXColumn || defaultXColumn(table)
-  const yColumn = storedYColumn || mosaicYcolumn(table)
+  const yColumn = storedYColumn || mosaicYcolumn(table) //, 'taskID'
+  //const stringFillColumn = storedStringFillColumn || defaultStringFillColumn(table, '_value')
 
   const columnKeys = table.columnKeys
 
