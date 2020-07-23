@@ -10,7 +10,12 @@ import {
   useVisXDomainSettings,
   useVisYDomainSettings,
 } from 'src/shared/utils/useVisDomainSettings'
-import {getFormatter, defaultXColumn, mosaicYcolumn} from 'src/shared/utils/vis'
+import {
+  getFormatter,
+  defaultXColumn,
+  mosaicYcolumn,
+  mosaicFillColumn,
+} from 'src/shared/utils/vis'
 
 // Constants
 import {VIS_THEME, VIS_THEME_LIGHT} from 'src/shared/constants'
@@ -42,7 +47,7 @@ const MosaicPlot: FunctionComponent<Props> = ({
     xSuffix,
     yPrefix,
     ySuffix,
-    fillColumns: storedFill,
+    fillColumn: storedFill,
     colors,
     xDomain: storedXDomain,
     yDomain: storedYDomain,
@@ -52,8 +57,8 @@ const MosaicPlot: FunctionComponent<Props> = ({
   },
   theme,
 }) => {
-  const fillColumns = storedFill || []
-  // console.log('children', children, 'table', table)
+  const fillColumn = storedFill || mosaicFillColumn(table)
+  console.log('fillColumn mosaicPlot', fillColumn)
 
   console.log('table', table)
   console.log('timeRange', timeRange)
@@ -130,7 +135,7 @@ const MosaicPlot: FunctionComponent<Props> = ({
         x: xColumn,
         y: yColumn,
         colors: colorHexes,
-        fill: fillColumns,
+        fill: fillColumn,
       },
     ],
   }

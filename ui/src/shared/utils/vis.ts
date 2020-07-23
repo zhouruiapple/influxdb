@@ -235,6 +235,32 @@ export const getGroupableColumns = (table: Table): string[] => {
   return groupableColumns
 }
 
+export const mosaicFillColumn = (
+  table: Table,
+  preferredColumnKey?: string
+): string | null => {
+  const validColumnKeys = getStringColumns(table)
+  console.log('validColumnKeys', validColumnKeys)
+  if (validColumnKeys.includes(preferredColumnKey)) {
+    console.log('prefered key case')
+    return preferredColumnKey
+  }
+
+  for (const key of validColumnKeys) {
+    if (key.startsWith('_value')) {
+      console.log('entered _value case with ', key)
+      return key
+    }
+  }
+
+  console.log('validColumnKeys take 2', validColumnKeys)
+  if (validColumnKeys.length) {
+    return validColumnKeys[0]
+  }
+
+  return null
+}
+
 /*
   Previously we would automatically select an x and y column setting for an
   `XYView` based on the current Flux response.  We then added support for an
@@ -251,6 +277,7 @@ export const getGroupableColumns = (table: Table): string[] => {
   A `null` result from this function indicates that no valid selection could be
   made.
 */
+
 export const defaultXColumn = (
   table: Table,
   preferredColumnKey?: string
@@ -323,6 +350,20 @@ export const mosaicYcolumn = (
   if (validColumnKeys.includes(preferredColumnKey)) {
     console.log('prefered key case')
     return preferredColumnKey
+  }
+
+  const invalidMosaicYColumns = new Set([
+    '_value',
+    'status',
+    '_field',
+    '_measurement',
+  ])
+  const preferredValidColumnKeys = validColumnKeys.filter(
+    name => !invalidMosaicYColumns.has(name)
+  )
+
+  if (preferredValidColumnKeys.length) {
+    return preferredValidColumnKeys[0]
   }
 
   // for (const key of validColumnKeys) {

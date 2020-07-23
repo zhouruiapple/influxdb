@@ -3,13 +3,13 @@ import React, {SFC} from 'react'
 import {connect, ConnectedProps} from 'react-redux'
 
 // Components
-import {Form, Input, Grid, MultiSelectDropdown} from '@influxdata/clockface'
+import {Form, Input, Grid} from '@influxdata/clockface'
 import AxisAffixes from 'src/timeMachine/components/view_options/AxisAffixes'
 import TimeFormat from 'src/timeMachine/components/view_options/TimeFormat'
 
 // Actions
 import {
-  setFillColumns,
+  setMosaicFillColumn,
   setYAxisLabel,
   setXAxisLabel,
   setAxisPrefix,
@@ -24,7 +24,8 @@ import {
 // Utils
 import {
   getGroupableColumns,
-  getFillColumnsSelection,
+  //getFillColumnsSelection,
+  getMosaicFillColumnsSelection,
   getXColumnSelection,
   //getYColumnSelection,
   getMosaicYColumnSelection,
@@ -46,7 +47,7 @@ import ColumnSelector from 'src/shared/components/ColumnSelector'
 interface OwnProps {
   xColumn: string
   yColumn: string
-  fillColumns: string[]
+  fillColumn: string
   xDomain: number[]
   yDomain: number[]
   xAxisLabel: string
@@ -64,11 +65,11 @@ type Props = OwnProps & ReduxProps
 
 const MosaicOptions: SFC<Props> = props => {
   const {
-    fillColumns,
-    availableGroupColumns,
+    fillColumn,
+    // availableGroupColumns,
     yAxisLabel,
     xAxisLabel,
-    onSetFillColumns,
+    onSetMosaicFillColumn,
     colors,
     onSetColors,
     onSetYAxisLabel,
@@ -89,22 +90,25 @@ const MosaicOptions: SFC<Props> = props => {
     timeFormat,
   } = props
 
-  const groupDropdownStatus = availableGroupColumns.length
-    ? ComponentStatus.Default
-    : ComponentStatus.Disabled
+  // const groupDropdownStatus = stringColumns.length
+  //   ? ComponentStatus.Default
+  //   : ComponentStatus.Disabled
 
-  const handleFillColumnSelect = (column: string): void => {
-    let updatedFillColumns
+  // const handleFillColumnSelect = (column: string): void => {
+  //   //let updatedFillColumns
+  //   const fillColumn = column
+  //   // updatedFillColumns = [column]
 
-    if (fillColumns.includes(column)) {
-      updatedFillColumns = fillColumns.filter(col => col !== column)
-    } else {
-      updatedFillColumns = [...fillColumns, column]
-    }
+  //   // if (fillColumns.includes(column)) {
+  //   //   // I think this deselects the selected column
+  //   //   updatedFillColumns = fillColumns.filter(col => col !== column)
+  //   // } else {
+  //   //   updatedFillColumns = [...fillColumns, column]
+  //   // }
 
-    onSetFillColumns(updatedFillColumns)
-  }
-  console.log('xcol', xColumn)
+  //   onSetFillColumn(fillColumn)
+  // }
+  console.log('fillColumn mosaicOptions', fillColumn)
 
   return (
     <Grid.Column>
@@ -112,15 +116,15 @@ const MosaicOptions: SFC<Props> = props => {
       <h5 className="view-options--header">Data</h5>
       {/* <Form.Element label="Fill Column">
         <MultiSelectDropdown
-          options={availableGroupColumns}
+          options={stringColumns}
           selectedOptions={fillColumns}
           onSelect={handleFillColumnSelect}
           buttonStatus={groupDropdownStatus}
         />
       </Form.Element> */}
       <ColumnSelector
-        selectedColumn={'_value'}
-        onSelectColumn={handleFillColumnSelect}
+        selectedColumn={fillColumn}
+        onSelectColumn={onSetMosaicFillColumn}
         availableColumns={stringColumns}
         axisName="fill"
       />
@@ -184,7 +188,8 @@ const MosaicOptions: SFC<Props> = props => {
 
 const mstp = (state: AppState) => {
   const availableGroupColumns = getGroupableColumns(state)
-  const fillColumns = getFillColumnsSelection(state)
+  //const fillColumns = getFillColumnsSelection(state)
+  const fillColumn = getMosaicFillColumnsSelection(state)
   const xColumn = getXColumnSelection(state)
   //const yColumn = getYColumnSelection(state)
   const yColumn = getMosaicYColumnSelection(state)
@@ -195,7 +200,7 @@ const mstp = (state: AppState) => {
 
   return {
     availableGroupColumns,
-    fillColumns,
+    fillColumn,
     xColumn,
     yColumn,
     stringColumns,
@@ -205,7 +210,7 @@ const mstp = (state: AppState) => {
 }
 
 const mdtp = {
-  onSetFillColumns: setFillColumns,
+  onSetMosaicFillColumn: setMosaicFillColumn,
   onSetColors: setColorHexes,
   onSetYAxisLabel: setYAxisLabel,
   onSetXAxisLabel: setXAxisLabel,

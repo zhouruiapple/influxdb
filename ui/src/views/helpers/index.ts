@@ -182,7 +182,7 @@ const NEW_VIEW_CREATORS = {
       shape: 'chronograf-v2',
       xColumn: null,
       yColumn: null,
-      fillColumns: null,
+      fillColumn: null,
       xDomain: null,
       yDomain: null,
       xAxisLabel: '',

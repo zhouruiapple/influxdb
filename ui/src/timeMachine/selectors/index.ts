@@ -10,6 +10,7 @@ import {
   defaultXColumn,
   defaultYColumn,
   mosaicYcolumn,
+  mosaicFillColumn,
   getNumericColumns as getNumericColumnsUtil,
   getGroupableColumns as getGroupableColumnsUtil,
   getStringColumns as getStringColumnsUtil,
@@ -182,6 +183,18 @@ export const getFillColumnsSelection = (state: AppState): string[] => {
   )
 }
 
+export const getMosaicFillColumnsSelection = (state: AppState): string => {
+  const {table} = getVisTable(state)
+  console.log('getActiveTimeMachine(state)', getActiveTimeMachine(state))
+  const preferredFillColumnKey = get(
+    getActiveTimeMachine(state),
+    'view.properties.fillColumn'
+  )
+  console.log('preferredFillColumnKey', preferredFillColumnKey)
+
+  return mosaicFillColumn(table, preferredFillColumnKey)
+}
+
 export const getSymbolColumnsSelection = (state: AppState): string[] => {
   const validSymbolColumns = getGroupableColumns(state)
   const preference = get(
@@ -262,6 +275,17 @@ export const getSaveableView = (state: AppState): QueryView & {id?: string} => {
   }
 
   // TODO: remove all of these conditionals
+  if (saveableView.properties.type === 'mosaic') {
+    saveableView = {
+      ...saveableView,
+      properties: {
+        ...saveableView.properties,
+        xColumn: getXColumnSelection(state),
+        yColumn: getMosaicYColumnSelection(state),
+        fillColumn: getMosaicFillColumnsSelection(state),
+      },
+    }
+  }
 
   if (saveableView.properties.type === 'histogram') {
     saveableView = {
