@@ -3,24 +3,19 @@ import React, {FunctionComponent} from 'react'
 import {Config, Table} from '@influxdata/giraffe'
 
 // Components
-// import EmptyGraphMessage from 'src/shared/components/EmptyGraphMessage'
+import EmptyGraphMessage from 'src/shared/components/EmptyGraphMessage'
 
 // Utils
 import {
   useVisXDomainSettings,
   useVisYDomainSettings,
 } from 'src/shared/utils/useVisDomainSettings'
-import {
-  getFormatter,
-  defaultXColumn,
-  mosaicYcolumn,
-  // mosaicFillColumn,
-} from 'src/shared/utils/vis'
+import {getFormatter, defaultXColumn, mosaicYcolumn} from 'src/shared/utils/vis'
 
 // Constants
 import {VIS_THEME, VIS_THEME_LIGHT} from 'src/shared/constants'
 import {DEFAULT_LINE_COLORS} from 'src/shared/constants/graphColorPalettes'
-// import {INVALID_DATA_COPY} from 'src/shared/copy/cell'
+import {INVALID_DATA_COPY} from 'src/shared/copy/cell'
 
 // Types
 import {MosaicViewProperties, TimeZone, TimeRange, Theme} from 'src/types'
@@ -57,17 +52,11 @@ const MosaicPlot: FunctionComponent<Props> = ({
   },
   theme,
 }) => {
-  // const fillColumns = storedFill || mosaicFillColumn(table)
   const fillColumns = storedFill || []
-
-  // console.log('fillColumn mosaicPlot', fillColumn)
-
-  // console.log('table', table)
-  // console.log('timeRange', timeRange)
-  // console.log('storedYColumn', storedYColumn)
   const xColumn = storedXColumn || defaultXColumn(table)
-  const yColumn = storedYColumn || mosaicYcolumn(table) //, 'taskID'
-  //const stringFillColumn = storedStringFillColumn || defaultStringFillColumn(table, '_value')
+  const yColumn = storedYColumn || mosaicYcolumn(table)
+
+  console.log(mosaicYcolumn(table))
 
   const columnKeys = table.columnKeys
 
@@ -77,25 +66,30 @@ const MosaicPlot: FunctionComponent<Props> = ({
     timeRange
   )
 
-  // console.log('storedXDomain', storedXDomain)
-  // console.log('yColumn', yColumn)
   const [yDomain, onSetYDomain, onResetYDomain] = useVisYDomainSettings(
     storedYDomain,
     table.getColumn(yColumn, 'string')
   )
 
-  // console.log('yDomain', yDomain)
+  console.log(
+    'is valid?',
+    xColumn,
+    columnKeys.includes(xColumn),
+    yColumn,
+    columnKeys.includes(yColumn),
+    fillColumns.every(col => columnKeys.includes(col))
+  )
 
-  // const isValidView =
-  //   xColumn &&
-  //   columnKeys.includes(xColumn) &&
-  //   yColumn &&
-  //   columnKeys.includes(yColumn) &&
-  //   fillColumns.every(col => columnKeys.includes(col))
+  const isValidView =
+    xColumn &&
+    columnKeys.includes(xColumn) &&
+    yColumn &&
+    columnKeys.includes(yColumn) &&
+    fillColumns.every(col => columnKeys.includes(col))
 
-  // if (!isValidView) {
-  //   return <EmptyGraphMessage message={INVALID_DATA_COPY} />
-  // }
+  if (!isValidView) {
+    return <EmptyGraphMessage message={INVALID_DATA_COPY} />
+  }
 
   const colorHexes =
     colors && colors.length ? colors : DEFAULT_LINE_COLORS.map(c => c.hex)

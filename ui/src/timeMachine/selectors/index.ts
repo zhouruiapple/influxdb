@@ -188,6 +188,19 @@ export const getMosaicFillColumnsSelection = (state: AppState): string[] => {
     'view.properties.fillColumns'
   )
 
+  if (preference === null) {
+    for (const key of validFillColumns) {
+      if (key.startsWith('_value')) {
+        return [key]
+      }
+    }
+    // if (validFillColumns) {
+    //   return [validFillColumns[0]]
+    // }
+    // console.log('validFillColumns', validFillColumns)
+    // return [null]
+  }
+
   const {fluxGroupKeyUnion} = getVisTable(state)
 
   return getFillColumnsSelectionMemoized(

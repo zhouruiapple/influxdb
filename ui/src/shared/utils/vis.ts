@@ -235,31 +235,31 @@ export const getGroupableColumns = (table: Table): string[] => {
   return groupableColumns
 }
 
-export const mosaicFillColumn = (
-  table: Table,
-  preferredColumnKey?: string
-): string | null => {
-  const validColumnKeys = getStringColumns(table)
-  // console.log('validColumnKeys', validColumnKeys)
-  if (validColumnKeys.includes(preferredColumnKey)) {
-    // console.log('prefered key case')
-    return preferredColumnKey
-  }
+// export const mosaicFillColumn = (
+//   table: Table,
+//   preferredColumnKey?: string
+// ): string | null => {
+//   const validColumnKeys = getStringColumns(table)
+//   // console.log('validColumnKeys', validColumnKeys)
+//   if (validColumnKeys.includes(preferredColumnKey)) {
+//     // console.log('prefered key case')
+//     return preferredColumnKey
+//   }
 
-  for (const key of validColumnKeys) {
-    if (key.startsWith('_value')) {
-      // console.log('entered _value case with ', key)
-      return key
-    }
-  }
+//   for (const key of validColumnKeys) {
+//     if (key.startsWith('_value')) {
+//       // console.log('entered _value case with ', key)
+//       return key
+//     }
+//   }
 
-  // console.log('validColumnKeys take 2', validColumnKeys)
-  if (validColumnKeys.length) {
-    return validColumnKeys[0]
-  }
+//   // console.log('validColumnKeys take 2', validColumnKeys)
+//   if (validColumnKeys.length) {
+//     return validColumnKeys[0]
+//   }
 
-  return null
-}
+//   return null
+// }
 
 /*
   Previously we would automatically select an x and y column setting for an
@@ -346,7 +346,7 @@ export const mosaicYcolumn = (
   preferredColumnKey?: string
 ): string | null => {
   const validColumnKeys = getStringColumns(table)
-
+  console.log('validColumnKeys', validColumnKeys)
   if (validColumnKeys.includes(preferredColumnKey)) {
     console.log('prefered key case')
     return preferredColumnKey
@@ -361,7 +361,7 @@ export const mosaicYcolumn = (
   const preferredValidColumnKeys = validColumnKeys.filter(
     name => !invalidMosaicYColumns.has(name)
   )
-
+  console.log('preferredValidColumnKeys', preferredValidColumnKeys)
   if (preferredValidColumnKeys.length) {
     return preferredValidColumnKeys[0]
   }

@@ -61,30 +61,30 @@ type ReduxProps = ConnectedProps<typeof connector>
 type Props = OwnProps & ReduxProps
 
 const MosaicOptions: SFC<Props> = props => {
-    const {
-        fillColumns,
-        yAxisLabel,
-        xAxisLabel,
-        onSetFillColumns,
-        colors,
-        onSetColors,
-        onSetYAxisLabel,
-        onSetXAxisLabel,
-        yPrefix,
-        ySuffix,
-        onUpdateAxisSuffix,
-        onUpdateAxisPrefix,
-        yDomain,
-        onSetYDomain,
-        xColumn,
-        yColumn,
-        stringColumns,
-        numericColumns,
-        onSetXColumn,
-        onSetYColumn,
-        onSetTimeFormat,
-        timeFormat,
-      } = props
+  const {
+    fillColumns,
+    yAxisLabel,
+    xAxisLabel,
+    onSetFillColumns,
+    colors,
+    onSetColors,
+    onSetYAxisLabel,
+    onSetXAxisLabel,
+    yPrefix,
+    ySuffix,
+    onUpdateAxisSuffix,
+    onUpdateAxisPrefix,
+    yDomain,
+    onSetYDomain,
+    xColumn,
+    yColumn,
+    stringColumns,
+    numericColumns,
+    onSetXColumn,
+    onSetYColumn,
+    onSetTimeFormat,
+    timeFormat,
+  } = props
 
   const handleFillColumnSelect = (column: string): void => {
     const fillColumn = [column]
