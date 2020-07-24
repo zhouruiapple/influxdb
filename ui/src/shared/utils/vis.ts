@@ -240,20 +240,20 @@ export const mosaicFillColumn = (
   preferredColumnKey?: string
 ): string | null => {
   const validColumnKeys = getStringColumns(table)
-  console.log('validColumnKeys', validColumnKeys)
+  // console.log('validColumnKeys', validColumnKeys)
   if (validColumnKeys.includes(preferredColumnKey)) {
-    console.log('prefered key case')
+    // console.log('prefered key case')
     return preferredColumnKey
   }
 
   for (const key of validColumnKeys) {
     if (key.startsWith('_value')) {
-      console.log('entered _value case with ', key)
+      // console.log('entered _value case with ', key)
       return key
     }
   }
 
-  console.log('validColumnKeys take 2', validColumnKeys)
+  // console.log('validColumnKeys take 2', validColumnKeys)
   if (validColumnKeys.length) {
     return validColumnKeys[0]
   }

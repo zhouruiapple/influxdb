@@ -68,13 +68,6 @@ const updateVisualizationType = (
     newView.properties.fillColumns = results.fluxGroupKeyUnion
   }
 
-  console.log('reached mosaic case in view.tsx')
-
-  if (newView.properties.type === 'mosaic') {
-    console.log('results.flux...', results.fluxGroupKeyUnion)
-    newView.properties.fillColumn = results.fluxGroupKeyUnion[0]
-  }
-
   if (newView.properties.type === 'scatter' && results) {
     newView.properties.symbolColumns = results.fluxGroupKeyUnion
   }

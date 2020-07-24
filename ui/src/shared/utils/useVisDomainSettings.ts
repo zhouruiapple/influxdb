@@ -99,6 +99,6 @@ export const useVisYDomainSettings = (
 
   const [domain, setDomain] = useOneWayState(initialDomain)
   const resetDomain = () => setDomain(initialDomain)
-  console.log('setDomain', setDomain, 'resetDomain', resetDomain)
+  // console.log('setDomain', setDomain, 'resetDomain', resetDomain)
   return [domain, setDomain, resetDomain]
 }

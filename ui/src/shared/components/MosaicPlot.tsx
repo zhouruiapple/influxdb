@@ -14,7 +14,7 @@ import {
   getFormatter,
   defaultXColumn,
   mosaicYcolumn,
-  mosaicFillColumn,
+  // mosaicFillColumn,
 } from 'src/shared/utils/vis'
 
 // Constants
@@ -47,7 +47,7 @@ const MosaicPlot: FunctionComponent<Props> = ({
     xSuffix,
     yPrefix,
     ySuffix,
-    fillColumn: storedFill,
+    fillColumns: storedFill,
     colors,
     xDomain: storedXDomain,
     yDomain: storedYDomain,
@@ -57,12 +57,14 @@ const MosaicPlot: FunctionComponent<Props> = ({
   },
   theme,
 }) => {
-  const fillColumn = storedFill || mosaicFillColumn(table)
-  console.log('fillColumn mosaicPlot', fillColumn)
+  // const fillColumns = storedFill || mosaicFillColumn(table)
+  const fillColumns = storedFill || []
 
-  console.log('table', table)
-  console.log('timeRange', timeRange)
-  console.log('storedYColumn', storedYColumn)
+  // console.log('fillColumn mosaicPlot', fillColumn)
+
+  // console.log('table', table)
+  // console.log('timeRange', timeRange)
+  // console.log('storedYColumn', storedYColumn)
   const xColumn = storedXColumn || defaultXColumn(table)
   const yColumn = storedYColumn || mosaicYcolumn(table) //, 'taskID'
   //const stringFillColumn = storedStringFillColumn || defaultStringFillColumn(table, '_value')
@@ -75,14 +77,14 @@ const MosaicPlot: FunctionComponent<Props> = ({
     timeRange
   )
 
-  console.log('storedXDomain', storedXDomain)
-  console.log('yColumn', yColumn)
+  // console.log('storedXDomain', storedXDomain)
+  // console.log('yColumn', yColumn)
   const [yDomain, onSetYDomain, onResetYDomain] = useVisYDomainSettings(
     storedYDomain,
     table.getColumn(yColumn, 'string')
   )
 
-  console.log('yDomain', yDomain)
+  // console.log('yDomain', yDomain)
 
   // const isValidView =
   //   xColumn &&
@@ -135,7 +137,7 @@ const MosaicPlot: FunctionComponent<Props> = ({
         x: xColumn,
         y: yColumn,
         colors: colorHexes,
-        fill: fillColumn,
+        fill: fillColumns,
       },
     ],
   }

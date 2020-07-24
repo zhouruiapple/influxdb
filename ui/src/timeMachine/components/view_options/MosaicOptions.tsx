@@ -9,7 +9,7 @@ import TimeFormat from 'src/timeMachine/components/view_options/TimeFormat'
 
 // Actions
 import {
-  setMosaicFillColumn,
+  setFillColumns,
   setYAxisLabel,
   setXAxisLabel,
   setAxisPrefix,
@@ -24,10 +24,8 @@ import {
 // Utils
 import {
   getGroupableColumns,
-  //getFillColumnsSelection,
   getMosaicFillColumnsSelection,
   getXColumnSelection,
-  //getYColumnSelection,
   getMosaicYColumnSelection,
   getNumericColumns,
   getStringColumns,
@@ -38,7 +36,6 @@ import {
 import {GIRAFFE_COLOR_SCHEMES} from 'src/shared/constants'
 
 // Types
-import {ComponentStatus} from '@influxdata/clockface'
 import {AppState, NewView, MosaicViewProperties} from 'src/types'
 import HexColorSchemeDropdown from 'src/shared/components/HexColorSchemeDropdown'
 import AutoDomainInput from 'src/shared/components/AutoDomainInput'
@@ -64,67 +61,44 @@ type ReduxProps = ConnectedProps<typeof connector>
 type Props = OwnProps & ReduxProps
 
 const MosaicOptions: SFC<Props> = props => {
-  const {
-    fillColumn,
-    // availableGroupColumns,
-    yAxisLabel,
-    xAxisLabel,
-    onSetMosaicFillColumn,
-    colors,
-    onSetColors,
-    onSetYAxisLabel,
-    onSetXAxisLabel,
-    yPrefix,
-    ySuffix,
-    onUpdateAxisSuffix,
-    onUpdateAxisPrefix,
-    yDomain,
-    onSetYDomain,
-    xColumn,
-    yColumn,
-    stringColumns,
-    numericColumns,
-    onSetXColumn,
-    onSetYColumn,
-    onSetTimeFormat,
-    timeFormat,
-  } = props
+    const {
+        fillColumns,
+        yAxisLabel,
+        xAxisLabel,
+        onSetFillColumns,
+        colors,
+        onSetColors,
+        onSetYAxisLabel,
+        onSetXAxisLabel,
+        yPrefix,
+        ySuffix,
+        onUpdateAxisSuffix,
+        onUpdateAxisPrefix,
+        yDomain,
+        onSetYDomain,
+        xColumn,
+        yColumn,
+        stringColumns,
+        numericColumns,
+        onSetXColumn,
+        onSetYColumn,
+        onSetTimeFormat,
+        timeFormat,
+      } = props
 
-  // const groupDropdownStatus = stringColumns.length
-  //   ? ComponentStatus.Default
-  //   : ComponentStatus.Disabled
+  const handleFillColumnSelect = (column: string): void => {
+    const fillColumn = [column]
+    onSetFillColumns(fillColumn)
+  }
 
-  // const handleFillColumnSelect = (column: string): void => {
-  //   //let updatedFillColumns
-  //   const fillColumn = column
-  //   // updatedFillColumns = [column]
-
-  //   // if (fillColumns.includes(column)) {
-  //   //   // I think this deselects the selected column
-  //   //   updatedFillColumns = fillColumns.filter(col => col !== column)
-  //   // } else {
-  //   //   updatedFillColumns = [...fillColumns, column]
-  //   // }
-
-  //   onSetFillColumn(fillColumn)
-  // }
-  console.log('fillColumn mosaicOptions', fillColumn)
-
+  console.log('fillColumns', fillColumns)
   return (
     <Grid.Column>
       <h4 className="view-options--header">Customize Mosaic Plot</h4>
       <h5 className="view-options--header">Data</h5>
-      {/* <Form.Element label="Fill Column">
-        <MultiSelectDropdown
-          options={stringColumns}
-          selectedOptions={fillColumns}
-          onSelect={handleFillColumnSelect}
-          buttonStatus={groupDropdownStatus}
-        />
-      </Form.Element> */}
       <ColumnSelector
-        selectedColumn={fillColumn}
-        onSelectColumn={onSetMosaicFillColumn}
+        selectedColumn={fillColumns[0]}
+        onSelectColumn={handleFillColumnSelect}
         availableColumns={stringColumns}
         axisName="fill"
       />
@@ -188,10 +162,8 @@ const MosaicOptions: SFC<Props> = props => {
 
 const mstp = (state: AppState) => {
   const availableGroupColumns = getGroupableColumns(state)
-  //const fillColumns = getFillColumnsSelection(state)
-  const fillColumn = getMosaicFillColumnsSelection(state)
+  const fillColumns = getMosaicFillColumnsSelection(state)
   const xColumn = getXColumnSelection(state)
-  //const yColumn = getYColumnSelection(state)
   const yColumn = getMosaicYColumnSelection(state)
   const stringColumns = getStringColumns(state)
   const numericColumns = getNumericColumns(state)
@@ -200,7 +172,7 @@ const mstp = (state: AppState) => {
 
   return {
     availableGroupColumns,
-    fillColumn,
+    fillColumns,
     xColumn,
     yColumn,
     stringColumns,
@@ -210,7 +182,7 @@ const mstp = (state: AppState) => {
 }
 
 const mdtp = {
-  onSetMosaicFillColumn: setMosaicFillColumn,
+  onSetFillColumns: setFillColumns,
   onSetColors: setColorHexes,
   onSetYAxisLabel: setYAxisLabel,
   onSetXAxisLabel: setXAxisLabel,
