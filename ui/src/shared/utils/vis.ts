@@ -346,9 +346,9 @@ export const mosaicYcolumn = (
   preferredColumnKey?: string
 ): string | null => {
   const validColumnKeys = getStringColumns(table)
-  console.log('validColumnKeys', validColumnKeys)
+  // console.log('validColumnKeys', validColumnKeys)
   if (validColumnKeys.includes(preferredColumnKey)) {
-    console.log('prefered key case')
+    // console.log('prefered key case')
     return preferredColumnKey
   }
 
@@ -361,7 +361,7 @@ export const mosaicYcolumn = (
   const preferredValidColumnKeys = validColumnKeys.filter(
     name => !invalidMosaicYColumns.has(name)
   )
-  console.log('preferredValidColumnKeys', preferredValidColumnKeys)
+  // console.log('preferredValidColumnKeys', preferredValidColumnKeys)
   if (preferredValidColumnKeys.length) {
     return preferredValidColumnKeys[0]
   }
