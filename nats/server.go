@@ -9,6 +9,7 @@ import (
 )
 
 const ServerName = "platform"
+const RANDOM_PORT = server.RANDOM_PORT
 
 var ErrNoNatsConnection = errors.New("nats connection has not been established. Call Open() first")
 
