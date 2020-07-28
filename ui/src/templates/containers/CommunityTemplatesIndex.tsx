@@ -30,7 +30,7 @@ import {
 import SettingsTabbedPage from 'src/settings/components/SettingsTabbedPage'
 import SettingsHeader from 'src/settings/components/SettingsHeader'
 
-import {communityTemplatesImportPath} from 'src/templates/containers/TemplatesIndex'
+import {COMMUNITY_TEMPLATES_IMPORT_PATH} from 'src/templates/containers/TemplatesIndex'
 
 import {getOrg} from 'src/organizations/selectors'
 
@@ -67,7 +67,7 @@ class UnconnectedTemplatesIndex extends Component<Props> {
     // (i.e. the user reloaded the page with the install template active)
     // grab the template name, and fill in the text input
     const match = matchPath(this.props.location.pathname, {
-      path: communityTemplatesImportPath,
+      path: COMMUNITY_TEMPLATES_IMPORT_PATH,
     }) as Params
 
     if (

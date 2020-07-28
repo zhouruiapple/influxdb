@@ -25,11 +25,14 @@ import {getOrg} from 'src/organizations/selectors'
 // Types
 import {AppState, ResourceType} from 'src/types'
 
+// Constants
+import {TEMPLATES_PATH} from 'src/shared/constants/routes'
+
 type ReduxProps = ConnectedProps<typeof connector>
 type Props = RouteComponentProps & ReduxProps
 
-const templatesPath = '/orgs/:orgID/settings/templates'
-export const communityTemplatesImportPath = `${templatesPath}/import/:directory/:templateName/:templateExtension`
+const TEMPLATES_PATH = '/orgs/:orgID/settings/templates'
+
 
 @ErrorHandling
 class TemplatesIndex extends Component<Props> {
@@ -51,23 +54,23 @@ class TemplatesIndex extends Component<Props> {
         </Page>
         <Switch>
           <Route
-            path={`${templatesPath}/import`}
+            path={`${TEMPLATES_PATH}/import`}
             component={TemplateImportOverlay}
           />
           <Route
-            path={`${templatesPath}/import/:templateName`}
+            path={`${TEMPLATES_PATH}/import/:templateName`}
             component={CommunityTemplateImportOverlay}
           />
           <Route
-            path={`${templatesPath}/:id/export`}
+            path={`${TEMPLATES_PATH}/:id/export`}
             component={TemplateExportOverlay}
           />
           <Route
-            path={`${templatesPath}/:id/view`}
+            path={`${TEMPLATES_PATH}/:id/view`}
             component={TemplateViewOverlay}
           />
           <Route
-            path={`${templatesPath}/:id/static/view`}
+            path={`${TEMPLATES_PATH}/:id/static/view`}
             component={StaticTemplateViewOverlay}
           />
         </Switch>
