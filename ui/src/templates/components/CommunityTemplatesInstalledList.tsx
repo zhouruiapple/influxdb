@@ -62,12 +62,38 @@ class CommunityTemplatesInstalledListUnconnected extends PureComponent<Props> {
 
   private renderStackResources(resources: Resource[]) {
     return resources.map(resource => {
-      return (
-        <React.Fragment key={resource.templateMetaName}>
-          {resource.kind}
-          <br />
-        </React.Fragment>
-      )
+      console.log(resource)
+      switch (resource.kind) {
+        case 'Bucket': {}
+        case 'Check': {}
+        case 'CheckDeadman': {}
+        case 'CheckThreshold': {}
+        case 'Dashboard': {}
+        case 'Label': {}
+        case 'NotificationEndpoint': {}
+        case 'NotificationEndpointHTTP': {}
+        case 'NotificationEndpointPagerDuty': {}
+        case 'NotificationEndpointSlack': {}
+        case 'NotificationRule': {}
+        case 'Task': {}
+        case 'Telegraf': {}
+        case 'Variable': {
+          return (
+            <React.Fragment key={resource.templateMetaName}>
+              {resource.kind} <code>{resource.templateMetaName}</code>
+              <br />
+            </React.Fragment>
+          )
+        }
+        default: {
+          return (
+            <React.Fragment key={resource.templateMetaName}>
+              {resource.kind}
+              <br />
+            </React.Fragment>
+          )
+        }
+      }
     })
   }
 
