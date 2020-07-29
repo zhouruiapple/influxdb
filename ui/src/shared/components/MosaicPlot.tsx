@@ -54,15 +54,16 @@ const MosaicPlot: FunctionComponent<Props> = ({
 }) => {
   const fillColumns = storedFill || []
   const xColumn = storedXColumn || defaultXColumn(table)
+  const yColumn = storedYColumn || mosaicYcolumn(table)
   // const yColumn = (table.columnKeys.includes(storedYColumn) && storedYColumn && typeof(storedYColumn) === 'string') || mosaicYcolumn(table)
-  let yColumn
-  if (!table.getColumn(storedYColumn, 'string')) {
-    console.log('called mosaicYcolumn')
-    yColumn = mosaicYcolumn(table)
-  } else {
-    console.log('used storedYcolumn')
-    yColumn = storedYColumn
-  }
+  // let yColumn
+  // if (!table.getColumn(storedYColumn, 'string')) {
+  //   console.log('called mosaicYcolumn')
+  //   yColumn = mosaicYcolumn(table)
+  // } else {
+  //   console.log('used storedYcolumn')
+  //   yColumn = storedYColumn
+  // }
   // console.log('storedYColumn', storedYColumn)
 
   // console.log(mosaicYcolumn(table))

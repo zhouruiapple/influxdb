@@ -138,7 +138,8 @@ const mstp = (state: AppState) => {
   const xColumn = getXColumnSelection(state)
 
   let yColumn, fillColumns
-  if (giraffeResult.table.getColumnType('_value') === 'string') {
+  console.log('activeTimeMachine', activeTimeMachine.view.properties.type)
+  if (activeTimeMachine.view.properties.type === 'mosaic') {
     yColumn = getMosaicYColumnSelection(state)
     fillColumns = getMosaicFillColumnsSelection(state)
   } else {
