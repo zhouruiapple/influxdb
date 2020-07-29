@@ -18,8 +18,10 @@ import {
   getVisTable,
   getXColumnSelection,
   getYColumnSelection,
-  getMosaicFillColumnsSelection,
+  getFillColumnsSelection,
   getSymbolColumnsSelection,
+  getMosaicYColumnSelection,
+  getMosaicFillColumnsSelection,
 } from 'src/timeMachine/selectors'
 import {getTimeRange, getTimeZone} from 'src/dashboards/selectors'
 
@@ -134,8 +136,16 @@ const mstp = (state: AppState) => {
 
   const giraffeResult = getVisTable(state)
   const xColumn = getXColumnSelection(state)
-  const yColumn = getYColumnSelection(state)
-  const fillColumns = getMosaicFillColumnsSelection(state)
+
+  let yColumn, fillColumns
+  if (giraffeResult.table.getColumnType('_value') === 'string') {
+    yColumn = getMosaicYColumnSelection(state)
+    fillColumns = getMosaicFillColumnsSelection(state)
+  } else {
+    yColumn = getYColumnSelection(state)
+    fillColumns = getFillColumnsSelection(state)
+  }
+
   const symbolColumns = getSymbolColumnsSelection(state)
 
   const timeZone = getTimeZone(state)
