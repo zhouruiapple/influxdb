@@ -188,11 +188,18 @@ export const getMosaicFillColumnsSelection = (state: AppState): string[] => {
     'view.properties.fillColumns'
   )
 
+  console.log('preference', preference)
+  console.log('valid columns in index.ts', validFillColumns)
+  console.log('column keys', table.columnKeys)
+
   if (preference === null) {
     for (const key of validFillColumns) {
       if (key.startsWith('_value')) {
         return [key]
       }
+    }
+    if (table.columnKeys.includes('_value')) {
+      return []
     }
     // if (validFillColumns) {
     //   return [validFillColumns[0]]

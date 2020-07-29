@@ -308,12 +308,10 @@ export const defaultYColumn = (
   table: Table,
   preferredColumnKey?: string
 ): string | null => {
-  // console.log('preferred Column key', preferredColumnKey)
   const validColumnKeys = getNumberColumns(table)
   const stringColumnKeys = getStringColumns(table)
-
-  // console.log('validcolumnkeys', validColumnKeys)
-  // console.log('stringColumnKeys', stringColumnKeys)
+  // console.log('preferred key', preferredColumnKey)
+  // console.log('validColumnKey', validColumnKeys)
 
   if (validColumnKeys.includes(preferredColumnKey)) {
     return preferredColumnKey
@@ -322,11 +320,6 @@ export const defaultYColumn = (
   if (stringColumnKeys.includes(preferredColumnKey)) {
     return preferredColumnKey
   }
-
-  // if (stringColumnKeys.length) {
-  //   console.log('reached hard coding case')
-  //   return 'taskID'
-  // }
 
   for (const key of validColumnKeys) {
     if (key.startsWith('_value')) {
@@ -346,7 +339,7 @@ export const mosaicYcolumn = (
   preferredColumnKey?: string
 ): string | null => {
   const validColumnKeys = getStringColumns(table)
-  // console.log('validColumnKeys', validColumnKeys)
+  console.log('validColumnKeys for mosaic', validColumnKeys)
   if (validColumnKeys.includes(preferredColumnKey)) {
     // console.log('prefered key case')
     return preferredColumnKey
