@@ -309,15 +309,8 @@ export const defaultYColumn = (
   preferredColumnKey?: string
 ): string | null => {
   const validColumnKeys = getNumberColumns(table)
-  const stringColumnKeys = getStringColumns(table)
-  // console.log('preferred key', preferredColumnKey)
-  // console.log('validColumnKey', validColumnKeys)
 
   if (validColumnKeys.includes(preferredColumnKey)) {
-    return preferredColumnKey
-  }
-
-  if (stringColumnKeys.includes(preferredColumnKey)) {
     return preferredColumnKey
   }
 
