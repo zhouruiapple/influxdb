@@ -107,10 +107,6 @@ const getGroupableColumnsMemoized = memoizeOne(getGroupableColumnsUtil)
 
 export const getGroupableColumns = (state: AppState): string[] => {
   const {table} = getVisTable(state)
-  // console.log(
-  //   'getGroupableColumnsMemoized(table)',
-  //   getGroupableColumnsMemoized(table)
-  // )
   return getGroupableColumnsMemoized(table)
 }
 
@@ -130,7 +126,6 @@ export const getYColumnSelection = (state: AppState): string => {
     getActiveTimeMachine(state),
     'view.properties.yColumn'
   )
-  // console.log('state', state)
 
   return defaultYColumn(table, preferredYColumnKey)
 }
@@ -141,7 +136,6 @@ export const getMosaicYColumnSelection = (state: AppState): string => {
     getActiveTimeMachine(state),
     'view.properties.yColumn'
   )
-  // console.log('state', state)
 
   return mosaicYcolumn(table, preferredYColumnKey)
 }
@@ -201,11 +195,6 @@ export const getMosaicFillColumnsSelection = (state: AppState): string[] => {
     if (table.columnKeys.includes('_value')) {
       return []
     }
-    // if (validFillColumns) {
-    //   return [validFillColumns[0]]
-    // }
-    // console.log('validFillColumns', validFillColumns)
-    // return [null]
   }
 
   const {fluxGroupKeyUnion} = getVisTable(state)

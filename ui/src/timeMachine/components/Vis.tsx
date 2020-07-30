@@ -70,8 +70,6 @@ const TimeMachineVis: SFC<Props> = ({
   const timeMachineViewClassName = classnames('time-machine--view', {
     'time-machine--view__empty': noQueries,
   })
-  // console.log('resolvedViewProperties in Vis.tsx', resolvedViewProperties)
-  // resolvedViewProperties.yColumn = 'cpu'
   return (
     <div className={timeMachineViewClassName}>
       <ErrorBoundary>
@@ -138,7 +136,6 @@ const mstp = (state: AppState) => {
   const xColumn = getXColumnSelection(state)
 
   let yColumn, fillColumns
-  console.log('activeTimeMachine', activeTimeMachine.view.properties.type)
   if (activeTimeMachine.view.properties.type === 'mosaic') {
     yColumn = getMosaicYColumnSelection(state)
     fillColumns = getMosaicFillColumnsSelection(state)
@@ -150,7 +147,6 @@ const mstp = (state: AppState) => {
   const symbolColumns = getSymbolColumnsSelection(state)
 
   const timeZone = getTimeZone(state)
-  console.log('fillColumns in Vis.tsx', fillColumns)
   return {
     loading,
     checkType,
