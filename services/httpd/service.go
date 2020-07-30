@@ -19,30 +19,30 @@ import (
 
 // statistics gathered by the httpd package.
 const (
-	statRequest                      = "req"                    // Number of HTTP requests served.
-	statQueryRequest                 = "queryReq"               // Number of query requests served.
-	statWriteRequest                 = "writeReq"               // Number of write requests serverd.
+	statAuthFail                     = "authFail"               // Number of authentication failures.
+	statClientError                  = "clientError"            // Number of HTTP responses due to client error.
+	statFluxQueryRequestDuration     = "fluxQueryReqDurationNs" // Number of (wall-time) nanoseconds spent executing Flux query requests.
+	statFluxQueryRequests            = "fluxQueryReq"           // Number of flux query requests served.
 	statPingRequest                  = "pingReq"                // Number of ping requests served.
-	statStatusRequest                = "statusReq"              // Number of status requests served.
-	statWriteRequestBytesReceived    = "writeReqBytes"          // Sum of all bytes in write requests.
-	statQueryRequestBytesTransmitted = "queryRespBytes"         // Sum of all bytes returned in query reponses.
-	statPointsWrittenOK              = "pointsWrittenOK"        // Number of points written OK.
 	statPointsWrittenDropped         = "pointsWrittenDropped"   // Number of points dropped by the storage engine.
 	statPointsWrittenFail            = "pointsWrittenFail"      // Number of points that failed to be written.
-	statAuthFail                     = "authFail"               // Number of authentication failures.
-	statRequestDuration              = "reqDurationNs"          // Number of (wall-time) nanoseconds spent inside requests.
-	statQueryRequestDuration         = "queryReqDurationNs"     // Number of (wall-time) nanoseconds spent inside query requests.
-	statWriteRequestDuration         = "writeReqDurationNs"     // Number of (wall-time) nanoseconds spent inside write requests.
-	statRequestsActive               = "reqActive"              // Number of currently active requests.
-	statWriteRequestsActive          = "writeReqActive"         // Number of currently active write requests.
-	statClientError                  = "clientError"            // Number of HTTP responses due to client error.
-	statServerError                  = "serverError"            // Number of HTTP responses due to server error.
-	statRecoveredPanics              = "recoveredPanics"        // Number of panics recovered by HTTP handler.
-	statPromWriteRequest             = "promWriteReq"           // Number of write requests to the prometheus endpoint.
+	statPointsWrittenOK              = "pointsWrittenOK"        // Number of points written OK.
 	statPromReadRequest              = "promReadReq"            // Number of read requests to the prometheus endpoint.
-	statFluxQueryRequests            = "fluxQueryReq"           // Number of flux query requests served.
-	statFluxQueryRequestDuration     = "fluxQueryReqDurationNs" // Number of (wall-time) nanoseconds spent executing Flux query requests.
-
+	statPromWriteRequest             = "promWriteReq"           // Number of write requests to the prometheus endpoint.
+	statQueryRequest                 = "queryReq"               // Number of query requests served.
+	statQueryRequestBytesTransmitted = "queryRespBytes"         // Sum of all bytes returned in query reponses.
+	statQueryRequestDuration         = "queryReqDurationNs"     // Number of (wall-time) nanoseconds spent inside query requests.
+	statRecoveredPanics              = "recoveredPanics"        // Number of panics recovered by HTTP handler.
+	statRequest                      = "req"                    // Number of HTTP requests served.
+	statRequestDuration              = "reqDurationNs"          // Number of (wall-time) nanoseconds spent inside requests.
+	statRequestsActive               = "reqActive"              // Number of currently active requests.
+	statServerError                  = "serverError"            // Number of HTTP responses due to server error.
+	statStatusRequest                = "statusReq"              // Number of status requests served.
+	statValuesWritten                = "valuesWritten"          // Number of values written.
+	statWriteRequest                 = "writeReq"               // Number of write requests serverd.
+	statWriteRequestBytesReceived    = "writeReqBytes"          // Sum of all bytes in write requests.
+	statWriteRequestDuration         = "writeReqDurationNs"     // Number of (wall-time) nanoseconds spent inside write requests.
+	statWriteRequestsActive          = "writeReqActive"         // Number of currently active write requests.
 )
 
 // Service manages the listener and handler for an HTTP endpoint.
