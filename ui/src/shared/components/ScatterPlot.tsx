@@ -76,9 +76,6 @@ const ScatterPlot: FunctionComponent<Props> = ({
     table.getColumn(yColumn, 'number')
   )
 
-  console.log('yColumn in scatter', yColumn)
-  console.log('fillColumns', fillColumns)
-
   const isValidView =
     xColumn &&
     columnKeys.includes(xColumn) &&

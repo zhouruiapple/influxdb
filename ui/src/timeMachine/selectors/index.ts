@@ -84,7 +84,7 @@ export const getVisTable = (
 ): {table: Table; fluxGroupKeyUnion: string[]} => {
   const files = getActiveTimeMachine(state).queryResults.files || []
   const {table, fluxGroupKeyUnion} = getVisTableMemoized(files.join('\n\n'))
-
+  console.log('fromFlux', memoizeOne(fromFlux)(files.join('\n\n')))
   return {table, fluxGroupKeyUnion}
 }
 
@@ -181,10 +181,6 @@ export const getMosaicFillColumnsSelection = (state: AppState): string[] => {
     getActiveTimeMachine(state),
     'view.properties.fillColumns'
   )
-
-  console.log('preference', preference)
-  console.log('valid columns in index.ts', validFillColumns)
-  console.log('column keys', table.columnKeys)
 
   if (preference === null) {
     for (const key of validFillColumns) {
