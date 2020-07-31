@@ -84,7 +84,6 @@ export const getVisTable = (
 ): {table: Table; fluxGroupKeyUnion: string[]} => {
   const files = getActiveTimeMachine(state).queryResults.files || []
   const {table, fluxGroupKeyUnion} = getVisTableMemoized(files.join('\n\n'))
-  console.log('fromFlux', memoizeOne(fromFlux)(files.join('\n\n')))
   return {table, fluxGroupKeyUnion}
 }
 
@@ -193,12 +192,10 @@ export const getMosaicFillColumnsSelection = (state: AppState): string[] => {
     }
   }
 
-  const {fluxGroupKeyUnion} = getVisTable(state)
-
   return getFillColumnsSelectionMemoized(
     validFillColumns,
     preference,
-    fluxGroupKeyUnion
+    validFillColumns
   )
 }
 

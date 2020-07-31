@@ -83,7 +83,6 @@ export type Action =
   | SetBinSizeAction
   | SetColorHexesAction
   | SetFillColumnsAction
-  // | SetMosaicFillColumnAction
   | SetSymbolColumnsAction
   | SetBinCountAction
   | SetHistogramPositionAction
@@ -598,18 +597,6 @@ export const setFillColumns = (
   type: 'SET_FILL_COLUMNS',
   payload: {fillColumns},
 })
-
-// interface SetMosaicFillColumnAction {
-//   type: 'SET_MOSAIC_FILL_COLUMN'
-//   payload: {mosaicFillColumn: string}
-// }
-
-// export const setMosaicFillColumn = (
-//   mosaicFillColumn: string
-// ): SetMosaicFillColumnAction => ({
-//   type: 'SET_MOSAIC_FILL_COLUMN',
-//   payload: {mosaicFillColumn},
-// })
 
 interface SetSymbolColumnsAction {
   type: 'SET_SYMBOL_COLUMNS'
