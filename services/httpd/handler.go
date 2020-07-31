@@ -367,6 +367,7 @@ type Statistics struct {
 	PromReadRequests             int64
 	FluxQueryRequests            int64
 	FluxQueryRequestDuration     int64
+	ValuesWritten                int64
 }
 
 // Statistics returns statistics for periodic monitoring.
@@ -398,6 +399,7 @@ func (h *Handler) Statistics(tags map[string]string) []models.Statistic {
 			statPromReadRequest:              atomic.LoadInt64(&h.stats.PromReadRequests),
 			statFluxQueryRequests:            atomic.LoadInt64(&h.stats.FluxQueryRequests),
 			statFluxQueryRequestDuration:     atomic.LoadInt64(&h.stats.FluxQueryRequestDuration),
+			statValuesWritten:                atomic.LoadInt64(&h.stats.ValuesWritten),
 		},
 	}}
 }
