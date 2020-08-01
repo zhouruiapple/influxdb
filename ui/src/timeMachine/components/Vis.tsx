@@ -143,7 +143,6 @@ const mstp = (state: AppState) => {
     yColumn = getYColumnSelection(state)
     fillColumns = getFillColumnsSelection(state)
   }
-
   const symbolColumns = getSymbolColumnsSelection(state)
 
   const timeZone = getTimeZone(state)
