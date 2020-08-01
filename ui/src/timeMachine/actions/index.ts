@@ -545,6 +545,16 @@ export const setYColumn = (yColumn: string): SetYColumnAction => ({
   payload: {yColumn},
 })
 
+interface SetMosaicYColumnAction {
+  type: 'SET_Y_COLUMN'
+  payload: {yColumn: string[]}
+}
+
+export const setMosaicYColumn = (yColumn: string[]): SetMosaicYColumnAction => ({
+  type: 'SET_Y_COLUMN',
+  payload: {yColumn},
+})
+
 interface SetShadeBelowAction {
   type: 'SET_SHADE_BELOW'
   payload: {shadeBelow}

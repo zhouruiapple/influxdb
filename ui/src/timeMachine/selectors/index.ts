@@ -130,7 +130,7 @@ export const getYColumnSelection = (state: AppState): string => {
   return defaultYColumn(table, preferredYColumnKey)
 }
 
-export const getMosaicYColumnSelection = (state: AppState): string => {
+export const getMosaicYColumnSelection = (state: AppState): string[] => {
   const {table} = getVisTable(state)
   const preferredYColumnKey = get(
     getActiveTimeMachine(state),
@@ -182,9 +182,9 @@ export const getMosaicFillColumnsSelection = (state: AppState): string[] => {
     'view.properties.fillColumns'
   )
 
-  console.log('preference', preference)
-  console.log('valid columns in index.ts', validFillColumns)
-  console.log('column keys', table.columnKeys)
+  // console.log('preference', preference)
+  // console.log('valid columns in index.ts', validFillColumns)
+  // console.log('column keys', table.columnKeys)
 
   if (preference === null) {
     for (const key of validFillColumns) {
@@ -197,12 +197,12 @@ export const getMosaicFillColumnsSelection = (state: AppState): string[] => {
     }
   }
 
-  const {fluxGroupKeyUnion} = getVisTable(state)
+  // const {fluxGroupKeyUnion} = getVisTable(state)
 
   return getFillColumnsSelectionMemoized(
     validFillColumns,
     preference,
-    fluxGroupKeyUnion
+    validFillColumns
   )
 }
 

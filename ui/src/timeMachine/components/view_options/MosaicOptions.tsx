@@ -3,7 +3,7 @@ import React, {SFC} from 'react'
 import {connect, ConnectedProps} from 'react-redux'
 
 // Components
-import {Form, Input, Grid} from '@influxdata/clockface'
+import {Form, Input, Grid, MultiSelectDropdown} from '@influxdata/clockface'
 import AxisAffixes from 'src/timeMachine/components/view_options/AxisAffixes'
 import TimeFormat from 'src/timeMachine/components/view_options/TimeFormat'
 
@@ -17,7 +17,7 @@ import {
   setColorHexes,
   setYDomain,
   setXColumn,
-  setYColumn,
+  setMosaicYColumn,
   setTimeFormat,
 } from 'src/timeMachine/actions'
 
@@ -36,6 +36,7 @@ import {
 import {GIRAFFE_COLOR_SCHEMES} from 'src/shared/constants'
 
 // Types
+import {ComponentStatus} from '@influxdata/clockface'
 import {AppState, NewView, MosaicViewProperties} from 'src/types'
 import HexColorSchemeDropdown from 'src/shared/components/HexColorSchemeDropdown'
 import AutoDomainInput from 'src/shared/components/AutoDomainInput'
@@ -43,8 +44,8 @@ import ColumnSelector from 'src/shared/components/ColumnSelector'
 
 interface OwnProps {
   xColumn: string
-  yColumn: string
-  fillColumn: string
+  yColumn: string[]
+  fillColumns: string
   xDomain: number[]
   yDomain: number[]
   xAxisLabel: string
@@ -63,6 +64,7 @@ type Props = OwnProps & ReduxProps
 const MosaicOptions: SFC<Props> = props => {
   const {
     fillColumns,
+    availableGroupColumns,
     yAxisLabel,
     xAxisLabel,
     onSetFillColumns,
@@ -91,6 +93,23 @@ const MosaicOptions: SFC<Props> = props => {
     onSetFillColumns(fillColumn)
   }
 
+  const handleYColumnSelect = (column: string): void => {
+    console.log('entered y-column select')
+    let updatedYColumns
+
+    if (yColumn.includes(column)) {
+      updatedYColumns = yColumn.filter(col => col !== column)
+    } else {
+      updatedYColumns = [...yColumn, column]
+    }
+
+    onSetYColumn(updatedYColumns)
+  }
+
+  const groupDropdownStatus = availableGroupColumns.length
+    ? ComponentStatus.Default
+    : ComponentStatus.Disabled
+
   console.log('fillColumns', fillColumns)
   return (
     <Grid.Column>
@@ -108,12 +127,23 @@ const MosaicOptions: SFC<Props> = props => {
         availableColumns={numericColumns}
         axisName="x"
       />
-      <ColumnSelector
+      {/* single select for y-column */}
+      {/* <ColumnSelector
         selectedColumn={yColumn}
         onSelectColumn={onSetYColumn}
         availableColumns={stringColumns}
         axisName="y"
-      />
+      /> */}
+
+      <Form.Element label="Y Column">
+        <MultiSelectDropdown
+          options={stringColumns}
+          selectedOptions={yColumn}
+          onSelect={handleYColumnSelect}
+          buttonStatus={groupDropdownStatus}
+        />
+      </Form.Element>
+
       <Form.Element label="Time Format">
         <TimeFormat
           timeFormat={timeFormat}
@@ -190,7 +220,7 @@ const mdtp = {
   onUpdateAxisSuffix: setAxisSuffix,
   onSetYDomain: setYDomain,
   onSetXColumn: setXColumn,
-  onSetYColumn: setYColumn,
+  onSetYColumn: setMosaicYColumn,
   onSetTimeFormat: setTimeFormat,
 }
 

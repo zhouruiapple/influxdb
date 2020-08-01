@@ -55,19 +55,6 @@ const MosaicPlot: FunctionComponent<Props> = ({
   const fillColumns = storedFill || []
   const xColumn = storedXColumn || defaultXColumn(table)
   const yColumn = storedYColumn || mosaicYcolumn(table)
-  // const yColumn = (table.columnKeys.includes(storedYColumn) && storedYColumn && typeof(storedYColumn) === 'string') || mosaicYcolumn(table)
-  // let yColumn
-  // if (!table.getColumn(storedYColumn, 'string')) {
-  //   console.log('called mosaicYcolumn')
-  //   yColumn = mosaicYcolumn(table)
-  // } else {
-  //   console.log('used storedYcolumn')
-  //   yColumn = storedYColumn
-  // }
-  // console.log('storedYColumn', storedYColumn)
-
-  // console.log(mosaicYcolumn(table))
-  console.log('yColumn', yColumn)
 
   const columnKeys = table.columnKeys
 
@@ -81,16 +68,8 @@ const MosaicPlot: FunctionComponent<Props> = ({
     storedYDomain,
     table.getColumn(yColumn, 'string')
   )
-  console.log('storedFill', storedFill)
-  console.log('fillColumns', fillColumns)
-  // console.log(
-  //   'is valid?',
-  //   xColumn,
-  //   columnKeys.includes(xColumn),
-  //   yColumn,
-  //   columnKeys.includes(yColumn),
-  //   fillColumns.every(col => columnKeys.includes(col))
-  // )
+  // console.log('storedFill', storedFill)
+  // console.log('fillColumns', fillColumns)
   const isValidView =
     xColumn &&
     columnKeys.includes(xColumn) &&
@@ -98,8 +77,6 @@ const MosaicPlot: FunctionComponent<Props> = ({
     columnKeys.includes(yColumn) &&
     fillColumns.length !== 0 &&
     fillColumns.every(col => columnKeys.includes(col))
-
-  console.log('isValidView', isValidView)
 
   if (!isValidView) {
     return <EmptyGraphMessage message={INVALID_DATA_COPY} />
@@ -149,8 +126,6 @@ const MosaicPlot: FunctionComponent<Props> = ({
       },
     ],
   }
-  // console.log('children(config)', children(config))
   return children(config)
 }
-// console.log('mosaic plot', MosaicPlot)
 export default MosaicPlot
