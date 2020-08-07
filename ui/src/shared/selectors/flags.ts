@@ -15,7 +15,7 @@ export const OSS_FLAGS = {
   streamEvents: false,
   'notebook-panel--spotify': false,
   'notebook-panel--test-flux': false,
-  'notebook-panel--data-source': false,
+  disableDefaultTableSort: false,
 }
 
 export const CLOUD_FLAGS = {
@@ -32,7 +32,7 @@ export const CLOUD_FLAGS = {
   streamEvents: false,
   'notebook-panel--spotify': false,
   'notebook-panel--test-flux': false,
-  'notebook-panel--data-source': false,
+  disableDefaultTableSort: false,
 }
 
 export const activeFlags = (state: AppState): FlagMap => {

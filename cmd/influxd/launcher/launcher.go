@@ -73,6 +73,7 @@ import (
 	jaegerconfig "github.com/uber/jaeger-client-go/config"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"golang.org/x/time/rate"
 )
 
 const (
@@ -354,6 +355,12 @@ func launcherOpts(l *Launcher) []cli.Opt {
 			Desc:    "the number of queries that are allowed to be awaiting execution before new queries are rejected",
 		},
 		{
+			DestP:   &l.pageFaultRate,
+			Flag:    "page-fault-rate",
+			Default: 0,
+			Desc:    "the number of page faults allowed per second in the storage engine",
+		},
+		{
 			DestP: &l.featureFlags,
 			Flag:  "feature-flags",
 			Desc:  "feature flag overrides",
@@ -423,6 +430,8 @@ type Launcher struct {
 	Stdout     io.Writer
 	Stderr     io.Writer
 	apibackend *http.APIBackend
+
+	pageFaultRate int
 }
 
 type stoppingScheduler interface {
@@ -692,13 +701,24 @@ func (m *Launcher) run(ctx context.Context) (err error) {
 		return err
 	}
 
+	// Enable storage layer page fault limiting if rate set above zero.
+	var pageFaultLimiter *rate.Limiter
+	if m.pageFaultRate > 0 {
+		pageFaultLimiter = rate.NewLimiter(rate.Limit(m.pageFaultRate), 1)
+	}
+
 	if m.testing {
 		// the testing engine will write/read into a temporary directory
-		engine := NewTemporaryEngine(m.StorageConfig, storage.WithRetentionEnforcer(ts.BucketSvc))
+		engine := NewTemporaryEngine(m.StorageConfig, storage.WithRetentionEnforcer(ts.BucketService))
 		flushers = append(flushers, engine)
 		m.engine = engine
 	} else {
-		m.engine = storage.NewEngine(m.enginePath, m.StorageConfig, storage.WithRetentionEnforcer(ts.BucketSvc))
+		m.engine = storage.NewEngine(
+			m.enginePath,
+			m.StorageConfig,
+			storage.WithRetentionEnforcer(ts.BucketService),
+			storage.WithPageFaultLimiter(pageFaultLimiter),
+		)
 	}
 	m.engine.WithLogger(m.log)
 	if err := m.engine.Open(ctx); err != nil {
@@ -717,8 +737,8 @@ func (m *Launcher) run(ctx context.Context) (err error) {
 	deps, err := influxdb.NewDependencies(
 		storageflux.NewReader(readservice.NewStore(m.engine)),
 		m.engine,
-		authorizer.NewBucketService(ts.BucketSvc, ts.UrmSvc),
-		authorizer.NewOrgService(ts.OrgSvc),
+		authorizer.NewBucketService(ts.BucketService),
+		authorizer.NewOrgService(ts.OrganizationService),
 		authorizer.NewSecretService(secretSvc),
 		nil,
 	)
@@ -752,7 +772,7 @@ func (m *Launcher) run(ctx context.Context) (err error) {
 		executor, executorMetrics := executor.NewExecutor(
 			m.log.With(zap.String("service", "task-executor")),
 			query.QueryServiceBridge{AsyncQueryService: m.queryController},
-			ts.UserSvc,
+			ts.UserService,
 			combinedTaskService,
 			combinedTaskService,
 			executor.WithFlagger(m.flagger),
@@ -808,7 +828,7 @@ func (m *Launcher) run(ctx context.Context) (err error) {
 		}
 	}
 
-	dbrpSvc := dbrp.NewService(ctx, authorizer.NewBucketService(ts.BucketSvc, ts.UrmSvc), m.kvStore)
+	dbrpSvc := dbrp.NewService(ctx, authorizer.NewBucketService(ts.BucketService), m.kvStore)
 	dbrpSvc = dbrp.NewAuthorizedService(dbrpSvc)
 
 	var checkSvc platform.CheckService
@@ -920,8 +940,8 @@ func (m *Launcher) run(ctx context.Context) (err error) {
 	{
 		sessionSvc = session.NewService(
 			session.NewStorage(inmem.NewSessionStore()),
-			ts.UserSvc,
-			ts.UrmSvc,
+			ts.UserService,
+			ts.UserResourceMappingService,
 			authSvc,
 			session.WithSessionLength(time.Duration(m.sessionLength)*time.Minute),
 		)
@@ -940,8 +960,8 @@ func (m *Launcher) run(ctx context.Context) (err error) {
 		labelSvc = label.NewLabelController(m.flagger, m.kvService, ls)
 	}
 
-	ts.BucketSvc = storage.NewBucketService(ts.BucketSvc, m.engine)
-	ts.BucketSvc = dbrp.NewBucketService(m.log, ts.BucketSvc, dbrpSvc)
+	ts.BucketService = storage.NewBucketService(ts.BucketService, m.engine)
+	ts.BucketService = dbrp.NewBucketService(m.log, ts.BucketService, dbrpSvc)
 
 	m.apibackend = &http.APIBackend{
 		AssetsPath:           m.assetsPath,
@@ -952,7 +972,7 @@ func (m *Launcher) run(ctx context.Context) (err error) {
 		NewQueryService:      source.NewQueryService,
 		PointsWriter: &storage.LoggingPointsWriter{
 			Underlying:    pointsWriter,
-			BucketFinder:  ts.BucketSvc,
+			BucketFinder:  ts.BucketService,
 			LogBucketName: platform.MonitoringSystemBucketName,
 		},
 		DeleteService:        deleteService,
@@ -961,12 +981,12 @@ func (m *Launcher) run(ctx context.Context) (err error) {
 		AuthorizationService: authSvc,
 		AlgoWProxy:           &http.NoopProxyHandler{},
 		// Wrap the BucketService in a storage backed one that will ensure deleted buckets are removed from the storage engine.
-		BucketService:                   ts.BucketSvc,
+		BucketService:                   ts.BucketService,
 		SessionService:                  sessionSvc,
-		UserService:                     ts.UserSvc,
+		UserService:                     ts.UserService,
 		DBRPService:                     dbrpSvc,
-		OrganizationService:             ts.OrgSvc,
-		UserResourceMappingService:      ts.UrmSvc,
+		OrganizationService:             ts.OrganizationService,
+		UserResourceMappingService:      ts.UserResourceMappingService,
 		LabelService:                    labelSvc,
 		DashboardService:                dashboardSvc,
 		DashboardOperationLogService:    dashboardLogSvc,
@@ -975,14 +995,14 @@ func (m *Launcher) run(ctx context.Context) (err error) {
 		OrganizationOperationLogService: orgLogSvc,
 		SourceService:                   sourceSvc,
 		VariableService:                 variableSvc,
-		PasswordsService:                ts.PasswordSvc,
+		PasswordsService:                ts.PasswordsService,
 		InfluxQLService:                 storageQueryService,
 		FluxService:                     storageQueryService,
 		FluxLanguageService:             fluxlang.DefaultService,
 		TaskService:                     taskSvc,
 		TelegrafService:                 telegrafSvc,
 		NotificationRuleStore:           notificationRuleSvc,
-		NotificationEndpointService:     endpoints.NewService(notificationEndpointStore, secretSvc, ts.UrmSvc, ts.OrgSvc),
+		NotificationEndpointService:     endpoints.NewService(notificationEndpointStore, secretSvc, ts.UserResourceMappingService, ts.OrganizationService),
 		CheckService:                    checkSvc,
 		ScraperTargetStoreService:       scraperTargetSvc,
 		ChronografService:               chronografSvc,
@@ -1009,7 +1029,7 @@ func (m *Launcher) run(ctx context.Context) (err error) {
 		pkgSVC = pkger.NewService(
 			pkger.WithLogger(pkgerLogger),
 			pkger.WithStore(pkger.NewStoreKV(m.kvStore)),
-			pkger.WithBucketSVC(authorizer.NewBucketService(b.BucketService, b.UserResourceMappingService)),
+			pkger.WithBucketSVC(authorizer.NewBucketService(b.BucketService)),
 			pkger.WithCheckSVC(authorizer.NewCheckService(b.CheckService, authedUrmSVC, authedOrgSVC)),
 			pkger.WithDashboardSVC(authorizer.NewDashboardService(b.DashboardService)),
 			pkger.WithLabelSVC(authorizer.NewLabelServiceWithOrg(b.LabelService, b.OrgLookupService)),
@@ -1025,12 +1045,6 @@ func (m *Launcher) run(ctx context.Context) (err error) {
 		pkgSVC = pkger.MWMetrics(m.reg)(pkgSVC)
 		pkgSVC = pkger.MWLogging(pkgerLogger)(pkgSVC)
 		pkgSVC = pkger.MWAuth(authAgent)(pkgSVC)
-	}
-
-	var pkgHTTPServerDeprecated *pkger.HTTPServerPackages
-	{
-		pkgServerLogger := m.log.With(zap.String("handler", "pkger"))
-		pkgHTTPServerDeprecated = pkger.NewHTTPServerPackages(pkgServerLogger, pkgSVC)
 	}
 
 	var stacksHTTPServer *pkger.HTTPServerStacks
@@ -1049,7 +1063,7 @@ func (m *Launcher) run(ctx context.Context) (err error) {
 
 	var onboardHTTPServer *tenant.OnboardHandler
 	{
-		onboardSvc := tenant.NewOnboardService(tenantStore, authSvc)                                      // basic service
+		onboardSvc := tenant.NewOnboardService(ts, authSvc)                                               // basic service
 		onboardSvc = tenant.NewAuthedOnboardSvc(onboardSvc)                                               // with auth
 		onboardSvc = tenant.NewOnboardingMetrics(m.reg, onboardSvc, metric.WithSuffix("new"))             // with metrics
 		onboardSvc = tenant.NewOnboardingLogger(m.log.With(zap.String("handler", "onboard")), onboardSvc) // with logging
@@ -1074,7 +1088,6 @@ func (m *Launcher) run(ctx context.Context) (err error) {
 	// feature flagging for new authorization service
 	var authHTTPServer *kithttp.FeatureHandler
 	{
-		ts := tenant.NewService(tenantStore) // todo (al): remove when tenant is un-flagged
 		authLogger := m.log.With(zap.String("handler", "authorization"))
 
 		oldBackend := http.NewAuthorizationBackend(authLogger, m.apibackend)
@@ -1097,16 +1110,15 @@ func (m *Launcher) run(ctx context.Context) (err error) {
 
 	var sessionHTTPServer *session.SessionHandler
 	{
-		sessionHTTPServer = session.NewSessionHandler(m.log.With(zap.String("handler", "session")), sessionSvc, ts.UserSvc, ts.PasswordSvc)
+		sessionHTTPServer = session.NewSessionHandler(m.log.With(zap.String("handler", "session")), sessionSvc, ts.UserService, ts.PasswordsService)
 	}
 
-	orgHTTPServer := ts.NewOrgHTTPHandler(m.log, labelSvc, secret.NewAuthedService(secretSvc))
+	orgHTTPServer := ts.NewOrgHTTPHandler(m.log, secret.NewAuthedService(secretSvc))
 
 	bucketHTTPServer := ts.NewBucketHTTPHandler(m.log, labelSvc)
 
 	{
 		platformHandler := http.NewPlatformHandler(m.apibackend,
-			http.WithResourceHandler(pkgHTTPServerDeprecated),
 			http.WithResourceHandler(stacksHTTPServer),
 			http.WithResourceHandler(templatesHTTPServer),
 			http.WithResourceHandler(onboardHTTPServer),

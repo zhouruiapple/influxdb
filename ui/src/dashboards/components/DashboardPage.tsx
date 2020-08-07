@@ -2,6 +2,7 @@
 import React, {Component} from 'react'
 import {connect, ConnectedProps} from 'react-redux'
 import {Switch, Route} from 'react-router-dom'
+import uuid from 'uuid'
 
 // Components
 import {Page} from '@influxdata/clockface'
@@ -19,9 +20,12 @@ import {AddNoteOverlay, EditNoteOverlay} from 'src/overlays/components'
 
 // Utils
 import {pageTitleSuffixer} from 'src/shared/utils/pageTitles'
+import {event} from 'src/cloud/utils/reporting'
+import {resetQueryCache} from 'src/shared/apis/queryCache'
+import {isFlagEnabled} from 'src/shared/utils/featureFlag'
 
 // Selectors & Actions
-import {resetCachedQueryResults} from 'src/queryCache/actions'
+import {setRenderID as setRenderIDAction} from 'src/perf/actions'
 import {getByID} from 'src/resources/selectors'
 
 // Types
@@ -46,8 +50,41 @@ const dashRoute = `/${ORGS}/${ORG_ID}/${DASHBOARDS}/${DASHBOARD_ID}`
 
 @ErrorHandling
 class DashboardPage extends Component<Props> {
+  public componentDidMount() {
+    const {dashboard, setRenderID} = this.props
+    const renderID = uuid.v4()
+    setRenderID('dashboard', renderID)
+
+    const tags = {
+      dashboardID: dashboard.id,
+    }
+    const fields = {renderID}
+
+    event('Dashboard Mounted', tags, fields)
+    if (isFlagEnabled('queryCacheForDashboards')) {
+      resetQueryCache()
+    }
+  }
+
+  public componentDidUpdate(prevProps) {
+    const {setRenderID, dashboard, manualRefresh} = this.props
+
+    if (prevProps.manualRefresh !== manualRefresh) {
+      const renderID = uuid.v4()
+      setRenderID('dashboard', renderID)
+      const tags = {
+        dashboardID: dashboard.id,
+      }
+      const fields = {renderID}
+
+      event('Dashboard Mounted', tags, fields)
+    }
+  }
+
   public componentWillUnmount() {
-    this.props.resetCachedQueryResults()
+    if (isFlagEnabled('queryCacheForDashboards')) {
+      resetQueryCache()
+    }
   }
 
   public render() {
@@ -62,7 +99,7 @@ class DashboardPage extends Component<Props> {
                 autoRefresh={autoRefresh}
                 onManualRefresh={onManualRefresh}
               />
-              <RateLimitAlert className="dashboard--rate-alert" />
+              <RateLimitAlert alertOnly={true} />
               <VariablesControlBar />
               <DashboardComponent manualRefresh={manualRefresh} />
             </HoverTimeProvider>
@@ -102,7 +139,7 @@ const mstp = (state: AppState) => {
 }
 
 const mdtp = {
-  resetCachedQueryResults: resetCachedQueryResults,
+  setRenderID: setRenderIDAction,
 }
 
 const connector = connect(mstp, mdtp)

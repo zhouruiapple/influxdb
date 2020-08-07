@@ -1,6 +1,6 @@
 import React, {FC, useMemo, useCallback} from 'react'
 import {default as StatelessTimeRangeDropdown} from 'src/shared/components/TimeRangeDropdown'
-import {TimeContextProps} from 'src/notebooks/components/header/Buttons'
+import {TimeContextProps} from 'src/notebooks/components/header'
 import {TimeBlock} from 'src/notebooks/context/time'
 
 // Utils
@@ -11,11 +11,13 @@ const TimeRangeDropdown: FC<TimeContextProps> = ({context, update}) => {
 
   const updateRange = useCallback(
     range => {
-      event('Time Range Updated', {
-        type: range.type,
-        upper: range.upper as string,
-        lower: range.lower,
-      })
+      event(
+        'Time Range Updated',
+        {
+          type: range.type,
+        },
+        {upper: range.upper as string, lower: range.lower}
+      )
 
       update({
         range,

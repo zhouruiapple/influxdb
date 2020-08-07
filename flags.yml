@@ -101,6 +101,14 @@
   lifetime: temporary
   expose: true
 
+- name: Query Cache for Dashboards UI
+  description: Enables a Dashboard Cache on the uI
+  key: queryCacheForDashboards
+  default: false
+  contact: Ariel Salem / Monitoring Team
+  lifetime: temporary
+  expose: true
+
 - name: Memory Optimized Fill
   description: Enable the memory optimized fill()
   key: memoryOptimizedFill
@@ -113,13 +121,6 @@
   key: memoryOptimizedSchemaMutation
   default: false
   contact: Query Team
-  lifetime: temporary
-
-- name: Urm Free Tasks
-  description: allow task system to operate without creating additional urms
-  key: urmFreeTasks
-  default: false
-  contact: Lyon Hill
   lifetime: temporary
 
 - name: Simple Task Options Extraction
@@ -135,3 +136,24 @@
   default: false
   contact: Lyon Hill
   lifetime: temporary
+
+- name: Merged Filters Rule
+  description: Create one filter combining multiple single return statements
+  key: mergeFiltersRule
+  default: false
+  contact: Query Team
+  lifetime: temporary
+
+- name: Notebooks
+  description: Determine if the notebook feature's route and navbar icon are visible to the user
+  key: notebooks
+  default: false
+  contact: Monitoring Team
+  lifetime: temporary
+  expose: true
+
+- name: Push Down Group Aggregate Min Max
+  description: Enable the min and max variants of the PushDownGroupAggregate planner rule
+  key: pushDownGroupAggregateMinMax
+  default: false
+  contact: Query Team

@@ -36,8 +36,10 @@ import {
   patchDashboardsCellsView as apiPatchDashboardsCellsView,
   deleteStack as apiDeleteStack,
   getStacks,
+  patchStack,
   postTemplatesApply,
   Error as PkgError,
+  TemplateApply,
   TemplateSummary,
 } from 'src/client'
 import {addDashboardDefaults} from 'src/schemas/dashboards'
@@ -484,13 +486,33 @@ export const reviewTemplate = async (orgID: string, templateUrl: string) => {
   return applyTemplates(params)
 }
 
-export const installTemplate = async (orgID: string, templateUrl: string) => {
+export const installTemplate = async (
+  orgID: string,
+  templateUrl: string,
+  resourcesToSkip
+) => {
+  const data: TemplateApply = {
+    dryRun: false,
+    orgID,
+    remotes: [{url: templateUrl}],
+  }
+
+  if (Object.keys(resourcesToSkip).length) {
+    const actions = []
+    for (const resourceTemplateName in resourcesToSkip) {
+      actions.push({
+        action: 'skipResource',
+        properties: {
+          kind: resourcesToSkip[resourceTemplateName],
+          resourceTemplateName,
+        },
+      })
+    }
+    data.actions = actions
+  }
+
   const params = {
-    data: {
-      dryRun: false,
-      orgID,
-      remotes: [{url: templateUrl}],
-    },
+    data,
   }
 
   return applyTemplates(params)
@@ -509,6 +531,23 @@ export const fetchStacks = async (orgID: string) => {
 export const deleteStack = async (stackId, orgID) => {
   const resp = await apiDeleteStack({stack_id: stackId, query: {orgID}})
 
+  if (resp.status >= 300) {
+    throw new Error((resp.data as PkgError).message)
+  }
+
+  return resp
+}
+
+export const updateStackName = async (stackID, name) => {
+  const resp = await patchStack({
+    stack_id: stackID,
+    data: {
+      name,
+      description: null,
+      templateURLs: null,
+      additionalResources: null,
+    },
+  })
   if (resp.status >= 300) {
     throw new Error((resp.data as PkgError).message)
   }

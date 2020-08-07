@@ -184,6 +184,20 @@ func NewHydrateVarsFunctionality() BoolFlag {
 	return hydratevars
 }
 
+var queryCacheForDashboards = MakeBoolFlag(
+	"Query Cache for Dashboards UI",
+	"queryCacheForDashboards",
+	"Ariel Salem / Monitoring Team",
+	false,
+	Temporary,
+	true,
+)
+
+// QueryCacheForDashboardsUi - Enables a Dashboard Cache on the uI
+func QueryCacheForDashboardsUi() BoolFlag {
+	return queryCacheForDashboards
+}
+
 var memoryOptimizedFill = MakeBoolFlag(
 	"Memory Optimized Fill",
 	"memoryOptimizedFill",
@@ -210,20 +224,6 @@ var memoryOptimizedSchemaMutation = MakeBoolFlag(
 // MemoryOptimizedSchemaMutation - Enable the memory optimized schema mutation functions
 func MemoryOptimizedSchemaMutation() BoolFlag {
 	return memoryOptimizedSchemaMutation
-}
-
-var urmFreeTasks = MakeBoolFlag(
-	"Urm Free Tasks",
-	"urmFreeTasks",
-	"Lyon Hill",
-	false,
-	Temporary,
-	false,
-)
-
-// UrmFreeTasks - allow task system to operate without creating additional urms
-func UrmFreeTasks() BoolFlag {
-	return urmFreeTasks
 }
 
 var simpleTaskOptionsExtraction = MakeBoolFlag(
@@ -254,6 +254,48 @@ func UseUserPermission() BoolFlag {
 	return useUserPermission
 }
 
+var mergeFiltersRule = MakeBoolFlag(
+	"Merged Filters Rule",
+	"mergeFiltersRule",
+	"Query Team",
+	false,
+	Temporary,
+	false,
+)
+
+// MergedFiltersRule - Create one filter combining multiple single return statements
+func MergedFiltersRule() BoolFlag {
+	return mergeFiltersRule
+}
+
+var notebooks = MakeBoolFlag(
+	"Notebooks",
+	"notebooks",
+	"Monitoring Team",
+	false,
+	Temporary,
+	true,
+)
+
+// Notebooks - Determine if the notebook feature's route and navbar icon are visible to the user
+func Notebooks() BoolFlag {
+	return notebooks
+}
+
+var pushDownGroupAggregateMinMax = MakeBoolFlag(
+	"Push Down Group Aggregate Min Max",
+	"pushDownGroupAggregateMinMax",
+	"Query Team",
+	false,
+	Temporary,
+	false,
+)
+
+// PushDownGroupAggregateMinMax - Enable the min and max variants of the PushDownGroupAggregate planner rule
+func PushDownGroupAggregateMinMax() BoolFlag {
+	return pushDownGroupAggregateMinMax
+}
+
 var all = []Flag{
 	appMetrics,
 	backendExample,
@@ -268,11 +310,14 @@ var all = []Flag{
 	newAuth,
 	newLabels,
 	hydratevars,
+	queryCacheForDashboards,
 	memoryOptimizedFill,
 	memoryOptimizedSchemaMutation,
-	urmFreeTasks,
 	simpleTaskOptionsExtraction,
 	useUserPermission,
+	mergeFiltersRule,
+	notebooks,
+	pushDownGroupAggregateMinMax,
 }
 
 var byKey = map[string]Flag{
@@ -289,9 +334,12 @@ var byKey = map[string]Flag{
 	"newAuth":                       newAuth,
 	"newLabels":                     newLabels,
 	"hydratevars":                   hydratevars,
+	"queryCacheForDashboards":       queryCacheForDashboards,
 	"memoryOptimizedFill":           memoryOptimizedFill,
 	"memoryOptimizedSchemaMutation": memoryOptimizedSchemaMutation,
-	"urmFreeTasks":                  urmFreeTasks,
 	"simpleTaskOptionsExtraction":   simpleTaskOptionsExtraction,
 	"useUserPermission":             useUserPermission,
+	"mergeFiltersRule":              mergeFiltersRule,
+	"notebooks":                     notebooks,
+	"pushDownGroupAggregateMinMax":  pushDownGroupAggregateMinMax,
 }

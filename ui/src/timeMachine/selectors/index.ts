@@ -129,7 +129,7 @@ export const getYColumnSelection = (state: AppState): string => {
   return defaultYColumn(table, preferredYColumnKey)
 }
 
-export const getMosaicYColumnSelection = (state: AppState): string[] => {
+export const getMosaicYColumnSelection = (state: AppState): string => {
   const {table} = getVisTable(state)
   const preferredYColumnKey = get(
     getActiveTimeMachine(state),

@@ -7,6 +7,7 @@
 package storageflux
 
 import (
+	"fmt"
 	"math"
 	"sync"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/influxdata/influxdb/v2"
 	"github.com/influxdata/influxdb/v2/models"
 	storage "github.com/influxdata/influxdb/v2/storage/reads"
+	"github.com/influxdata/influxdb/v2/storage/reads/datatypes"
 	"github.com/influxdata/influxdb/v2/tsdb/cursors"
 )
 
@@ -103,6 +105,7 @@ func (t *floatTable) advance() bool {
 type floatWindowTable struct {
 	floatTable
 	windowEvery int64
+	offset      int64
 	arr         *cursors.FloatArray
 	nextTS      int64
 	idxInArr    int
@@ -115,6 +118,7 @@ func newFloatWindowTable(
 	cur cursors.FloatArrayCursor,
 	bounds execute.Bounds,
 	every int64,
+	offset int64,
 	createEmpty bool,
 	timeColumn string,
 
@@ -131,12 +135,13 @@ func newFloatWindowTable(
 			cur:   cur,
 		},
 		windowEvery: every,
+		offset:      offset,
 		createEmpty: createEmpty,
 		timeColumn:  timeColumn,
 	}
 	if t.createEmpty {
 		start := int64(bounds.Start)
-		t.nextTS = start + (every - offset(start, every))
+		t.nextTS = storage.WindowStop(start, every, offset)
 	}
 	t.readTags(tags)
 	t.init(t.advance)
@@ -304,7 +309,7 @@ func (t *floatWindowTable) advance() bool {
 	} else {
 		cr.cols[startColIdx] = start
 		cr.cols[stopColIdx] = stop
-		cr.cols[windowedValueColIdx] = values
+		cr.cols[valueColIdxWithoutTime] = values
 	}
 	t.appendTags(cr)
 	return true
@@ -314,6 +319,7 @@ func (t *floatWindowTable) advance() bool {
 type floatWindowSelectorTable struct {
 	floatTable
 	windowEvery int64
+	offset      int64
 	timeColumn  string
 }
 
@@ -322,6 +328,7 @@ func newFloatWindowSelectorTable(
 	cur cursors.FloatArrayCursor,
 	bounds execute.Bounds,
 	every int64,
+	offset int64,
 	timeColumn string,
 	key flux.GroupKey,
 	cols []flux.ColMeta,
@@ -336,6 +343,7 @@ func newFloatWindowSelectorTable(
 			cur:   cur,
 		},
 		windowEvery: every,
+		offset:      offset,
 		timeColumn:  timeColumn,
 	}
 	t.readTags(tags)
@@ -380,7 +388,7 @@ func (t *floatWindowSelectorTable) startTimes(arr *cursors.FloatArray) *array.In
 	rangeStart := int64(t.bounds.Start)
 
 	for _, v := range arr.Timestamps {
-		if windowStart := v - offset(v, t.windowEvery); windowStart < rangeStart {
+		if windowStart := storage.WindowStart(v, t.windowEvery, t.offset); windowStart < rangeStart {
 			start.Append(rangeStart)
 		} else {
 			start.Append(windowStart)
@@ -396,7 +404,7 @@ func (t *floatWindowSelectorTable) stopTimes(arr *cursors.FloatArray) *array.Int
 	rangeStop := int64(t.bounds.Stop)
 
 	for _, v := range arr.Timestamps {
-		if windowStop := v - offset(v, t.windowEvery) + t.windowEvery; windowStop > rangeStop {
+		if windowStop := storage.WindowStop(v, t.windowEvery, t.offset); windowStop > rangeStop {
 			stop.Append(rangeStop)
 		} else {
 			stop.Append(windowStop)
@@ -424,6 +432,7 @@ func newFloatEmptyWindowSelectorTable(
 	cur cursors.FloatArrayCursor,
 	bounds execute.Bounds,
 	windowEvery int64,
+	offset int64,
 	timeColumn string,
 	key flux.GroupKey,
 	cols []flux.ColMeta,
@@ -434,9 +443,6 @@ func newFloatEmptyWindowSelectorTable(
 ) *floatEmptyWindowSelectorTable {
 	rangeStart := int64(bounds.Start)
 	rangeStop := int64(bounds.Stop)
-	windowStart := rangeStart - offset(rangeStart, windowEvery)
-	windowStop := windowStart + windowEvery
-
 	t := &floatEmptyWindowSelectorTable{
 		floatTable: floatTable{
 			table: newTable(done, bounds, key, cols, defs, cache, alloc),
@@ -445,8 +451,8 @@ func newFloatEmptyWindowSelectorTable(
 		arr:         cur.Next(),
 		rangeStart:  rangeStart,
 		rangeStop:   rangeStop,
-		windowStart: windowStart,
-		windowStop:  windowStop,
+		windowStart: storage.WindowStart(rangeStart, windowEvery, offset),
+		windowStop:  storage.WindowStop(rangeStart, windowEvery, offset),
 		windowEvery: windowEvery,
 		timeColumn:  timeColumn,
 	}
@@ -499,13 +505,6 @@ func (t *floatEmptyWindowSelectorTable) startTimes(builder *array.Float64Builder
 
 	for t.windowStart < t.rangeStop {
 
-		// If the current array is non-empty and has
-		// been read in its entirety, call Next().
-		if t.arr.Len() > 0 && t.idx == t.arr.Len() {
-			t.arr = t.cur.Next()
-			t.idx = 0
-		}
-
 		// The first window should start at the
 		// beginning of the time range.
 		if t.windowStart < t.rangeStart {
@@ -535,6 +534,13 @@ func (t *floatEmptyWindowSelectorTable) startTimes(builder *array.Float64Builder
 		t.windowStart += t.windowEvery
 		t.windowStop += t.windowEvery
 
+		// If the current array is non-empty and has
+		// been read in its entirety, call Next().
+		if t.arr.Len() > 0 && t.idx == t.arr.Len() {
+			t.arr = t.cur.Next()
+			t.idx = 0
+		}
+
 		if start.Len() == storage.MaxPointsPerBlock {
 			break
 		}
@@ -547,13 +553,6 @@ func (t *floatEmptyWindowSelectorTable) stopTimes(builder *array.Float64Builder)
 	stop.Resize(storage.MaxPointsPerBlock)
 
 	for t.windowStart < t.rangeStop {
-
-		// If the current array is non-empty and has
-		// been read in its entirety, call Next().
-		if t.arr.Len() > 0 && t.idx == t.arr.Len() {
-			t.arr = t.cur.Next()
-			t.idx = 0
-		}
 
 		// The last window should stop at the end of
 		// the time range.
@@ -584,6 +583,13 @@ func (t *floatEmptyWindowSelectorTable) stopTimes(builder *array.Float64Builder)
 		t.windowStart += t.windowEvery
 		t.windowStop += t.windowEvery
 
+		// If the current array is non-empty and has
+		// been read in its entirety, call Next().
+		if t.arr.Len() > 0 && t.idx == t.arr.Len() {
+			t.arr = t.cur.Next()
+			t.idx = 0
+		}
+
 		if stop.Len() == storage.MaxPointsPerBlock {
 			break
 		}
@@ -602,13 +608,6 @@ func (t *floatEmptyWindowSelectorTable) startStopTimes(builder *array.Float64Bui
 	time.Resize(storage.MaxPointsPerBlock)
 
 	for t.windowStart < t.rangeStop {
-
-		// If the current array is non-empty and has
-		// been read in its entirety, call Next().
-		if t.arr.Len() > 0 && t.idx == t.arr.Len() {
-			t.arr = t.cur.Next()
-			t.idx = 0
-		}
 
 		// The first window should start at the
 		// beginning of the time range.
@@ -648,6 +647,13 @@ func (t *floatEmptyWindowSelectorTable) startStopTimes(builder *array.Float64Bui
 
 		t.windowStart += t.windowEvery
 		t.windowStop += t.windowEvery
+
+		// If the current array is non-empty and has
+		// been read in its entirety, call Next().
+		if t.arr.Len() > 0 && t.idx == t.arr.Len() {
+			t.arr = t.cur.Next()
+			t.idx = 0
+		}
 
 		if time.Len() == storage.MaxPointsPerBlock {
 			break
@@ -706,27 +712,181 @@ func (t *floatGroupTable) Do(f func(flux.ColReader) error) error {
 }
 
 func (t *floatGroupTable) advance() bool {
-RETRY:
-	a := t.cur.Next()
-	l := a.Len()
-	if l == 0 {
-		if t.advanceCursor() {
-			goto RETRY
+	if t.cur == nil {
+		// For group aggregates, we will try to get all the series and all table buffers within those series
+		// all at once and merge them into one row when this advance() function is first called.
+		// At the end of this process, t.advanceCursor() already returns false and t.cur becomes nil.
+		// But we still need to return true to indicate that there is data to be returned.
+		// The second time when we call this advance(), t.cur is already nil, so we directly return false.
+		return false
+	}
+	var arr *cursors.FloatArray
+	var len int
+	for {
+		arr = t.cur.Next()
+		len = arr.Len()
+		if len > 0 {
+			break
 		}
+		if !t.advanceCursor() {
+			return false
+		}
+	}
 
+	// handle the group without aggregate case
+	if t.gc.Aggregate() == nil {
+		// Retrieve the buffer for the data to avoid allocating
+		// additional slices. If the buffer is still being used
+		// because the references were retained, then we will
+		// allocate a new buffer.
+		colReader := t.allocateBuffer(len)
+		colReader.cols[timeColIdx] = arrow.NewInt(arr.Timestamps, t.alloc)
+		colReader.cols[valueColIdx] = t.toArrowBuffer(arr.Values)
+		t.appendTags(colReader)
+		t.appendBounds(colReader)
+		return true
+	}
+
+	aggregate, err := determineFloatAggregateMethod(t.gc.Aggregate().Type)
+	if err != nil {
+		t.err = err
 		return false
 	}
 
-	// Retrieve the buffer for the data to avoid allocating
-	// additional slices. If the buffer is still being used
-	// because the references were retained, then we will
-	// allocate a new buffer.
-	cr := t.allocateBuffer(l)
-	cr.cols[timeColIdx] = arrow.NewInt(a.Timestamps, t.alloc)
-	cr.cols[valueColIdx] = t.toArrowBuffer(a.Values)
-	t.appendTags(cr)
-	t.appendBounds(cr)
+	ts, v := aggregate(arr.Timestamps, arr.Values)
+	timestamps, values := []int64{ts}, []float64{v}
+	for {
+		arr = t.cur.Next()
+		if arr.Len() > 0 {
+			ts, v := aggregate(arr.Timestamps, arr.Values)
+			timestamps = append(timestamps, ts)
+			values = append(values, v)
+			continue
+		}
+
+		if !t.advanceCursor() {
+			break
+		}
+	}
+	timestamp, value := aggregate(timestamps, values)
+
+	colReader := t.allocateBuffer(1)
+	if IsSelector(t.gc.Aggregate()) {
+		colReader.cols[timeColIdx] = arrow.NewInt([]int64{timestamp}, t.alloc)
+		colReader.cols[valueColIdx] = t.toArrowBuffer([]float64{value})
+	} else {
+		colReader.cols[valueColIdxWithoutTime] = t.toArrowBuffer([]float64{value})
+	}
+	t.appendTags(colReader)
+	t.appendBounds(colReader)
 	return true
+}
+
+type floatAggregateMethod func([]int64, []float64) (int64, float64)
+
+// determineFloatAggregateMethod returns the method for aggregating
+// returned points within the same group. The incoming points are the
+// ones returned for each series and the method returned here will
+// aggregate the aggregates.
+func determineFloatAggregateMethod(agg datatypes.Aggregate_AggregateType) (floatAggregateMethod, error) {
+	switch agg {
+	case datatypes.AggregateTypeFirst:
+		return aggregateFirstGroupsFloat, nil
+	case datatypes.AggregateTypeLast:
+		return aggregateLastGroupsFloat, nil
+	case datatypes.AggregateTypeCount:
+
+		return nil, &influxdb.Error{
+			Code: influxdb.EInvalid,
+			Msg:  "unsupported for aggregate count: Float",
+		}
+
+	case datatypes.AggregateTypeSum:
+
+		return aggregateSumGroupsFloat, nil
+
+	case datatypes.AggregateTypeMin:
+
+		return aggregateMinGroupsFloat, nil
+
+	case datatypes.AggregateTypeMax:
+
+		return aggregateMaxGroupsFloat, nil
+
+	default:
+		return nil, &influxdb.Error{
+			Code: influxdb.EInvalid,
+			Msg:  fmt.Sprintf("unknown/unimplemented aggregate type: %v", agg),
+		}
+	}
+}
+
+func aggregateMinGroupsFloat(timestamps []int64, values []float64) (int64, float64) {
+	value := values[0]
+	timestamp := timestamps[0]
+
+	for i := 1; i < len(values); i++ {
+		if value > values[i] {
+			value = values[i]
+			timestamp = timestamps[i]
+		}
+	}
+
+	return timestamp, value
+}
+
+func aggregateMaxGroupsFloat(timestamps []int64, values []float64) (int64, float64) {
+	value := values[0]
+	timestamp := timestamps[0]
+
+	for i := 1; i < len(values); i++ {
+		if value < values[i] {
+			value = values[i]
+			timestamp = timestamps[i]
+		}
+	}
+
+	return timestamp, value
+}
+
+// For group count and sum, the timestamp here is always math.MaxInt64.
+// their final result does not contain _time, so this timestamp value can be anything
+// and it won't matter.
+
+func aggregateSumGroupsFloat(_ []int64, values []float64) (int64, float64) {
+	var sum float64
+	for _, v := range values {
+		sum += v
+	}
+	return math.MaxInt64, sum
+}
+
+func aggregateFirstGroupsFloat(timestamps []int64, values []float64) (int64, float64) {
+	value := values[0]
+	timestamp := timestamps[0]
+
+	for i := 1; i < len(values); i++ {
+		if timestamp > timestamps[i] {
+			value = values[i]
+			timestamp = timestamps[i]
+		}
+	}
+
+	return timestamp, value
+}
+
+func aggregateLastGroupsFloat(timestamps []int64, values []float64) (int64, float64) {
+	value := values[0]
+	timestamp := timestamps[0]
+
+	for i := 1; i < len(values); i++ {
+		if timestamp < timestamps[i] {
+			value = values[i]
+			timestamp = timestamps[i]
+		}
+	}
+
+	return timestamp, value
 }
 
 func (t *floatGroupTable) advanceCursor() bool {
@@ -851,6 +1011,7 @@ func (t *integerTable) advance() bool {
 type integerWindowTable struct {
 	integerTable
 	windowEvery int64
+	offset      int64
 	arr         *cursors.IntegerArray
 	nextTS      int64
 	idxInArr    int
@@ -864,6 +1025,7 @@ func newIntegerWindowTable(
 	cur cursors.IntegerArrayCursor,
 	bounds execute.Bounds,
 	every int64,
+	offset int64,
 	createEmpty bool,
 	timeColumn string,
 	fillValue *int64,
@@ -880,13 +1042,14 @@ func newIntegerWindowTable(
 			cur:   cur,
 		},
 		windowEvery: every,
+		offset:      offset,
 		createEmpty: createEmpty,
 		timeColumn:  timeColumn,
 		fillValue:   fillValue,
 	}
 	if t.createEmpty {
 		start := int64(bounds.Start)
-		t.nextTS = start + (every - offset(start, every))
+		t.nextTS = storage.WindowStop(start, every, offset)
 	}
 	t.readTags(tags)
 	t.init(t.advance)
@@ -1054,7 +1217,7 @@ func (t *integerWindowTable) advance() bool {
 	} else {
 		cr.cols[startColIdx] = start
 		cr.cols[stopColIdx] = stop
-		cr.cols[windowedValueColIdx] = values
+		cr.cols[valueColIdxWithoutTime] = values
 	}
 	t.appendTags(cr)
 	return true
@@ -1064,6 +1227,7 @@ func (t *integerWindowTable) advance() bool {
 type integerWindowSelectorTable struct {
 	integerTable
 	windowEvery int64
+	offset      int64
 	timeColumn  string
 }
 
@@ -1072,6 +1236,7 @@ func newIntegerWindowSelectorTable(
 	cur cursors.IntegerArrayCursor,
 	bounds execute.Bounds,
 	every int64,
+	offset int64,
 	timeColumn string,
 	key flux.GroupKey,
 	cols []flux.ColMeta,
@@ -1086,6 +1251,7 @@ func newIntegerWindowSelectorTable(
 			cur:   cur,
 		},
 		windowEvery: every,
+		offset:      offset,
 		timeColumn:  timeColumn,
 	}
 	t.readTags(tags)
@@ -1130,7 +1296,7 @@ func (t *integerWindowSelectorTable) startTimes(arr *cursors.IntegerArray) *arra
 	rangeStart := int64(t.bounds.Start)
 
 	for _, v := range arr.Timestamps {
-		if windowStart := v - offset(v, t.windowEvery); windowStart < rangeStart {
+		if windowStart := storage.WindowStart(v, t.windowEvery, t.offset); windowStart < rangeStart {
 			start.Append(rangeStart)
 		} else {
 			start.Append(windowStart)
@@ -1146,7 +1312,7 @@ func (t *integerWindowSelectorTable) stopTimes(arr *cursors.IntegerArray) *array
 	rangeStop := int64(t.bounds.Stop)
 
 	for _, v := range arr.Timestamps {
-		if windowStop := v - offset(v, t.windowEvery) + t.windowEvery; windowStop > rangeStop {
+		if windowStop := storage.WindowStop(v, t.windowEvery, t.offset); windowStop > rangeStop {
 			stop.Append(rangeStop)
 		} else {
 			stop.Append(windowStop)
@@ -1174,6 +1340,7 @@ func newIntegerEmptyWindowSelectorTable(
 	cur cursors.IntegerArrayCursor,
 	bounds execute.Bounds,
 	windowEvery int64,
+	offset int64,
 	timeColumn string,
 	key flux.GroupKey,
 	cols []flux.ColMeta,
@@ -1184,9 +1351,6 @@ func newIntegerEmptyWindowSelectorTable(
 ) *integerEmptyWindowSelectorTable {
 	rangeStart := int64(bounds.Start)
 	rangeStop := int64(bounds.Stop)
-	windowStart := rangeStart - offset(rangeStart, windowEvery)
-	windowStop := windowStart + windowEvery
-
 	t := &integerEmptyWindowSelectorTable{
 		integerTable: integerTable{
 			table: newTable(done, bounds, key, cols, defs, cache, alloc),
@@ -1195,8 +1359,8 @@ func newIntegerEmptyWindowSelectorTable(
 		arr:         cur.Next(),
 		rangeStart:  rangeStart,
 		rangeStop:   rangeStop,
-		windowStart: windowStart,
-		windowStop:  windowStop,
+		windowStart: storage.WindowStart(rangeStart, windowEvery, offset),
+		windowStop:  storage.WindowStop(rangeStart, windowEvery, offset),
 		windowEvery: windowEvery,
 		timeColumn:  timeColumn,
 	}
@@ -1249,13 +1413,6 @@ func (t *integerEmptyWindowSelectorTable) startTimes(builder *array.Int64Builder
 
 	for t.windowStart < t.rangeStop {
 
-		// If the current array is non-empty and has
-		// been read in its entirety, call Next().
-		if t.arr.Len() > 0 && t.idx == t.arr.Len() {
-			t.arr = t.cur.Next()
-			t.idx = 0
-		}
-
 		// The first window should start at the
 		// beginning of the time range.
 		if t.windowStart < t.rangeStart {
@@ -1285,6 +1442,13 @@ func (t *integerEmptyWindowSelectorTable) startTimes(builder *array.Int64Builder
 		t.windowStart += t.windowEvery
 		t.windowStop += t.windowEvery
 
+		// If the current array is non-empty and has
+		// been read in its entirety, call Next().
+		if t.arr.Len() > 0 && t.idx == t.arr.Len() {
+			t.arr = t.cur.Next()
+			t.idx = 0
+		}
+
 		if start.Len() == storage.MaxPointsPerBlock {
 			break
 		}
@@ -1297,13 +1461,6 @@ func (t *integerEmptyWindowSelectorTable) stopTimes(builder *array.Int64Builder)
 	stop.Resize(storage.MaxPointsPerBlock)
 
 	for t.windowStart < t.rangeStop {
-
-		// If the current array is non-empty and has
-		// been read in its entirety, call Next().
-		if t.arr.Len() > 0 && t.idx == t.arr.Len() {
-			t.arr = t.cur.Next()
-			t.idx = 0
-		}
 
 		// The last window should stop at the end of
 		// the time range.
@@ -1334,6 +1491,13 @@ func (t *integerEmptyWindowSelectorTable) stopTimes(builder *array.Int64Builder)
 		t.windowStart += t.windowEvery
 		t.windowStop += t.windowEvery
 
+		// If the current array is non-empty and has
+		// been read in its entirety, call Next().
+		if t.arr.Len() > 0 && t.idx == t.arr.Len() {
+			t.arr = t.cur.Next()
+			t.idx = 0
+		}
+
 		if stop.Len() == storage.MaxPointsPerBlock {
 			break
 		}
@@ -1352,13 +1516,6 @@ func (t *integerEmptyWindowSelectorTable) startStopTimes(builder *array.Int64Bui
 	time.Resize(storage.MaxPointsPerBlock)
 
 	for t.windowStart < t.rangeStop {
-
-		// If the current array is non-empty and has
-		// been read in its entirety, call Next().
-		if t.arr.Len() > 0 && t.idx == t.arr.Len() {
-			t.arr = t.cur.Next()
-			t.idx = 0
-		}
 
 		// The first window should start at the
 		// beginning of the time range.
@@ -1398,6 +1555,13 @@ func (t *integerEmptyWindowSelectorTable) startStopTimes(builder *array.Int64Bui
 
 		t.windowStart += t.windowEvery
 		t.windowStop += t.windowEvery
+
+		// If the current array is non-empty and has
+		// been read in its entirety, call Next().
+		if t.arr.Len() > 0 && t.idx == t.arr.Len() {
+			t.arr = t.cur.Next()
+			t.idx = 0
+		}
 
 		if time.Len() == storage.MaxPointsPerBlock {
 			break
@@ -1456,27 +1620,182 @@ func (t *integerGroupTable) Do(f func(flux.ColReader) error) error {
 }
 
 func (t *integerGroupTable) advance() bool {
-RETRY:
-	a := t.cur.Next()
-	l := a.Len()
-	if l == 0 {
-		if t.advanceCursor() {
-			goto RETRY
+	if t.cur == nil {
+		// For group aggregates, we will try to get all the series and all table buffers within those series
+		// all at once and merge them into one row when this advance() function is first called.
+		// At the end of this process, t.advanceCursor() already returns false and t.cur becomes nil.
+		// But we still need to return true to indicate that there is data to be returned.
+		// The second time when we call this advance(), t.cur is already nil, so we directly return false.
+		return false
+	}
+	var arr *cursors.IntegerArray
+	var len int
+	for {
+		arr = t.cur.Next()
+		len = arr.Len()
+		if len > 0 {
+			break
 		}
+		if !t.advanceCursor() {
+			return false
+		}
+	}
 
+	// handle the group without aggregate case
+	if t.gc.Aggregate() == nil {
+		// Retrieve the buffer for the data to avoid allocating
+		// additional slices. If the buffer is still being used
+		// because the references were retained, then we will
+		// allocate a new buffer.
+		colReader := t.allocateBuffer(len)
+		colReader.cols[timeColIdx] = arrow.NewInt(arr.Timestamps, t.alloc)
+		colReader.cols[valueColIdx] = t.toArrowBuffer(arr.Values)
+		t.appendTags(colReader)
+		t.appendBounds(colReader)
+		return true
+	}
+
+	aggregate, err := determineIntegerAggregateMethod(t.gc.Aggregate().Type)
+	if err != nil {
+		t.err = err
 		return false
 	}
 
-	// Retrieve the buffer for the data to avoid allocating
-	// additional slices. If the buffer is still being used
-	// because the references were retained, then we will
-	// allocate a new buffer.
-	cr := t.allocateBuffer(l)
-	cr.cols[timeColIdx] = arrow.NewInt(a.Timestamps, t.alloc)
-	cr.cols[valueColIdx] = t.toArrowBuffer(a.Values)
-	t.appendTags(cr)
-	t.appendBounds(cr)
+	ts, v := aggregate(arr.Timestamps, arr.Values)
+	timestamps, values := []int64{ts}, []int64{v}
+	for {
+		arr = t.cur.Next()
+		if arr.Len() > 0 {
+			ts, v := aggregate(arr.Timestamps, arr.Values)
+			timestamps = append(timestamps, ts)
+			values = append(values, v)
+			continue
+		}
+
+		if !t.advanceCursor() {
+			break
+		}
+	}
+	timestamp, value := aggregate(timestamps, values)
+
+	colReader := t.allocateBuffer(1)
+	if IsSelector(t.gc.Aggregate()) {
+		colReader.cols[timeColIdx] = arrow.NewInt([]int64{timestamp}, t.alloc)
+		colReader.cols[valueColIdx] = t.toArrowBuffer([]int64{value})
+	} else {
+		colReader.cols[valueColIdxWithoutTime] = t.toArrowBuffer([]int64{value})
+	}
+	t.appendTags(colReader)
+	t.appendBounds(colReader)
 	return true
+}
+
+type integerAggregateMethod func([]int64, []int64) (int64, int64)
+
+// determineIntegerAggregateMethod returns the method for aggregating
+// returned points within the same group. The incoming points are the
+// ones returned for each series and the method returned here will
+// aggregate the aggregates.
+func determineIntegerAggregateMethod(agg datatypes.Aggregate_AggregateType) (integerAggregateMethod, error) {
+	switch agg {
+	case datatypes.AggregateTypeFirst:
+		return aggregateFirstGroupsInteger, nil
+	case datatypes.AggregateTypeLast:
+		return aggregateLastGroupsInteger, nil
+	case datatypes.AggregateTypeCount:
+
+		return aggregateCountGroupsInteger, nil
+
+	case datatypes.AggregateTypeSum:
+
+		return aggregateSumGroupsInteger, nil
+
+	case datatypes.AggregateTypeMin:
+
+		return aggregateMinGroupsInteger, nil
+
+	case datatypes.AggregateTypeMax:
+
+		return aggregateMaxGroupsInteger, nil
+
+	default:
+		return nil, &influxdb.Error{
+			Code: influxdb.EInvalid,
+			Msg:  fmt.Sprintf("unknown/unimplemented aggregate type: %v", agg),
+		}
+	}
+}
+
+func aggregateMinGroupsInteger(timestamps []int64, values []int64) (int64, int64) {
+	value := values[0]
+	timestamp := timestamps[0]
+
+	for i := 1; i < len(values); i++ {
+		if value > values[i] {
+			value = values[i]
+			timestamp = timestamps[i]
+		}
+	}
+
+	return timestamp, value
+}
+
+func aggregateMaxGroupsInteger(timestamps []int64, values []int64) (int64, int64) {
+	value := values[0]
+	timestamp := timestamps[0]
+
+	for i := 1; i < len(values); i++ {
+		if value < values[i] {
+			value = values[i]
+			timestamp = timestamps[i]
+		}
+	}
+
+	return timestamp, value
+}
+
+// For group count and sum, the timestamp here is always math.MaxInt64.
+// their final result does not contain _time, so this timestamp value can be anything
+// and it won't matter.
+
+func aggregateCountGroupsInteger(timestamps []int64, values []int64) (int64, int64) {
+	return aggregateSumGroupsInteger(timestamps, values)
+}
+
+func aggregateSumGroupsInteger(_ []int64, values []int64) (int64, int64) {
+	var sum int64
+	for _, v := range values {
+		sum += v
+	}
+	return math.MaxInt64, sum
+}
+
+func aggregateFirstGroupsInteger(timestamps []int64, values []int64) (int64, int64) {
+	value := values[0]
+	timestamp := timestamps[0]
+
+	for i := 1; i < len(values); i++ {
+		if timestamp > timestamps[i] {
+			value = values[i]
+			timestamp = timestamps[i]
+		}
+	}
+
+	return timestamp, value
+}
+
+func aggregateLastGroupsInteger(timestamps []int64, values []int64) (int64, int64) {
+	value := values[0]
+	timestamp := timestamps[0]
+
+	for i := 1; i < len(values); i++ {
+		if timestamp < timestamps[i] {
+			value = values[i]
+			timestamp = timestamps[i]
+		}
+	}
+
+	return timestamp, value
 }
 
 func (t *integerGroupTable) advanceCursor() bool {
@@ -1601,6 +1920,7 @@ func (t *unsignedTable) advance() bool {
 type unsignedWindowTable struct {
 	unsignedTable
 	windowEvery int64
+	offset      int64
 	arr         *cursors.UnsignedArray
 	nextTS      int64
 	idxInArr    int
@@ -1613,6 +1933,7 @@ func newUnsignedWindowTable(
 	cur cursors.UnsignedArrayCursor,
 	bounds execute.Bounds,
 	every int64,
+	offset int64,
 	createEmpty bool,
 	timeColumn string,
 
@@ -1629,12 +1950,13 @@ func newUnsignedWindowTable(
 			cur:   cur,
 		},
 		windowEvery: every,
+		offset:      offset,
 		createEmpty: createEmpty,
 		timeColumn:  timeColumn,
 	}
 	if t.createEmpty {
 		start := int64(bounds.Start)
-		t.nextTS = start + (every - offset(start, every))
+		t.nextTS = storage.WindowStop(start, every, offset)
 	}
 	t.readTags(tags)
 	t.init(t.advance)
@@ -1802,7 +2124,7 @@ func (t *unsignedWindowTable) advance() bool {
 	} else {
 		cr.cols[startColIdx] = start
 		cr.cols[stopColIdx] = stop
-		cr.cols[windowedValueColIdx] = values
+		cr.cols[valueColIdxWithoutTime] = values
 	}
 	t.appendTags(cr)
 	return true
@@ -1812,6 +2134,7 @@ func (t *unsignedWindowTable) advance() bool {
 type unsignedWindowSelectorTable struct {
 	unsignedTable
 	windowEvery int64
+	offset      int64
 	timeColumn  string
 }
 
@@ -1820,6 +2143,7 @@ func newUnsignedWindowSelectorTable(
 	cur cursors.UnsignedArrayCursor,
 	bounds execute.Bounds,
 	every int64,
+	offset int64,
 	timeColumn string,
 	key flux.GroupKey,
 	cols []flux.ColMeta,
@@ -1834,6 +2158,7 @@ func newUnsignedWindowSelectorTable(
 			cur:   cur,
 		},
 		windowEvery: every,
+		offset:      offset,
 		timeColumn:  timeColumn,
 	}
 	t.readTags(tags)
@@ -1878,7 +2203,7 @@ func (t *unsignedWindowSelectorTable) startTimes(arr *cursors.UnsignedArray) *ar
 	rangeStart := int64(t.bounds.Start)
 
 	for _, v := range arr.Timestamps {
-		if windowStart := v - offset(v, t.windowEvery); windowStart < rangeStart {
+		if windowStart := storage.WindowStart(v, t.windowEvery, t.offset); windowStart < rangeStart {
 			start.Append(rangeStart)
 		} else {
 			start.Append(windowStart)
@@ -1894,7 +2219,7 @@ func (t *unsignedWindowSelectorTable) stopTimes(arr *cursors.UnsignedArray) *arr
 	rangeStop := int64(t.bounds.Stop)
 
 	for _, v := range arr.Timestamps {
-		if windowStop := v - offset(v, t.windowEvery) + t.windowEvery; windowStop > rangeStop {
+		if windowStop := storage.WindowStop(v, t.windowEvery, t.offset); windowStop > rangeStop {
 			stop.Append(rangeStop)
 		} else {
 			stop.Append(windowStop)
@@ -1922,6 +2247,7 @@ func newUnsignedEmptyWindowSelectorTable(
 	cur cursors.UnsignedArrayCursor,
 	bounds execute.Bounds,
 	windowEvery int64,
+	offset int64,
 	timeColumn string,
 	key flux.GroupKey,
 	cols []flux.ColMeta,
@@ -1932,9 +2258,6 @@ func newUnsignedEmptyWindowSelectorTable(
 ) *unsignedEmptyWindowSelectorTable {
 	rangeStart := int64(bounds.Start)
 	rangeStop := int64(bounds.Stop)
-	windowStart := rangeStart - offset(rangeStart, windowEvery)
-	windowStop := windowStart + windowEvery
-
 	t := &unsignedEmptyWindowSelectorTable{
 		unsignedTable: unsignedTable{
 			table: newTable(done, bounds, key, cols, defs, cache, alloc),
@@ -1943,8 +2266,8 @@ func newUnsignedEmptyWindowSelectorTable(
 		arr:         cur.Next(),
 		rangeStart:  rangeStart,
 		rangeStop:   rangeStop,
-		windowStart: windowStart,
-		windowStop:  windowStop,
+		windowStart: storage.WindowStart(rangeStart, windowEvery, offset),
+		windowStop:  storage.WindowStop(rangeStart, windowEvery, offset),
 		windowEvery: windowEvery,
 		timeColumn:  timeColumn,
 	}
@@ -1997,13 +2320,6 @@ func (t *unsignedEmptyWindowSelectorTable) startTimes(builder *array.Uint64Build
 
 	for t.windowStart < t.rangeStop {
 
-		// If the current array is non-empty and has
-		// been read in its entirety, call Next().
-		if t.arr.Len() > 0 && t.idx == t.arr.Len() {
-			t.arr = t.cur.Next()
-			t.idx = 0
-		}
-
 		// The first window should start at the
 		// beginning of the time range.
 		if t.windowStart < t.rangeStart {
@@ -2033,6 +2349,13 @@ func (t *unsignedEmptyWindowSelectorTable) startTimes(builder *array.Uint64Build
 		t.windowStart += t.windowEvery
 		t.windowStop += t.windowEvery
 
+		// If the current array is non-empty and has
+		// been read in its entirety, call Next().
+		if t.arr.Len() > 0 && t.idx == t.arr.Len() {
+			t.arr = t.cur.Next()
+			t.idx = 0
+		}
+
 		if start.Len() == storage.MaxPointsPerBlock {
 			break
 		}
@@ -2045,13 +2368,6 @@ func (t *unsignedEmptyWindowSelectorTable) stopTimes(builder *array.Uint64Builde
 	stop.Resize(storage.MaxPointsPerBlock)
 
 	for t.windowStart < t.rangeStop {
-
-		// If the current array is non-empty and has
-		// been read in its entirety, call Next().
-		if t.arr.Len() > 0 && t.idx == t.arr.Len() {
-			t.arr = t.cur.Next()
-			t.idx = 0
-		}
 
 		// The last window should stop at the end of
 		// the time range.
@@ -2082,6 +2398,13 @@ func (t *unsignedEmptyWindowSelectorTable) stopTimes(builder *array.Uint64Builde
 		t.windowStart += t.windowEvery
 		t.windowStop += t.windowEvery
 
+		// If the current array is non-empty and has
+		// been read in its entirety, call Next().
+		if t.arr.Len() > 0 && t.idx == t.arr.Len() {
+			t.arr = t.cur.Next()
+			t.idx = 0
+		}
+
 		if stop.Len() == storage.MaxPointsPerBlock {
 			break
 		}
@@ -2100,13 +2423,6 @@ func (t *unsignedEmptyWindowSelectorTable) startStopTimes(builder *array.Uint64B
 	time.Resize(storage.MaxPointsPerBlock)
 
 	for t.windowStart < t.rangeStop {
-
-		// If the current array is non-empty and has
-		// been read in its entirety, call Next().
-		if t.arr.Len() > 0 && t.idx == t.arr.Len() {
-			t.arr = t.cur.Next()
-			t.idx = 0
-		}
 
 		// The first window should start at the
 		// beginning of the time range.
@@ -2146,6 +2462,13 @@ func (t *unsignedEmptyWindowSelectorTable) startStopTimes(builder *array.Uint64B
 
 		t.windowStart += t.windowEvery
 		t.windowStop += t.windowEvery
+
+		// If the current array is non-empty and has
+		// been read in its entirety, call Next().
+		if t.arr.Len() > 0 && t.idx == t.arr.Len() {
+			t.arr = t.cur.Next()
+			t.idx = 0
+		}
 
 		if time.Len() == storage.MaxPointsPerBlock {
 			break
@@ -2204,27 +2527,181 @@ func (t *unsignedGroupTable) Do(f func(flux.ColReader) error) error {
 }
 
 func (t *unsignedGroupTable) advance() bool {
-RETRY:
-	a := t.cur.Next()
-	l := a.Len()
-	if l == 0 {
-		if t.advanceCursor() {
-			goto RETRY
+	if t.cur == nil {
+		// For group aggregates, we will try to get all the series and all table buffers within those series
+		// all at once and merge them into one row when this advance() function is first called.
+		// At the end of this process, t.advanceCursor() already returns false and t.cur becomes nil.
+		// But we still need to return true to indicate that there is data to be returned.
+		// The second time when we call this advance(), t.cur is already nil, so we directly return false.
+		return false
+	}
+	var arr *cursors.UnsignedArray
+	var len int
+	for {
+		arr = t.cur.Next()
+		len = arr.Len()
+		if len > 0 {
+			break
 		}
+		if !t.advanceCursor() {
+			return false
+		}
+	}
 
+	// handle the group without aggregate case
+	if t.gc.Aggregate() == nil {
+		// Retrieve the buffer for the data to avoid allocating
+		// additional slices. If the buffer is still being used
+		// because the references were retained, then we will
+		// allocate a new buffer.
+		colReader := t.allocateBuffer(len)
+		colReader.cols[timeColIdx] = arrow.NewInt(arr.Timestamps, t.alloc)
+		colReader.cols[valueColIdx] = t.toArrowBuffer(arr.Values)
+		t.appendTags(colReader)
+		t.appendBounds(colReader)
+		return true
+	}
+
+	aggregate, err := determineUnsignedAggregateMethod(t.gc.Aggregate().Type)
+	if err != nil {
+		t.err = err
 		return false
 	}
 
-	// Retrieve the buffer for the data to avoid allocating
-	// additional slices. If the buffer is still being used
-	// because the references were retained, then we will
-	// allocate a new buffer.
-	cr := t.allocateBuffer(l)
-	cr.cols[timeColIdx] = arrow.NewInt(a.Timestamps, t.alloc)
-	cr.cols[valueColIdx] = t.toArrowBuffer(a.Values)
-	t.appendTags(cr)
-	t.appendBounds(cr)
+	ts, v := aggregate(arr.Timestamps, arr.Values)
+	timestamps, values := []int64{ts}, []uint64{v}
+	for {
+		arr = t.cur.Next()
+		if arr.Len() > 0 {
+			ts, v := aggregate(arr.Timestamps, arr.Values)
+			timestamps = append(timestamps, ts)
+			values = append(values, v)
+			continue
+		}
+
+		if !t.advanceCursor() {
+			break
+		}
+	}
+	timestamp, value := aggregate(timestamps, values)
+
+	colReader := t.allocateBuffer(1)
+	if IsSelector(t.gc.Aggregate()) {
+		colReader.cols[timeColIdx] = arrow.NewInt([]int64{timestamp}, t.alloc)
+		colReader.cols[valueColIdx] = t.toArrowBuffer([]uint64{value})
+	} else {
+		colReader.cols[valueColIdxWithoutTime] = t.toArrowBuffer([]uint64{value})
+	}
+	t.appendTags(colReader)
+	t.appendBounds(colReader)
 	return true
+}
+
+type unsignedAggregateMethod func([]int64, []uint64) (int64, uint64)
+
+// determineUnsignedAggregateMethod returns the method for aggregating
+// returned points within the same group. The incoming points are the
+// ones returned for each series and the method returned here will
+// aggregate the aggregates.
+func determineUnsignedAggregateMethod(agg datatypes.Aggregate_AggregateType) (unsignedAggregateMethod, error) {
+	switch agg {
+	case datatypes.AggregateTypeFirst:
+		return aggregateFirstGroupsUnsigned, nil
+	case datatypes.AggregateTypeLast:
+		return aggregateLastGroupsUnsigned, nil
+	case datatypes.AggregateTypeCount:
+
+		return nil, &influxdb.Error{
+			Code: influxdb.EInvalid,
+			Msg:  "unsupported for aggregate count: Unsigned",
+		}
+
+	case datatypes.AggregateTypeSum:
+
+		return aggregateSumGroupsUnsigned, nil
+
+	case datatypes.AggregateTypeMin:
+
+		return aggregateMinGroupsUnsigned, nil
+
+	case datatypes.AggregateTypeMax:
+
+		return aggregateMaxGroupsUnsigned, nil
+
+	default:
+		return nil, &influxdb.Error{
+			Code: influxdb.EInvalid,
+			Msg:  fmt.Sprintf("unknown/unimplemented aggregate type: %v", agg),
+		}
+	}
+}
+
+func aggregateMinGroupsUnsigned(timestamps []int64, values []uint64) (int64, uint64) {
+	value := values[0]
+	timestamp := timestamps[0]
+
+	for i := 1; i < len(values); i++ {
+		if value > values[i] {
+			value = values[i]
+			timestamp = timestamps[i]
+		}
+	}
+
+	return timestamp, value
+}
+
+func aggregateMaxGroupsUnsigned(timestamps []int64, values []uint64) (int64, uint64) {
+	value := values[0]
+	timestamp := timestamps[0]
+
+	for i := 1; i < len(values); i++ {
+		if value < values[i] {
+			value = values[i]
+			timestamp = timestamps[i]
+		}
+	}
+
+	return timestamp, value
+}
+
+// For group count and sum, the timestamp here is always math.MaxInt64.
+// their final result does not contain _time, so this timestamp value can be anything
+// and it won't matter.
+
+func aggregateSumGroupsUnsigned(_ []int64, values []uint64) (int64, uint64) {
+	var sum uint64
+	for _, v := range values {
+		sum += v
+	}
+	return math.MaxInt64, sum
+}
+
+func aggregateFirstGroupsUnsigned(timestamps []int64, values []uint64) (int64, uint64) {
+	value := values[0]
+	timestamp := timestamps[0]
+
+	for i := 1; i < len(values); i++ {
+		if timestamp > timestamps[i] {
+			value = values[i]
+			timestamp = timestamps[i]
+		}
+	}
+
+	return timestamp, value
+}
+
+func aggregateLastGroupsUnsigned(timestamps []int64, values []uint64) (int64, uint64) {
+	value := values[0]
+	timestamp := timestamps[0]
+
+	for i := 1; i < len(values); i++ {
+		if timestamp < timestamps[i] {
+			value = values[i]
+			timestamp = timestamps[i]
+		}
+	}
+
+	return timestamp, value
 }
 
 func (t *unsignedGroupTable) advanceCursor() bool {
@@ -2349,6 +2826,7 @@ func (t *stringTable) advance() bool {
 type stringWindowTable struct {
 	stringTable
 	windowEvery int64
+	offset      int64
 	arr         *cursors.StringArray
 	nextTS      int64
 	idxInArr    int
@@ -2361,6 +2839,7 @@ func newStringWindowTable(
 	cur cursors.StringArrayCursor,
 	bounds execute.Bounds,
 	every int64,
+	offset int64,
 	createEmpty bool,
 	timeColumn string,
 
@@ -2377,12 +2856,13 @@ func newStringWindowTable(
 			cur:   cur,
 		},
 		windowEvery: every,
+		offset:      offset,
 		createEmpty: createEmpty,
 		timeColumn:  timeColumn,
 	}
 	if t.createEmpty {
 		start := int64(bounds.Start)
-		t.nextTS = start + (every - offset(start, every))
+		t.nextTS = storage.WindowStop(start, every, offset)
 	}
 	t.readTags(tags)
 	t.init(t.advance)
@@ -2550,7 +3030,7 @@ func (t *stringWindowTable) advance() bool {
 	} else {
 		cr.cols[startColIdx] = start
 		cr.cols[stopColIdx] = stop
-		cr.cols[windowedValueColIdx] = values
+		cr.cols[valueColIdxWithoutTime] = values
 	}
 	t.appendTags(cr)
 	return true
@@ -2560,6 +3040,7 @@ func (t *stringWindowTable) advance() bool {
 type stringWindowSelectorTable struct {
 	stringTable
 	windowEvery int64
+	offset      int64
 	timeColumn  string
 }
 
@@ -2568,6 +3049,7 @@ func newStringWindowSelectorTable(
 	cur cursors.StringArrayCursor,
 	bounds execute.Bounds,
 	every int64,
+	offset int64,
 	timeColumn string,
 	key flux.GroupKey,
 	cols []flux.ColMeta,
@@ -2582,6 +3064,7 @@ func newStringWindowSelectorTable(
 			cur:   cur,
 		},
 		windowEvery: every,
+		offset:      offset,
 		timeColumn:  timeColumn,
 	}
 	t.readTags(tags)
@@ -2626,7 +3109,7 @@ func (t *stringWindowSelectorTable) startTimes(arr *cursors.StringArray) *array.
 	rangeStart := int64(t.bounds.Start)
 
 	for _, v := range arr.Timestamps {
-		if windowStart := v - offset(v, t.windowEvery); windowStart < rangeStart {
+		if windowStart := storage.WindowStart(v, t.windowEvery, t.offset); windowStart < rangeStart {
 			start.Append(rangeStart)
 		} else {
 			start.Append(windowStart)
@@ -2642,7 +3125,7 @@ func (t *stringWindowSelectorTable) stopTimes(arr *cursors.StringArray) *array.I
 	rangeStop := int64(t.bounds.Stop)
 
 	for _, v := range arr.Timestamps {
-		if windowStop := v - offset(v, t.windowEvery) + t.windowEvery; windowStop > rangeStop {
+		if windowStop := storage.WindowStop(v, t.windowEvery, t.offset); windowStop > rangeStop {
 			stop.Append(rangeStop)
 		} else {
 			stop.Append(windowStop)
@@ -2670,6 +3153,7 @@ func newStringEmptyWindowSelectorTable(
 	cur cursors.StringArrayCursor,
 	bounds execute.Bounds,
 	windowEvery int64,
+	offset int64,
 	timeColumn string,
 	key flux.GroupKey,
 	cols []flux.ColMeta,
@@ -2680,9 +3164,6 @@ func newStringEmptyWindowSelectorTable(
 ) *stringEmptyWindowSelectorTable {
 	rangeStart := int64(bounds.Start)
 	rangeStop := int64(bounds.Stop)
-	windowStart := rangeStart - offset(rangeStart, windowEvery)
-	windowStop := windowStart + windowEvery
-
 	t := &stringEmptyWindowSelectorTable{
 		stringTable: stringTable{
 			table: newTable(done, bounds, key, cols, defs, cache, alloc),
@@ -2691,8 +3172,8 @@ func newStringEmptyWindowSelectorTable(
 		arr:         cur.Next(),
 		rangeStart:  rangeStart,
 		rangeStop:   rangeStop,
-		windowStart: windowStart,
-		windowStop:  windowStop,
+		windowStart: storage.WindowStart(rangeStart, windowEvery, offset),
+		windowStop:  storage.WindowStop(rangeStart, windowEvery, offset),
 		windowEvery: windowEvery,
 		timeColumn:  timeColumn,
 	}
@@ -2745,13 +3226,6 @@ func (t *stringEmptyWindowSelectorTable) startTimes(builder *array.BinaryBuilder
 
 	for t.windowStart < t.rangeStop {
 
-		// If the current array is non-empty and has
-		// been read in its entirety, call Next().
-		if t.arr.Len() > 0 && t.idx == t.arr.Len() {
-			t.arr = t.cur.Next()
-			t.idx = 0
-		}
-
 		// The first window should start at the
 		// beginning of the time range.
 		if t.windowStart < t.rangeStart {
@@ -2781,6 +3255,13 @@ func (t *stringEmptyWindowSelectorTable) startTimes(builder *array.BinaryBuilder
 		t.windowStart += t.windowEvery
 		t.windowStop += t.windowEvery
 
+		// If the current array is non-empty and has
+		// been read in its entirety, call Next().
+		if t.arr.Len() > 0 && t.idx == t.arr.Len() {
+			t.arr = t.cur.Next()
+			t.idx = 0
+		}
+
 		if start.Len() == storage.MaxPointsPerBlock {
 			break
 		}
@@ -2793,13 +3274,6 @@ func (t *stringEmptyWindowSelectorTable) stopTimes(builder *array.BinaryBuilder)
 	stop.Resize(storage.MaxPointsPerBlock)
 
 	for t.windowStart < t.rangeStop {
-
-		// If the current array is non-empty and has
-		// been read in its entirety, call Next().
-		if t.arr.Len() > 0 && t.idx == t.arr.Len() {
-			t.arr = t.cur.Next()
-			t.idx = 0
-		}
 
 		// The last window should stop at the end of
 		// the time range.
@@ -2830,6 +3304,13 @@ func (t *stringEmptyWindowSelectorTable) stopTimes(builder *array.BinaryBuilder)
 		t.windowStart += t.windowEvery
 		t.windowStop += t.windowEvery
 
+		// If the current array is non-empty and has
+		// been read in its entirety, call Next().
+		if t.arr.Len() > 0 && t.idx == t.arr.Len() {
+			t.arr = t.cur.Next()
+			t.idx = 0
+		}
+
 		if stop.Len() == storage.MaxPointsPerBlock {
 			break
 		}
@@ -2848,13 +3329,6 @@ func (t *stringEmptyWindowSelectorTable) startStopTimes(builder *array.BinaryBui
 	time.Resize(storage.MaxPointsPerBlock)
 
 	for t.windowStart < t.rangeStop {
-
-		// If the current array is non-empty and has
-		// been read in its entirety, call Next().
-		if t.arr.Len() > 0 && t.idx == t.arr.Len() {
-			t.arr = t.cur.Next()
-			t.idx = 0
-		}
 
 		// The first window should start at the
 		// beginning of the time range.
@@ -2894,6 +3368,13 @@ func (t *stringEmptyWindowSelectorTable) startStopTimes(builder *array.BinaryBui
 
 		t.windowStart += t.windowEvery
 		t.windowStop += t.windowEvery
+
+		// If the current array is non-empty and has
+		// been read in its entirety, call Next().
+		if t.arr.Len() > 0 && t.idx == t.arr.Len() {
+			t.arr = t.cur.Next()
+			t.idx = 0
+		}
 
 		if time.Len() == storage.MaxPointsPerBlock {
 			break
@@ -2952,27 +3433,154 @@ func (t *stringGroupTable) Do(f func(flux.ColReader) error) error {
 }
 
 func (t *stringGroupTable) advance() bool {
-RETRY:
-	a := t.cur.Next()
-	l := a.Len()
-	if l == 0 {
-		if t.advanceCursor() {
-			goto RETRY
+	if t.cur == nil {
+		// For group aggregates, we will try to get all the series and all table buffers within those series
+		// all at once and merge them into one row when this advance() function is first called.
+		// At the end of this process, t.advanceCursor() already returns false and t.cur becomes nil.
+		// But we still need to return true to indicate that there is data to be returned.
+		// The second time when we call this advance(), t.cur is already nil, so we directly return false.
+		return false
+	}
+	var arr *cursors.StringArray
+	var len int
+	for {
+		arr = t.cur.Next()
+		len = arr.Len()
+		if len > 0 {
+			break
 		}
+		if !t.advanceCursor() {
+			return false
+		}
+	}
 
+	// handle the group without aggregate case
+	if t.gc.Aggregate() == nil {
+		// Retrieve the buffer for the data to avoid allocating
+		// additional slices. If the buffer is still being used
+		// because the references were retained, then we will
+		// allocate a new buffer.
+		colReader := t.allocateBuffer(len)
+		colReader.cols[timeColIdx] = arrow.NewInt(arr.Timestamps, t.alloc)
+		colReader.cols[valueColIdx] = t.toArrowBuffer(arr.Values)
+		t.appendTags(colReader)
+		t.appendBounds(colReader)
+		return true
+	}
+
+	aggregate, err := determineStringAggregateMethod(t.gc.Aggregate().Type)
+	if err != nil {
+		t.err = err
 		return false
 	}
 
-	// Retrieve the buffer for the data to avoid allocating
-	// additional slices. If the buffer is still being used
-	// because the references were retained, then we will
-	// allocate a new buffer.
-	cr := t.allocateBuffer(l)
-	cr.cols[timeColIdx] = arrow.NewInt(a.Timestamps, t.alloc)
-	cr.cols[valueColIdx] = t.toArrowBuffer(a.Values)
-	t.appendTags(cr)
-	t.appendBounds(cr)
+	ts, v := aggregate(arr.Timestamps, arr.Values)
+	timestamps, values := []int64{ts}, []string{v}
+	for {
+		arr = t.cur.Next()
+		if arr.Len() > 0 {
+			ts, v := aggregate(arr.Timestamps, arr.Values)
+			timestamps = append(timestamps, ts)
+			values = append(values, v)
+			continue
+		}
+
+		if !t.advanceCursor() {
+			break
+		}
+	}
+	timestamp, value := aggregate(timestamps, values)
+
+	colReader := t.allocateBuffer(1)
+	if IsSelector(t.gc.Aggregate()) {
+		colReader.cols[timeColIdx] = arrow.NewInt([]int64{timestamp}, t.alloc)
+		colReader.cols[valueColIdx] = t.toArrowBuffer([]string{value})
+	} else {
+		colReader.cols[valueColIdxWithoutTime] = t.toArrowBuffer([]string{value})
+	}
+	t.appendTags(colReader)
+	t.appendBounds(colReader)
 	return true
+}
+
+type stringAggregateMethod func([]int64, []string) (int64, string)
+
+// determineStringAggregateMethod returns the method for aggregating
+// returned points within the same group. The incoming points are the
+// ones returned for each series and the method returned here will
+// aggregate the aggregates.
+func determineStringAggregateMethod(agg datatypes.Aggregate_AggregateType) (stringAggregateMethod, error) {
+	switch agg {
+	case datatypes.AggregateTypeFirst:
+		return aggregateFirstGroupsString, nil
+	case datatypes.AggregateTypeLast:
+		return aggregateLastGroupsString, nil
+	case datatypes.AggregateTypeCount:
+
+		return nil, &influxdb.Error{
+			Code: influxdb.EInvalid,
+			Msg:  "unsupported for aggregate count: String",
+		}
+
+	case datatypes.AggregateTypeSum:
+
+		return nil, &influxdb.Error{
+			Code: influxdb.EInvalid,
+			Msg:  "unsupported for aggregate sum: String",
+		}
+
+	case datatypes.AggregateTypeMin:
+
+		return nil, &influxdb.Error{
+			Code: influxdb.EInvalid,
+			Msg:  "unsupported for aggregate min: String",
+		}
+
+	case datatypes.AggregateTypeMax:
+
+		return nil, &influxdb.Error{
+			Code: influxdb.EInvalid,
+			Msg:  "unsupported for aggregate max: String",
+		}
+
+	default:
+		return nil, &influxdb.Error{
+			Code: influxdb.EInvalid,
+			Msg:  fmt.Sprintf("unknown/unimplemented aggregate type: %v", agg),
+		}
+	}
+}
+
+// For group count and sum, the timestamp here is always math.MaxInt64.
+// their final result does not contain _time, so this timestamp value can be anything
+// and it won't matter.
+
+func aggregateFirstGroupsString(timestamps []int64, values []string) (int64, string) {
+	value := values[0]
+	timestamp := timestamps[0]
+
+	for i := 1; i < len(values); i++ {
+		if timestamp > timestamps[i] {
+			value = values[i]
+			timestamp = timestamps[i]
+		}
+	}
+
+	return timestamp, value
+}
+
+func aggregateLastGroupsString(timestamps []int64, values []string) (int64, string) {
+	value := values[0]
+	timestamp := timestamps[0]
+
+	for i := 1; i < len(values); i++ {
+		if timestamp < timestamps[i] {
+			value = values[i]
+			timestamp = timestamps[i]
+		}
+	}
+
+	return timestamp, value
 }
 
 func (t *stringGroupTable) advanceCursor() bool {
@@ -3097,6 +3705,7 @@ func (t *booleanTable) advance() bool {
 type booleanWindowTable struct {
 	booleanTable
 	windowEvery int64
+	offset      int64
 	arr         *cursors.BooleanArray
 	nextTS      int64
 	idxInArr    int
@@ -3109,6 +3718,7 @@ func newBooleanWindowTable(
 	cur cursors.BooleanArrayCursor,
 	bounds execute.Bounds,
 	every int64,
+	offset int64,
 	createEmpty bool,
 	timeColumn string,
 
@@ -3125,12 +3735,13 @@ func newBooleanWindowTable(
 			cur:   cur,
 		},
 		windowEvery: every,
+		offset:      offset,
 		createEmpty: createEmpty,
 		timeColumn:  timeColumn,
 	}
 	if t.createEmpty {
 		start := int64(bounds.Start)
-		t.nextTS = start + (every - offset(start, every))
+		t.nextTS = storage.WindowStop(start, every, offset)
 	}
 	t.readTags(tags)
 	t.init(t.advance)
@@ -3298,7 +3909,7 @@ func (t *booleanWindowTable) advance() bool {
 	} else {
 		cr.cols[startColIdx] = start
 		cr.cols[stopColIdx] = stop
-		cr.cols[windowedValueColIdx] = values
+		cr.cols[valueColIdxWithoutTime] = values
 	}
 	t.appendTags(cr)
 	return true
@@ -3308,6 +3919,7 @@ func (t *booleanWindowTable) advance() bool {
 type booleanWindowSelectorTable struct {
 	booleanTable
 	windowEvery int64
+	offset      int64
 	timeColumn  string
 }
 
@@ -3316,6 +3928,7 @@ func newBooleanWindowSelectorTable(
 	cur cursors.BooleanArrayCursor,
 	bounds execute.Bounds,
 	every int64,
+	offset int64,
 	timeColumn string,
 	key flux.GroupKey,
 	cols []flux.ColMeta,
@@ -3330,6 +3943,7 @@ func newBooleanWindowSelectorTable(
 			cur:   cur,
 		},
 		windowEvery: every,
+		offset:      offset,
 		timeColumn:  timeColumn,
 	}
 	t.readTags(tags)
@@ -3374,7 +3988,7 @@ func (t *booleanWindowSelectorTable) startTimes(arr *cursors.BooleanArray) *arra
 	rangeStart := int64(t.bounds.Start)
 
 	for _, v := range arr.Timestamps {
-		if windowStart := v - offset(v, t.windowEvery); windowStart < rangeStart {
+		if windowStart := storage.WindowStart(v, t.windowEvery, t.offset); windowStart < rangeStart {
 			start.Append(rangeStart)
 		} else {
 			start.Append(windowStart)
@@ -3390,7 +4004,7 @@ func (t *booleanWindowSelectorTable) stopTimes(arr *cursors.BooleanArray) *array
 	rangeStop := int64(t.bounds.Stop)
 
 	for _, v := range arr.Timestamps {
-		if windowStop := v - offset(v, t.windowEvery) + t.windowEvery; windowStop > rangeStop {
+		if windowStop := storage.WindowStop(v, t.windowEvery, t.offset); windowStop > rangeStop {
 			stop.Append(rangeStop)
 		} else {
 			stop.Append(windowStop)
@@ -3418,6 +4032,7 @@ func newBooleanEmptyWindowSelectorTable(
 	cur cursors.BooleanArrayCursor,
 	bounds execute.Bounds,
 	windowEvery int64,
+	offset int64,
 	timeColumn string,
 	key flux.GroupKey,
 	cols []flux.ColMeta,
@@ -3428,9 +4043,6 @@ func newBooleanEmptyWindowSelectorTable(
 ) *booleanEmptyWindowSelectorTable {
 	rangeStart := int64(bounds.Start)
 	rangeStop := int64(bounds.Stop)
-	windowStart := rangeStart - offset(rangeStart, windowEvery)
-	windowStop := windowStart + windowEvery
-
 	t := &booleanEmptyWindowSelectorTable{
 		booleanTable: booleanTable{
 			table: newTable(done, bounds, key, cols, defs, cache, alloc),
@@ -3439,8 +4051,8 @@ func newBooleanEmptyWindowSelectorTable(
 		arr:         cur.Next(),
 		rangeStart:  rangeStart,
 		rangeStop:   rangeStop,
-		windowStart: windowStart,
-		windowStop:  windowStop,
+		windowStart: storage.WindowStart(rangeStart, windowEvery, offset),
+		windowStop:  storage.WindowStop(rangeStart, windowEvery, offset),
 		windowEvery: windowEvery,
 		timeColumn:  timeColumn,
 	}
@@ -3493,13 +4105,6 @@ func (t *booleanEmptyWindowSelectorTable) startTimes(builder *array.BooleanBuild
 
 	for t.windowStart < t.rangeStop {
 
-		// If the current array is non-empty and has
-		// been read in its entirety, call Next().
-		if t.arr.Len() > 0 && t.idx == t.arr.Len() {
-			t.arr = t.cur.Next()
-			t.idx = 0
-		}
-
 		// The first window should start at the
 		// beginning of the time range.
 		if t.windowStart < t.rangeStart {
@@ -3529,6 +4134,13 @@ func (t *booleanEmptyWindowSelectorTable) startTimes(builder *array.BooleanBuild
 		t.windowStart += t.windowEvery
 		t.windowStop += t.windowEvery
 
+		// If the current array is non-empty and has
+		// been read in its entirety, call Next().
+		if t.arr.Len() > 0 && t.idx == t.arr.Len() {
+			t.arr = t.cur.Next()
+			t.idx = 0
+		}
+
 		if start.Len() == storage.MaxPointsPerBlock {
 			break
 		}
@@ -3541,13 +4153,6 @@ func (t *booleanEmptyWindowSelectorTable) stopTimes(builder *array.BooleanBuilde
 	stop.Resize(storage.MaxPointsPerBlock)
 
 	for t.windowStart < t.rangeStop {
-
-		// If the current array is non-empty and has
-		// been read in its entirety, call Next().
-		if t.arr.Len() > 0 && t.idx == t.arr.Len() {
-			t.arr = t.cur.Next()
-			t.idx = 0
-		}
 
 		// The last window should stop at the end of
 		// the time range.
@@ -3578,6 +4183,13 @@ func (t *booleanEmptyWindowSelectorTable) stopTimes(builder *array.BooleanBuilde
 		t.windowStart += t.windowEvery
 		t.windowStop += t.windowEvery
 
+		// If the current array is non-empty and has
+		// been read in its entirety, call Next().
+		if t.arr.Len() > 0 && t.idx == t.arr.Len() {
+			t.arr = t.cur.Next()
+			t.idx = 0
+		}
+
 		if stop.Len() == storage.MaxPointsPerBlock {
 			break
 		}
@@ -3596,13 +4208,6 @@ func (t *booleanEmptyWindowSelectorTable) startStopTimes(builder *array.BooleanB
 	time.Resize(storage.MaxPointsPerBlock)
 
 	for t.windowStart < t.rangeStop {
-
-		// If the current array is non-empty and has
-		// been read in its entirety, call Next().
-		if t.arr.Len() > 0 && t.idx == t.arr.Len() {
-			t.arr = t.cur.Next()
-			t.idx = 0
-		}
 
 		// The first window should start at the
 		// beginning of the time range.
@@ -3642,6 +4247,13 @@ func (t *booleanEmptyWindowSelectorTable) startStopTimes(builder *array.BooleanB
 
 		t.windowStart += t.windowEvery
 		t.windowStop += t.windowEvery
+
+		// If the current array is non-empty and has
+		// been read in its entirety, call Next().
+		if t.arr.Len() > 0 && t.idx == t.arr.Len() {
+			t.arr = t.cur.Next()
+			t.idx = 0
+		}
 
 		if time.Len() == storage.MaxPointsPerBlock {
 			break
@@ -3700,27 +4312,154 @@ func (t *booleanGroupTable) Do(f func(flux.ColReader) error) error {
 }
 
 func (t *booleanGroupTable) advance() bool {
-RETRY:
-	a := t.cur.Next()
-	l := a.Len()
-	if l == 0 {
-		if t.advanceCursor() {
-			goto RETRY
+	if t.cur == nil {
+		// For group aggregates, we will try to get all the series and all table buffers within those series
+		// all at once and merge them into one row when this advance() function is first called.
+		// At the end of this process, t.advanceCursor() already returns false and t.cur becomes nil.
+		// But we still need to return true to indicate that there is data to be returned.
+		// The second time when we call this advance(), t.cur is already nil, so we directly return false.
+		return false
+	}
+	var arr *cursors.BooleanArray
+	var len int
+	for {
+		arr = t.cur.Next()
+		len = arr.Len()
+		if len > 0 {
+			break
 		}
+		if !t.advanceCursor() {
+			return false
+		}
+	}
 
+	// handle the group without aggregate case
+	if t.gc.Aggregate() == nil {
+		// Retrieve the buffer for the data to avoid allocating
+		// additional slices. If the buffer is still being used
+		// because the references were retained, then we will
+		// allocate a new buffer.
+		colReader := t.allocateBuffer(len)
+		colReader.cols[timeColIdx] = arrow.NewInt(arr.Timestamps, t.alloc)
+		colReader.cols[valueColIdx] = t.toArrowBuffer(arr.Values)
+		t.appendTags(colReader)
+		t.appendBounds(colReader)
+		return true
+	}
+
+	aggregate, err := determineBooleanAggregateMethod(t.gc.Aggregate().Type)
+	if err != nil {
+		t.err = err
 		return false
 	}
 
-	// Retrieve the buffer for the data to avoid allocating
-	// additional slices. If the buffer is still being used
-	// because the references were retained, then we will
-	// allocate a new buffer.
-	cr := t.allocateBuffer(l)
-	cr.cols[timeColIdx] = arrow.NewInt(a.Timestamps, t.alloc)
-	cr.cols[valueColIdx] = t.toArrowBuffer(a.Values)
-	t.appendTags(cr)
-	t.appendBounds(cr)
+	ts, v := aggregate(arr.Timestamps, arr.Values)
+	timestamps, values := []int64{ts}, []bool{v}
+	for {
+		arr = t.cur.Next()
+		if arr.Len() > 0 {
+			ts, v := aggregate(arr.Timestamps, arr.Values)
+			timestamps = append(timestamps, ts)
+			values = append(values, v)
+			continue
+		}
+
+		if !t.advanceCursor() {
+			break
+		}
+	}
+	timestamp, value := aggregate(timestamps, values)
+
+	colReader := t.allocateBuffer(1)
+	if IsSelector(t.gc.Aggregate()) {
+		colReader.cols[timeColIdx] = arrow.NewInt([]int64{timestamp}, t.alloc)
+		colReader.cols[valueColIdx] = t.toArrowBuffer([]bool{value})
+	} else {
+		colReader.cols[valueColIdxWithoutTime] = t.toArrowBuffer([]bool{value})
+	}
+	t.appendTags(colReader)
+	t.appendBounds(colReader)
 	return true
+}
+
+type booleanAggregateMethod func([]int64, []bool) (int64, bool)
+
+// determineBooleanAggregateMethod returns the method for aggregating
+// returned points within the same group. The incoming points are the
+// ones returned for each series and the method returned here will
+// aggregate the aggregates.
+func determineBooleanAggregateMethod(agg datatypes.Aggregate_AggregateType) (booleanAggregateMethod, error) {
+	switch agg {
+	case datatypes.AggregateTypeFirst:
+		return aggregateFirstGroupsBoolean, nil
+	case datatypes.AggregateTypeLast:
+		return aggregateLastGroupsBoolean, nil
+	case datatypes.AggregateTypeCount:
+
+		return nil, &influxdb.Error{
+			Code: influxdb.EInvalid,
+			Msg:  "unsupported for aggregate count: Boolean",
+		}
+
+	case datatypes.AggregateTypeSum:
+
+		return nil, &influxdb.Error{
+			Code: influxdb.EInvalid,
+			Msg:  "unsupported for aggregate sum: Boolean",
+		}
+
+	case datatypes.AggregateTypeMin:
+
+		return nil, &influxdb.Error{
+			Code: influxdb.EInvalid,
+			Msg:  "unsupported for aggregate min: Boolean",
+		}
+
+	case datatypes.AggregateTypeMax:
+
+		return nil, &influxdb.Error{
+			Code: influxdb.EInvalid,
+			Msg:  "unsupported for aggregate max: Boolean",
+		}
+
+	default:
+		return nil, &influxdb.Error{
+			Code: influxdb.EInvalid,
+			Msg:  fmt.Sprintf("unknown/unimplemented aggregate type: %v", agg),
+		}
+	}
+}
+
+// For group count and sum, the timestamp here is always math.MaxInt64.
+// their final result does not contain _time, so this timestamp value can be anything
+// and it won't matter.
+
+func aggregateFirstGroupsBoolean(timestamps []int64, values []bool) (int64, bool) {
+	value := values[0]
+	timestamp := timestamps[0]
+
+	for i := 1; i < len(values); i++ {
+		if timestamp > timestamps[i] {
+			value = values[i]
+			timestamp = timestamps[i]
+		}
+	}
+
+	return timestamp, value
+}
+
+func aggregateLastGroupsBoolean(timestamps []int64, values []bool) (int64, bool) {
+	value := values[0]
+	timestamp := timestamps[0]
+
+	for i := 1; i < len(values); i++ {
+		if timestamp < timestamps[i] {
+			value = values[i]
+			timestamp = timestamps[i]
+		}
+	}
+
+	return timestamp, value
 }
 
 func (t *booleanGroupTable) advanceCursor() bool {

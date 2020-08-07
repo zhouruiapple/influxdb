@@ -191,7 +191,6 @@ export const getTimeColumns = (table: Table): string[] => {
     }
 
     const columnType = table.getColumnType(k)
-
     return columnType === 'time'
   })
 
@@ -205,7 +204,6 @@ export const getNumberColumns = (table: Table): string[] => {
     }
 
     const columnType = table.getColumnType(k)
-
     return columnType === 'number'
   })
 
@@ -256,12 +254,10 @@ export const defaultXColumn = (
   table: Table,
   preferredColumnKey?: string
 ): string | null => {
-  const validColumnKeys = getTimeColumns(table)
-
+  const validColumnKeys = [...getTimeColumns(table), ...getNumberColumns(table)]
   if (validColumnKeys.includes(preferredColumnKey)) {
     return preferredColumnKey
   }
-
   for (const key of ['_time', '_stop', '_start']) {
     if (validColumnKeys.includes(key)) {
       return key
@@ -282,7 +278,7 @@ export const defaultYColumn = (
   table: Table,
   preferredColumnKey?: string
 ): string | null => {
-  const validColumnKeys = getNumberColumns(table)
+  const validColumnKeys = [...getTimeColumns(table), ...getNumberColumns(table)]
 
   if (validColumnKeys.includes(preferredColumnKey)) {
     return preferredColumnKey
@@ -304,10 +300,10 @@ export const defaultYColumn = (
 export const mosaicYcolumn = (
   table: Table,
   preferredColumnKey?: string
-): string[] | null => {
+): string | null => {
   const validColumnKeys = getStringColumns(table)
   if (validColumnKeys.includes(preferredColumnKey)) {
-    return [preferredColumnKey]
+    return preferredColumnKey
   }
 
   const invalidMosaicYColumns = new Set([
@@ -320,11 +316,11 @@ export const mosaicYcolumn = (
     name => !invalidMosaicYColumns.has(name)
   )
   if (preferredValidColumnKeys.length) {
-    return [preferredValidColumnKeys[0]]
+    return preferredValidColumnKeys[0]
   }
 
   if (validColumnKeys.length) {
-    return [validColumnKeys[0]]
+    return validColumnKeys[0]
   }
   return null
 }

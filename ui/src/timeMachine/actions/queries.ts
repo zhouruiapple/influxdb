@@ -8,6 +8,10 @@ import {
   RunQueryResult,
   RunQuerySuccessResult,
 } from 'src/shared/apis/query'
+import {
+  getCachedResultsOrRunQuery,
+  resetQueryCacheByQuery,
+} from 'src/shared/apis/queryCache'
 import {runStatusesQuery} from 'src/alerting/utils/statusEvents'
 
 // Actions
@@ -50,6 +54,7 @@ import {
 // Selectors
 import {getOrg} from 'src/organizations/selectors'
 import {getAll} from 'src/resources/selectors/index'
+import {isCurrentPageDashboard} from 'src/dashboards/selectors'
 
 export type Action = SaveDraftQueriesAction | SetQueryResults
 
@@ -204,11 +209,6 @@ export const executeQueries = (abortController?: AbortController) => async (
       .map(v => asAssignment(v))
       .filter(v => !!v)
 
-    // keeping getState() here ensures that the state we are working with
-    // is the most current one. By having this set to state, we were creating a race
-    // condition that was causing the following bug:
-    // https://github.com/influxdata/idpe/issues/6240
-
     const startTime = window.performance.now()
     const startDate = Date.now()
 
@@ -227,13 +227,21 @@ export const executeQueries = (abortController?: AbortController) => async (
       const extern = buildVarsOption(variableAssignments)
 
       event('runQuery', {context: 'timeMachine'})
+      if (
+        isCurrentPageDashboard(state) &&
+        isFlagEnabled('queryCacheForDashboards')
+      ) {
+        // reset any existing matching query in the cache
+        resetQueryCacheByQuery(text)
+        return getCachedResultsOrRunQuery(orgID, text, state)
+      }
       return runQuery(orgID, text, extern, abortController)
     })
     const results = await Promise.all(pendingResults.map(r => r.promise))
 
     const duration = window.performance.now() - startTime
 
-    event('executeQueries querying', {time: startDate, duration})
+    event('executeQueries querying', {time: startDate}, {duration})
 
     let statuses = [[]] as StatusRow[][]
     const {
@@ -280,10 +288,13 @@ export const executeQueries = (abortController?: AbortController) => async (
       setQueryResults(RemoteDataState.Done, files, duration, null, statuses)
     )
 
-    event('executeQueries function', {
-      time: executeQueriesStartTime,
-      duration: Date.now() - executeQueriesStartTime,
-    })
+    event(
+      'executeQueries function',
+      {
+        time: executeQueriesStartTime,
+      },
+      {duration: Date.now() - executeQueriesStartTime}
+    )
 
     return results
   } catch (error) {

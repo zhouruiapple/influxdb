@@ -324,25 +324,32 @@ export const deleteDashboard = (dashboardID: string, name: string) => async (
   }
 }
 
-export const getDashboard = (dashboardID: string) => async (
-  dispatch,
-  getState: GetState
-): Promise<void> => {
+export const getDashboard = (
+  dashboardID: string,
+  controller?: AbortController
+) => async (dispatch, getState: GetState): Promise<void> => {
   try {
     dispatch(creators.setDashboard(dashboardID, RemoteDataState.Loading))
 
     // Fetch the dashboard, views, and all variables a user has access to
     const [resp] = await Promise.all([
-      api.getDashboard({dashboardID, query: {include: 'properties'}}),
-      dispatch(getVariables()),
+      api.getDashboard(
+        {dashboardID, query: {include: 'properties'}},
+        {signal: controller?.signal}
+      ),
+      dispatch(getVariables(controller)),
     ])
+
+    if (!resp) {
+      return
+    }
 
     if (resp.status !== 200) {
       throw new Error(resp.data.message)
     }
 
     const skipCache = true
-    dispatch(hydrateVariables(skipCache))
+    dispatch(hydrateVariables(skipCache, controller))
 
     const normDash = normalize<Dashboard, DashboardEntities, string>(
       resp.data,
@@ -351,18 +358,30 @@ export const getDashboard = (dashboardID: string) => async (
 
     const cellViews: CellsWithViewProperties = resp.data.cells || []
     const viewsData = viewsFromCells(cellViews, dashboardID)
+    setTimeout(() => {
+      const normCells = normalize<Dashboard, DashboardEntities, string[]>(
+        cellViews,
+        arrayOfCells
+      )
 
-    const normViews = normalize<View, ViewEntities, string[]>(
-      viewsData,
-      arrayOfViews
-    )
+      dispatch(setCells(dashboardID, RemoteDataState.Done, normCells))
+      const normViews = normalize<View, ViewEntities, string[]>(
+        viewsData,
+        arrayOfViews
+      )
 
-    dispatch(setViews(RemoteDataState.Done, normViews))
-
-    // Now that all the necessary state has been loaded, set the dashboard
-    dispatch(creators.setDashboard(dashboardID, RemoteDataState.Done, normDash))
-    dispatch(updateTimeRangeFromQueryParams(dashboardID))
+      dispatch(setViews(RemoteDataState.Done, normViews))
+      // Now that all the necessary state has been loaded, set the dashboard
+      dispatch(
+        creators.setDashboard(dashboardID, RemoteDataState.Done, normDash)
+      )
+      dispatch(updateTimeRangeFromQueryParams(dashboardID))
+    }, 0)
   } catch (error) {
+    if (error.name === 'AbortError') {
+      return
+    }
+
     const org = getOrg(getState())
     dispatch(push(`/orgs/${org.id}/dashboards-list`))
     dispatch(notify(copy.dashboardGetFailed(dashboardID, error.message)))

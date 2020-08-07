@@ -14,15 +14,6 @@ import (
 	"github.com/influxdata/influxdb/v2/models"
 )
 
-// offset returns a non-negative equivalent to t % windowEvery.
-func offset(t, windowEvery int64) int64 {
-	r := t % windowEvery
-	if r < 0 {
-		r += windowEvery
-	}
-	return r
-}
-
 type table struct {
 	bounds execute.Bounds
 	key    flux.GroupKey
@@ -80,7 +71,7 @@ func (t *table) isCancelled() bool {
 }
 
 func (t *table) init(advance func() bool) {
-	t.empty = !advance()
+	t.empty = !advance() && t.err == nil
 }
 
 func (t *table) do(f func(flux.ColReader) error, advance func() bool) error {
@@ -90,6 +81,12 @@ func (t *table) do(f func(flux.ColReader) error, advance func() bool) error {
 		return errors.New("table already used")
 	}
 	defer t.closeDone()
+
+	// If an error occurred during initialization, that is
+	// returned here.
+	if t.err != nil {
+		return t.err
+	}
 
 	if !t.Empty() {
 		t.err = f(t.colBufs)
@@ -205,6 +202,11 @@ func (t *table) readTags(tags models.Tags) {
 
 	for _, tag := range tags {
 		j := execute.ColIdx(string(tag.Key), t.cols)
+		// In the case of group aggregate, tags that are not referenced in group() are not included in the result, but
+		// readTags () still get a complete tag list. Here is just to skip the tags that should not present in the result.
+		if j < 0 {
+			continue
+		}
 		t.tags[j] = tag.Value
 	}
 }

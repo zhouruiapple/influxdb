@@ -27,6 +27,8 @@ import {
 
 // Utils
 import {event} from 'src/cloud/utils/reporting'
+import {resetQueryCache} from 'src/shared/apis/queryCache'
+import {isFlagEnabled} from 'src/shared/utils/featureFlag'
 
 // Selectors
 import {getTimeRange} from 'src/dashboards/selectors'
@@ -73,12 +75,12 @@ const DashboardHeader: FC<Props> = ({
   history,
   org,
 }) => {
+  const demoDataset = DemoDataDashboardNames[dashboard.name]
   useEffect(() => {
-    const demoDataset = DemoDataDashboardNames[dashboard.name]
     if (demoDataset) {
       event('demoData_dashboardViewed', {demo_dataset: demoDataset})
     }
-  }, [dashboard.id])
+  }, [dashboard.id, demoDataset])
 
   const handleAddNote = () => {
     history.push(`/orgs/${org.id}/dashboards/${dashboard.id}/notes/new`)
@@ -125,6 +127,14 @@ const DashboardHeader: FC<Props> = ({
     }
   }
 
+  const resetCacheAndRefresh = (): void => {
+    // We want to invalidate the existing cache when a user manually refreshes the dashboard
+    if (isFlagEnabled('queryCacheForDashboards')) {
+      resetQueryCache()
+    }
+    onManualRefresh()
+  }
+
   return (
     <>
       <Page.Header fullWidth={true}>
@@ -169,7 +179,7 @@ const DashboardHeader: FC<Props> = ({
           <TimeZoneDropdown />
           <AutoRefreshDropdown
             onChoose={handleChooseAutoRefresh}
-            onManualRefresh={onManualRefresh}
+            onManualRefresh={resetCacheAndRefresh}
             selected={autoRefresh}
           />
           <TimeRangeDropdown

@@ -1,16 +1,48 @@
-## v2.0.0-beta.15 [unreleased]
+## v2.0.0-beta.16 [unreleased]
+
+### Breaking
+
+1. [19066](https://github.com/influxdata/influxdb/pull/19066): Drop deprecated /packages route tree
+1. [19116](https://github.com/influxdata/influxdb/pull/19116): Support more types for template envRef default value and require explicit default values
+1. [19104](https://github.com/influxdata/influxdb/pull/19104): Remove orgs/labels nested routes from the API.
+
+### Features
+
+1. [19075](https://github.com/influxdata/influxdb/pull/19075): Add resource links to a stack's resources from public HTTP API list/read calls
+1. [19103](https://github.com/influxdata/influxdb/pull/19103): Enhance resource creation experience when limits are reached
+
+### Bug Fixes
+
+1. [19043](https://github.com/influxdata/influxdb/pull/19043): Enforce all influx CLI flag args are valid
+1. [19188](https://github.com/influxdata/influxdb/pull/19188): Dashboard cells correctly map results when multiple queries exist
+
+## v2.0.0-beta.15 [2020-07-23]
+
+### Breaking
+
+1. [19004](https://github.com/influxdata/influxdb/pull/19004): Removed the `migrate` command from the `influxd` binary.
+1. [18921](https://github.com/influxdata/influxdb/pull/18921): Restricted UI variable names to not clash with Flux reserved words
 
 ### Features
 
 1. [18888](https://github.com/influxdata/influxdb/pull/18888): Add event source to influx stack operations
 1. [18910](https://github.com/influxdata/influxdb/pull/18910): Add uninstall functionality for stacks
 1. [18912](https://github.com/influxdata/influxdb/pull/18912): Drop deprecated influx pkg command tree
+1. [18997](https://github.com/influxdata/influxdb/pull/18997): Add telegraf management commands to influx CLI
+1. [19030](https://github.com/influxdata/influxdb/pull/19030): Enable dynamic destination for the influx CLI configs file
+1. [19029](https://github.com/influxdata/influxdb/pull/19029): Navigating away from a dashboard cancels all pending queries
+1. [19003](https://github.com/influxdata/influxdb/pull/19003): Upgrade to Flux v0.74.0
+1. [19040](https://github.com/influxdata/influxdb/pull/19040): Drop the REPL command from influx CLI
+1. [19032](https://github.com/influxdata/influxdb/pull/19032): Redesign asset & rate limit alerts
 
 ### Bug Fixes
 
 1. [18891](https://github.com/influxdata/influxdb/pull/18891): Allow 0 to be the custom set minimum value for Y Domain
 1. [18969](https://github.com/influxdata/influxdb/pull/18969): Single Stat cells should render properly in Safari again
 1. [18974](https://github.com/influxdata/influxdb/pull/18974): Limit variable querying when submitting queries to used variables
+1. [19039](https://github.com/influxdata/influxdb/pull/19039): Fix an issue where switching orgs was not redirecting correctly
+1. [18989](https://github.com/influxdata/influxdb/pull/18989): Stopped fetching tags in the advanced builder
+1. [19044](https://github.com/influxdata/influxdb/pull/19044): Graph customization: X and Y axis properly accept values
 
 ## v2.0.0-beta.14 [2020-07-08]
 

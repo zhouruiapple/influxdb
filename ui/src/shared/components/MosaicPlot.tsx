@@ -68,8 +68,6 @@ const MosaicPlot: FunctionComponent<Props> = ({
     storedYDomain,
     table.getColumn(yColumn, 'string')
   )
-  // console.log('storedFill', storedFill)
-  // console.log('fillColumns', fillColumns)
   const isValidView =
     xColumn &&
     columnKeys.includes(xColumn) &&
