@@ -268,6 +268,20 @@ func MergedFiltersRule() BoolFlag {
 	return mergeFiltersRule
 }
 
+var mosaicGraphType = MakeBoolFlag(
+	"Mosaic Graph Type",
+	"mosaicGraphType",
+	"Monitoring Team",
+	false,
+	Temporary,
+	true,
+)
+
+// MosaicGraphType - Enables the creation of a mosaic graph in Dashboards
+func MosaicGraphType() BoolFlag {
+	return mosaicGraphType
+}
+
 var notebooks = MakeBoolFlag(
 	"Notebooks",
 	"notebooks",
@@ -316,6 +330,7 @@ var all = []Flag{
 	simpleTaskOptionsExtraction,
 	useUserPermission,
 	mergeFiltersRule,
+	mosaicGraphType,
 	notebooks,
 	pushDownGroupAggregateMinMax,
 }
@@ -340,6 +355,7 @@ var byKey = map[string]Flag{
 	"simpleTaskOptionsExtraction":   simpleTaskOptionsExtraction,
 	"useUserPermission":             useUserPermission,
 	"mergeFiltersRule":              mergeFiltersRule,
+	"mosaicGraphType":               mosaicGraphType,
 	"notebooks":                     notebooks,
 	"pushDownGroupAggregateMinMax":  pushDownGroupAggregateMinMax,
 }
