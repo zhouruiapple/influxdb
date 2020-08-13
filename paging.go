@@ -40,10 +40,17 @@ func DecodeFindOptions(r *http.Request) (*FindOptions, error) {
 
 	if offset := qp.Get("offset"); offset != "" {
 		o, err := strconv.Atoi(offset)
-		if err != nil {
+		if err != nil || o < 0 {
 			return nil, &Error{
 				Code: EInvalid,
 				Msg:  "offset is invalid",
+			}
+		}
+
+		if o < 0 {
+			return nil, &Error{
+				Code: EInvalid,
+				Msg:  "offset must be greater than 0",
 			}
 		}
 
