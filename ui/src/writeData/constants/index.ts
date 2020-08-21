@@ -1,9 +1,10 @@
 // Constants
-import WRITE_DATA_CLIENT_LIBRARIES_SECTION from 'src/writeData/constants/contentClientLibraries'
-import WRITE_DATA_TELEGRAF_PLUGINS_SECTION from 'src/writeData/constants/contentTelegrafPlugins'
-import WRITE_DATA_INTEGRATIONS_SECTION from 'src/writeData/constants/contentIntegrations'
-import WRITE_DATA_FLUX_SOURCES_SECTION from 'src/writeData/constants/contentFluxSources'
-import WRITE_DATA_DEVELOPER_TOOLS_SECTION from 'src/writeData/constants/contentDeveloperTools'
+import {WRITE_DATA_DEMO_DATA_SECTION} from 'src/writeData/constants/contentDemoData'
+import {WRITE_DATA_CLIENT_LIBRARIES_SECTION} from 'src/writeData/constants/contentClientLibraries'
+import {WRITE_DATA_TELEGRAF_PLUGINS_SECTION} from 'src/writeData/constants/contentTelegrafPlugins'
+import {WRITE_DATA_INTEGRATIONS_SECTION} from 'src/writeData/constants/contentIntegrations'
+import {WRITE_DATA_FLUX_SOURCES_SECTION} from 'src/writeData/constants/contentFluxSources'
+import {WRITE_DATA_DEVELOPER_TOOLS_SECTION} from 'src/writeData/constants/contentDeveloperTools'
 
 // Types
 export interface WriteDataItem {
@@ -20,10 +21,12 @@ export interface WriteDataSection {
   description: string
   items: WriteDataItem[]
   featureFlag: string
+  cloudOnly: boolean
 }
 
 // Sections
 export const WRITE_DATA_SECTIONS: WriteDataSection[] = [
+  WRITE_DATA_DEMO_DATA_SECTION,
   WRITE_DATA_CLIENT_LIBRARIES_SECTION,
   WRITE_DATA_TELEGRAF_PLUGINS_SECTION,
   WRITE_DATA_INTEGRATIONS_SECTION,

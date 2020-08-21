@@ -27,6 +27,7 @@ import AlertHistoryIndex from 'src/alerting/components/AlertHistoryIndex'
 import CheckHistory from 'src/checks/components/CheckHistory'
 import MembersIndex from 'src/members/containers/MembersIndex'
 import RouteToDashboardList from 'src/dashboards/components/RouteToDashboardList'
+import DemoDataPage from 'src/writeData/containers/DemoDataPage'
 import ClientLibrariesPage from 'src/writeData/containers/ClientLibrariesPage'
 import TelegrafPluginsPage from 'src/writeData/containers/TelegrafPluginsPage'
 
@@ -39,6 +40,7 @@ import {
   LOAD_DATA,
   TELEGRAF_PLUGINS,
   CLIENT_LIBS,
+  DEMO_DATA,
 } from 'src/shared/constants/routes'
 
 // Actions
@@ -143,6 +145,10 @@ const SetOrg: FC<Props> = ({
         <Route
           path={`${orgPath}/${LOAD_DATA}/sources`}
           component={WriteDataPage}
+        />
+        <Route
+          path={`${orgPath}/${LOAD_DATA}/${DEMO_DATA}`}
+          component={DemoDataPage}
         />
         <Route
           path={`${orgPath}/${LOAD_DATA}/${CLIENT_LIBS}`}

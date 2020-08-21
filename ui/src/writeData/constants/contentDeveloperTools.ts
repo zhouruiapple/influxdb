@@ -12,12 +12,11 @@ export const WRITE_DATA_DEVELOPER_TOOLS: WriteDataItem[] = [
   },
 ]
 
-const WRITE_DATA_DEVELOPER_TOOLS_SECTION: WriteDataSection = {
+export const WRITE_DATA_DEVELOPER_TOOLS_SECTION: WriteDataSection = {
   id: DEVELOPER_TOOLS,
   name: 'Developer Tools',
   description: 'Description goes here',
   items: WRITE_DATA_DEVELOPER_TOOLS,
   featureFlag: 'load-data-dev-tools',
+  cloudOnly: false,
 }
-
-export default WRITE_DATA_DEVELOPER_TOOLS_SECTION

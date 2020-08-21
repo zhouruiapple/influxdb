@@ -10,7 +10,7 @@ import WriteDataDetailsView from 'src/writeData/components/WriteDataDetailsView'
 
 // Constants
 import {ORGS, ORG_ID, TELEGRAF_PLUGINS} from 'src/shared/constants/routes'
-import WRITE_DATA_TELEGRAF_PLUGINS_SECTION from 'src/writeData/constants/contentTelegrafPlugins'
+import {WRITE_DATA_TELEGRAF_PLUGINS_SECTION} from 'src/writeData/constants/contentTelegrafPlugins'
 
 const telegrafPluginPath = `/${ORGS}/${ORG_ID}/load-data/${TELEGRAF_PLUGINS}`
 

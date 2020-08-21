@@ -10,7 +10,7 @@ import WriteDataHelper from 'src/writeData/components/WriteDataHelper'
 
 // Constants
 import {ORGS, ORG_ID, CLIENT_LIBS} from 'src/shared/constants/routes'
-import WRITE_DATA_CLIENT_LIBRARIES_SECTION from 'src/writeData/constants/contentClientLibraries'
+import {WRITE_DATA_CLIENT_LIBRARIES_SECTION} from 'src/writeData/constants/contentClientLibraries'
 
 const clientLibPath = `/${ORGS}/${ORG_ID}/load-data/${CLIENT_LIBS}`
 

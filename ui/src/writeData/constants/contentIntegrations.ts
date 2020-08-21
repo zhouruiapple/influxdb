@@ -12,12 +12,11 @@ export const WRITE_DATA_INTEGRATIONS: WriteDataItem[] = [
   },
 ]
 
-const WRITE_DATA_INTEGRATIONS_SECTION: WriteDataSection = {
+export const WRITE_DATA_INTEGRATIONS_SECTION: WriteDataSection = {
   id: INTEGRATIONS,
   name: 'Integrations',
   description: 'Description goes here',
   items: WRITE_DATA_INTEGRATIONS,
   featureFlag: 'load-data-integrations',
+  cloudOnly: false,
 }
-
-export default WRITE_DATA_INTEGRATIONS_SECTION

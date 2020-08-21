@@ -101,12 +101,11 @@ export const WRITE_DATA_CLIENT_LIBRARIES: WriteDataItem[] = [
   },
 ]
 
-const WRITE_DATA_CLIENT_LIBRARIES_SECTION: WriteDataSection = {
+export const WRITE_DATA_CLIENT_LIBRARIES_SECTION: WriteDataSection = {
   id: CLIENT_LIBS,
   name: 'Client Libraries',
   description: 'Back-end, front-end, and mobile applications',
   items: WRITE_DATA_CLIENT_LIBRARIES,
   featureFlag: 'load-data-client-libraries',
+  cloudOnly: false,
 }
-
-export default WRITE_DATA_CLIENT_LIBRARIES_SECTION

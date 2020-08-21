@@ -9,6 +9,7 @@ import {
   WRITE_DATA_SECTIONS,
   sectionContainsMatchingItems,
 } from 'src/writeData/constants'
+import {CLOUD} from 'src/shared/constants'
 
 // Utils
 import {isFlagEnabled} from 'src/shared/utils/featureFlag'
@@ -23,6 +24,12 @@ const WriteDataSections: FC = () => {
   const filteredSections = WRITE_DATA_SECTIONS.filter(section => {
     const containsMatches = sectionContainsMatchingItems(section, searchTerm)
     const featureFlagEnabled = isFlagEnabled(section.featureFlag)
+
+    if (!CLOUD) {
+      return (
+        containsMatches && featureFlagEnabled && section.cloudOnly === false
+      )
+    }
 
     return containsMatches && featureFlagEnabled
   })

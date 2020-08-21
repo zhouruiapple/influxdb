@@ -12,12 +12,11 @@ export const WRITE_DATA_FLUX_SOURCES: WriteDataItem[] = [
   },
 ]
 
-const WRITE_DATA_FLUX_SOURCES_SECTION: WriteDataSection = {
+export const WRITE_DATA_FLUX_SOURCES_SECTION: WriteDataSection = {
   id: FLUX_SOURCES,
   name: 'Flux Sources',
   description: 'Description goes here',
   items: WRITE_DATA_FLUX_SOURCES,
   featureFlag: 'load-data-flux-sources',
+  cloudOnly: false,
 }
-
-export default WRITE_DATA_FLUX_SOURCES_SECTION

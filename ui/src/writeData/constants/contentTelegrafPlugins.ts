@@ -1613,13 +1613,12 @@ export const WRITE_DATA_TELEGRAF_PLUGINS: WriteDataItem[] = [
   },
 ]
 
-const WRITE_DATA_TELEGRAF_PLUGINS_SECTION: WriteDataSection = {
+export const WRITE_DATA_TELEGRAF_PLUGINS_SECTION: WriteDataSection = {
   id: TELEGRAF_PLUGINS,
   name: 'Telegraf Plugins',
   description:
     'An open-source agent for collecting data and reporting metrics via a vast library of plugins',
   items: WRITE_DATA_TELEGRAF_PLUGINS,
   featureFlag: 'load-data-telegraf-plugins',
+  cloudOnly: false,
 }
-
-export default WRITE_DATA_TELEGRAF_PLUGINS_SECTION
