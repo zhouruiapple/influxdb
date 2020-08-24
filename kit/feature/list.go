@@ -212,6 +212,20 @@ func MergedFiltersRule() BoolFlag {
 	return mergeFiltersRule
 }
 
+var bandPlotType = MakeBoolFlag(
+	"Band Plot Type",
+	"bandPlotType",
+	"Monitoring Team",
+	false,
+	Temporary,
+	true,
+)
+
+// BandPlotType - Enables the creation of a band plot in Dashboards
+func BandPlotType() BoolFlag {
+	return bandPlotType
+}
+
 var mosaicGraphType = MakeBoolFlag(
 	"Mosaic Graph Type",
 	"mosaicGraphType",
@@ -254,6 +268,34 @@ func PushDownGroupAggregateMinMax() BoolFlag {
 	return pushDownGroupAggregateMinMax
 }
 
+var orgOnlyMemberList = MakeBoolFlag(
+	"Org Only Member list",
+	"orgOnlyMemberList",
+	"Compute Team",
+	false,
+	Temporary,
+	false,
+)
+
+// OrgOnlyMemberList - Enforce only org members have access to view members of org related resorces
+func OrgOnlyMemberList() BoolFlag {
+	return orgOnlyMemberList
+}
+
+var enforceOrgDashboardLimits = MakeBoolFlag(
+	"Enforce Organization Dashboard Limits",
+	"enforceOrgDashboardLimits",
+	"Compute Team",
+	false,
+	Temporary,
+	false,
+)
+
+// EnforceOrganizationDashboardLimits - Enforces the default limit params for the dashboards api when orgs are set
+func EnforceOrganizationDashboardLimits() BoolFlag {
+	return enforceOrgDashboardLimits
+}
+
 var all = []Flag{
 	appMetrics,
 	backendExample,
@@ -270,9 +312,12 @@ var all = []Flag{
 	simpleTaskOptionsExtraction,
 	useUserPermission,
 	mergeFiltersRule,
+	bandPlotType,
 	mosaicGraphType,
 	notebooks,
 	pushDownGroupAggregateMinMax,
+	orgOnlyMemberList,
+	enforceOrgDashboardLimits,
 }
 
 var byKey = map[string]Flag{
@@ -291,7 +336,10 @@ var byKey = map[string]Flag{
 	"simpleTaskOptionsExtraction":   simpleTaskOptionsExtraction,
 	"useUserPermission":             useUserPermission,
 	"mergeFiltersRule":              mergeFiltersRule,
+	"bandPlotType":                  bandPlotType,
 	"mosaicGraphType":               mosaicGraphType,
 	"notebooks":                     notebooks,
 	"pushDownGroupAggregateMinMax":  pushDownGroupAggregateMinMax,
+	"orgOnlyMemberList":             orgOnlyMemberList,
+	"enforceOrgDashboardLimits":     enforceOrgDashboardLimits,
 }
