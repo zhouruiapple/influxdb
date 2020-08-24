@@ -1,0 +1,39 @@
+@import '@influxdata/clockface/dist/variables.scss';
+
+.write-bucket {
+  background-color: $g2-kevlar;
+  padding: $cf-marg-c;
+  border-radius: $cf-radius;
+}
+
+.write-bucket--block {
+  flex: 1 0 350px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  max-width: 320px;
+  height: 180px;
+}
+
+.write-bucket--block-title {
+  font-size: 14px;
+  user-select: none;
+  font-weight: $cf-font-weight--medium;
+  padding-bottom: $cf-marg-b;
+  margin-bottom: $cf-marg-b;
+  color: $g13-mist;
+  border-bottom: $cf-border solid $g3-castle;
+}
+
+.write-bucket--list,
+.write-bucket--list__empty {
+  flex: 1 0 0;
+}
+
+.write-bucket--list__empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  color: $g8-storm;
+}

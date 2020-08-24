@@ -7,6 +7,7 @@ import {
 } from 'src/notebooks/context/notebook.list'
 import {v4 as UUID} from 'uuid'
 import {RemoteDataState} from 'src/types'
+import {getHumanReadableName} from 'src/notebooks/utils'
 
 const useNotebookCurrentState = createPersistedState('current-notebook')
 
@@ -31,25 +32,6 @@ export const DEFAULT_CONTEXT: NotebookContextType = {
 export const NotebookContext = React.createContext<NotebookContextType>(
   DEFAULT_CONTEXT
 )
-
-let GENERATOR_INDEX = 0
-
-const getHumanReadableName = (type: string): string => {
-  ++GENERATOR_INDEX
-
-  switch (type) {
-    case 'data':
-      return `Bucket ${GENERATOR_INDEX}`
-    case 'visualization':
-      return `Visualization ${GENERATOR_INDEX}`
-    case 'markdown':
-      return `Markdown ${GENERATOR_INDEX}`
-    case 'query':
-      return `Flux Script ${GENERATOR_INDEX}`
-    default:
-      return `Cell ${GENERATOR_INDEX}`
-  }
-}
 
 export const NotebookProvider: FC = ({children}) => {
   const [currentID, setCurrentID] = useNotebookCurrentState(null)

@@ -50,6 +50,10 @@ const SUPPORTED_FAMILIES = [
     name: 'Side Effects',
     family: 'sideEffects',
   },
+  {
+    name: 'Output',
+    family: 'outputs',
+  },
 ]
 
 const AddButtons: FC<Props> = ({index, onInsert, eventName}) => {

@@ -2,6 +2,7 @@ import React, {FC, useState, useCallback, RefObject} from 'react'
 import {RemoteDataState} from 'src/types'
 import {PipeData} from 'src/notebooks'
 import {FluxResult} from 'src/notebooks'
+import {getHumanReadableName} from 'src/notebooks/utils'
 
 export interface PipeMeta {
   title: string
@@ -53,25 +54,6 @@ if (TEST_MODE) {
 export const NotebookContext = React.createContext<NotebookContextType>(
   DEFAULT_CONTEXT
 )
-
-let GENERATOR_INDEX = 0
-
-const getHumanReadableName = (type: string): string => {
-  ++GENERATOR_INDEX
-
-  switch (type) {
-    case 'data':
-      return `Bucket ${GENERATOR_INDEX}`
-    case 'visualization':
-      return `Visualization ${GENERATOR_INDEX}`
-    case 'markdown':
-      return `Markdown ${GENERATOR_INDEX}`
-    case 'query':
-      return `Flux Script ${GENERATOR_INDEX}`
-    default:
-      return `Cell ${GENERATOR_INDEX}`
-  }
-}
 
 export const NotebookProvider: FC = ({children}) => {
   const [id] = useState(DEFAULT_CONTEXT.id)

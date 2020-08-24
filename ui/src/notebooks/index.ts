@@ -88,6 +88,7 @@ export interface TypeRegistration {
   type: string // a unique string that identifies a pipe
   family:
     | 'inputs'
+    | 'outputs'
     | 'passThrough'
     | 'test'
     | 'transform'
