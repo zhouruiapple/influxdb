@@ -20,12 +20,10 @@ import {doesItemMatchSearchTerm} from 'src/writeData/constants'
 // Types
 import {WriteDataSection} from 'src/writeData/constants'
 
-const WriteDataSection: FC<Omit<WriteDataSection, 'featureFlag'>> = ({
-  id,
-  name,
-  description,
-  items,
-}) => {
+const WriteDataSection: FC<Omit<
+  WriteDataSection,
+  'featureFlag' | 'cloudOnly'
+>> = ({id, name, description, items}) => {
   const {searchTerm} = useContext(WriteDataSearchContext)
 
   const filteredItems = items.filter(item =>
