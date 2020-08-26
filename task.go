@@ -29,32 +29,12 @@ var (
 	TaskSystemType = "system"
 )
 
-type contextKey string
-
-const (
-	taskAuthKey contextKey = "taskAuth"
-)
-
-// TODO: these are temporary functions until we can work through optimizing auth
-// FindTaskWithAuth adds a auth hint for lookup of tasks
-func FindTaskWithoutAuth(ctx context.Context) context.Context {
-	return context.WithValue(ctx, taskAuthKey, "omit")
-}
-
-// FindTaskAuthRequired retrieves the taskAuth hint
-func FindTaskAuthRequired(ctx context.Context) bool {
-	val, ok := ctx.Value(taskAuthKey).(string)
-	return !(ok && val == "omit")
-}
-
 // Task is a task. 🎊
 type Task struct {
 	ID              ID                     `json:"id"`
 	Type            string                 `json:"type,omitempty"`
 	OrganizationID  ID                     `json:"orgID"`
 	Organization    string                 `json:"org"`
-	AuthorizationID ID                     `json:"-"`
-	Authorization   *Authorization         `json:"-"`
 	OwnerID         ID                     `json:"ownerID"`
 	Name            string                 `json:"name"`
 	Description     string                 `json:"description,omitempty"`
@@ -65,6 +45,8 @@ type Task struct {
 	Offset          time.Duration          `json:"offset,omitempty"`
 	LatestCompleted time.Time              `json:"latestCompleted,omitempty"`
 	LatestScheduled time.Time              `json:"latestScheduled,omitempty"`
+	LatestSuccess   time.Time              `json:"latestSuccess,omitempty"`
+	LatestFailure   time.Time              `json:"latestFailure,omitempty"`
 	LastRunStatus   string                 `json:"lastRunStatus,omitempty"`
 	LastRunError    string                 `json:"lastRunError,omitempty"`
 	CreatedAt       time.Time              `json:"createdAt,omitempty"`
@@ -183,6 +165,8 @@ type TaskUpdate struct {
 	// LatestCompleted us to set latest completed on startup to skip task catchup
 	LatestCompleted *time.Time             `json:"-"`
 	LatestScheduled *time.Time             `json:"-"`
+	LatestSuccess   *time.Time             `json:"-"`
+	LatestFailure   *time.Time             `json:"-"`
 	LastRunStatus   *string                `json:"-"`
 	LastRunError    *string                `json:"-"`
 	Metadata        map[string]interface{} `json:"-"` // not to be set through a web request but rather used by a http service using tasks backend.
