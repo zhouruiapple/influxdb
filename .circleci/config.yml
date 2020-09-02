@@ -206,7 +206,6 @@ jobs:
           at: ~/project
       - run: docker login -u=$QUAY_USER -p=$QUAY_PASS quay.io
       - run: docker run --net host -v /var/run/docker.sock:/var/run/docker.sock -e TEST_RESULTS=/grace/test-results/grace-results -v ~/project:/grace/test-results/grace-results quay.io/influxdb/grace:latest
-      - run: docker run --net host -v /var/run/docker.sock:/var/run/docker.sock -e TEST_RESULTS=~/project quay.io/influxdb/grace:latest
       - store_artifacts:
           path: ~/project
       - store_test_results:
