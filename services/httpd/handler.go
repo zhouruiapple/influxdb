@@ -1953,18 +1953,22 @@ func (h *Handler) SetHeadersHandler(handler http.Handler) http.Handler {
 	return http.HandlerFunc(h.SetHeadersWrapper(handler.ServeHTTP))
 }
 
-// wrapper that adds user supplied headers to the response.
-func (h *Handler) SetHeadersWrapper(f func(http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
-	if len(h.Config.HTTPHeaders) == 0 {
+func SetHeadersWrapper(headers map[string]string, f func(http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
+	if len(headers) == 0 {
 		return f
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		for header, value := range h.Config.HTTPHeaders {
+		for header, value := range headers {
 			w.Header().Add(header, value)
 		}
 		f(w, r)
 	}
+}
+
+// wrapper that adds user supplied headers to the response.
+func (h *Handler) SetHeadersWrapper(f func(http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
+	return SetHeadersWrapper(h.Config.HTTPHeaders, f)
 }
 
 func (h *Handler) logging(inner http.Handler, name string) http.Handler {
