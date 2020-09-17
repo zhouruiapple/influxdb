@@ -27,7 +27,9 @@ describe('Collectors', () => {
       const configDescription = 'This is a new config testing'
 
       cy.getByTestID('table-row').should('have.length', 0)
-      cy.contains('Create Configuration').click()
+      cy.getByTestID('resource-list--body').within(() => {
+        cy.contains('Create Configuration').click()
+      })
       cy.getByTestID('overlay--container').within(() => {
         cy.getByTestID('telegraf-plugins--System').click()
         cy.getByTestID('next').click()
@@ -55,6 +57,198 @@ describe('Collectors', () => {
           .should('have.length', 1)
           .and('contain', newConfig)
           .and('contain', bucket)
+      })
+
+      //test the Create Configuration overlay dismiss button
+      cy.contains('Create Configuration').click()
+      cy.getByTestID('overlay--container')
+        .should('exist')
+        .then(() => {
+          cy.get('.cf-overlay--dismiss')
+            .click()
+            .then(() => {
+              cy.getByTestID('overlay--container').should('not.exist')
+            })
+        })
+    })
+
+    it('can create a telegraf config with every plugin', () => {
+      //docker plugin configuration
+      const dockerConf = 'Docker Config'
+      const dockerConfDescription = 'This is a docker config description'
+
+      //open Create Configuration popup and select plugin
+      cy.getByTestID('table-row').should('have.length', 0)
+      cy.contains('Create Configuration').click()
+      cy.getByTestID('telegraf-plugins--Docker').click()
+      cy.getByTestID('next').click()
+
+      //assert plugin and fill out inputs
+      cy.get('.side-bar--container').within(() => {
+        cy.get('.side-bar--tab').should('contain', 'docker')
+      })
+      cy.getByInputName('name')
+        .clear()
+        .type(dockerConf)
+      cy.getByInputName('description')
+        .clear()
+        .type(dockerConfDescription)
+      cy.getByTestID('next').click()
+
+      //assert notification
+      cy.getByTestID('notification-success').should(
+        'contain',
+        'Your configurations have been saved'
+      )
+
+      //click the Listen for Data button and assert the result
+      cy.getByTestID('streaming').within(() => {
+        cy.get('.cf-button')
+          .contains('Listen for Data')
+          .click()
+      })
+      cy.getByTestID('streaming').should('contain', 'Connection Found!')
+      cy.getByTestID('next').click()
+
+      //assert the created telegraf card
+      cy.fixture('user').then(() => {
+        cy.getByTestID('resource-card')
+          .should('have.length', 1)
+          .and('contain', dockerConf)
+          .and('contain', dockerConfDescription)
+      })
+
+      //kubernetes plugin configuration
+      const kubernetesConf = 'Kubernetes Config'
+      const kubernetesConfDescription =
+        'This is a kubernetes config description'
+
+      //open Create Configuration popup and select plugin
+      cy.contains('Create Configuration').click()
+      cy.getByTestID('telegraf-plugins--Kubernetes').click()
+      cy.getByTestID('next').click()
+
+      //assert plugin and fill out inputs
+      cy.get('.side-bar--container').within(() => {
+        cy.get('.side-bar--tab').should('contain', 'kubernetes')
+      })
+      cy.getByInputName('name')
+        .clear()
+        .type(kubernetesConf)
+      cy.getByInputName('description')
+        .clear()
+        .type(kubernetesConfDescription)
+      cy.getByTestID('next').click()
+
+      //assert notification
+      cy.getByTestID('notification-success').should(
+        'contain',
+        'Your configurations have been saved'
+      )
+
+      //click the Listen for Data button and assert the result
+      cy.getByTestID('streaming').within(() => {
+        cy.get('.cf-button')
+          .contains('Listen for Data')
+          .click()
+      })
+      cy.getByTestID('streaming').should('contain', 'Connection Found!')
+      cy.getByTestID('next').click()
+
+      //assert the created telegraf card
+      cy.fixture('user').then(() => {
+        cy.getByTestID('resource-card')
+          .should('have.length', 2)
+          .and('contain', kubernetesConf)
+          .and('contain', kubernetesConfDescription)
+      })
+
+      //Nginx plugin configuration
+      const nginxConf = 'NGINX Config'
+      const nginxConfDescription = 'This is a nginx config description'
+
+      //open Create Configuration popup and select plugin
+      cy.contains('Create Configuration').click()
+      cy.getByTestID('telegraf-plugins--NGINX').click()
+      cy.getByTestID('next').click()
+
+      //assert plugin and fill out inputs
+      cy.get('.side-bar--container').within(() => {
+        cy.get('.side-bar--tab').should('contain', 'nginx')
+      })
+      cy.getByInputName('name')
+        .clear()
+        .type(nginxConf)
+      cy.getByInputName('description')
+        .clear()
+        .type(nginxConfDescription)
+      cy.getByTestID('next').click()
+
+      //assert notification
+      cy.getByTestID('notification-success').should(
+        'contain',
+        'Your configurations have been saved'
+      )
+
+      //click the Listen for Data button and assert the result
+      cy.getByTestID('streaming').within(() => {
+        cy.get('.cf-button')
+          .contains('Listen for Data')
+          .click()
+      })
+      cy.getByTestID('streaming').should('contain', 'Connection Found!')
+      cy.getByTestID('next').click()
+
+      //assert the created telegraf card
+      cy.fixture('user').then(() => {
+        cy.getByTestID('resource-card')
+          .should('have.length', 3)
+          .and('contain', nginxConf)
+          .and('contain', nginxConfDescription)
+      })
+
+      //Redis plugin configuration
+      const redisConf = 'Redis Config'
+      const redisConfDescription = 'This is a redis config description'
+
+      //open Create Configuration popup and select plugin
+      cy.contains('Create Configuration').click()
+      cy.getByTestID('telegraf-plugins--Redis').click()
+      cy.getByTestID('next').click()
+
+      //assert plugin and fill out inputs
+      cy.get('.side-bar--container').within(() => {
+        cy.get('.side-bar--tab').should('contain', 'redis')
+      })
+      cy.getByInputName('name')
+        .clear()
+        .type(redisConf)
+      cy.getByInputName('description')
+        .clear()
+        .type(redisConfDescription)
+      cy.getByTestID('next').click()
+
+      //assert notification
+      cy.getByTestID('notification-success').should(
+        'contain',
+        'Your configurations have been saved'
+      )
+
+      //click the Listen for Data button and assert the result
+      cy.getByTestID('streaming').within(() => {
+        cy.get('.cf-button')
+          .contains('Listen for Data')
+          .click()
+      })
+      cy.getByTestID('streaming').should('contain', 'Connection Found!')
+      cy.getByTestID('next').click()
+
+      //assert the created telegraf card
+      cy.fixture('user').then(() => {
+        cy.getByTestID('resource-card')
+          .should('have.length', 4)
+          .and('contain', redisConf)
+          .and('contain', redisConfDescription)
       })
     })
 
@@ -137,6 +331,26 @@ describe('Collectors', () => {
         cy.getByTestID('resource-card').should('have.length', 1)
       })
 
+      it('can edit configuration description', () => {
+        const newConfDesc = 'This is an edited description'
+
+        //click on the description and edit it
+        cy.get('.cf-resource-description--preview')
+          .trigger('mouseover')
+          .click()
+          .then(() => {
+            cy.getByTestID('input-field')
+              .type(newConfDesc)
+              .type('{enter}')
+          })
+
+        //assert description
+        cy.getByTestID('resource-list--editable-description').should(
+          'contain',
+          newConfDesc
+        )
+      })
+
       it('can view setup instructions & config text', () => {
         cy.getByTestID('resource-card').should('have.length', 1)
 
@@ -190,7 +404,9 @@ describe('Collectors', () => {
           cy.createTelegraf(thirdTelegraf, description, id, thirdBucket)
         })
         cy.reload()
-        cy.get('[data-testid="resource-list--body"]', {timeout: PAGE_LOAD_SLA})
+        cy.get('[data-testid="resource-list--body"]', {
+          timeout: PAGE_LOAD_SLA,
+        })
       })
       // filter by name
       it('can filter telegraf configs and sort by name', () => {
@@ -227,7 +443,9 @@ describe('Collectors', () => {
 
         // sort by buckets test here
         cy.reload() // clear out filtering state from the previous test
-        cy.get('[data-testid="resource-list--body"]', {timeout: PAGE_LOAD_SLA})
+        cy.get('[data-testid="resource-list--body"]', {
+          timeout: PAGE_LOAD_SLA,
+        })
 
         cy.getByTestID('collector-card--name').should('have.length', 3)
 
