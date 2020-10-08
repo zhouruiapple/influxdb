@@ -36,6 +36,10 @@ describe('Checks', () => {
       .should('be.disabled')
       .and('not.contain', 'Group')
       .contains('Filter')
+    cy.getByTestID(`selector-list defbuck`)
+      .wait(1200)
+      .click()
+
     cy.getByTestID(`selector-list ${measurement}`).click()
 
     cy.getByTestID('save-cell--button').should('be.disabled')
@@ -74,6 +78,9 @@ describe('Checks', () => {
       // TODO: refactor into a request
       cy.getByTestID('create-check').click()
       cy.getByTestID('create-threshold-check').click()
+      cy.getByTestID(`selector-list defbuck`)
+        .wait(1200)
+        .click()
       cy.getByTestID(`selector-list ${measurement}`).click()
       cy.getByTestID('save-cell--button').should('be.disabled')
       cy.getByTestID(`selector-list ${field}`).click()
@@ -167,6 +174,9 @@ describe('Checks', () => {
       // TODO: refactor into a request with other before each
       cy.getByTestID('create-check').click()
       cy.getByTestID('create-threshold-check').click()
+      cy.getByTestID(`selector-list defbuck`)
+        .wait(1200)
+        .click()
       cy.getByTestID(`selector-list ${measurement}`).click()
       cy.getByTestID('save-cell--button').should('be.disabled')
       cy.getByTestID(`selector-list ${field}`).click()
@@ -180,11 +190,7 @@ describe('Checks', () => {
       cy.getByTestID('schedule-check')
         .clear()
         .type('5s')
-      cy.getByTestID('offset-options')
-        .clear()
-        .type('1s')
       cy.getByTestID('save-cell--button').click()
-      cy.getByTestID('check-card').should('have.length', 1)
       cy.getByTestID('notification-error').should('not.exist')
       cy.getByTestID('context-history-menu').click()
       cy.getByTestID('context-history-task').click()

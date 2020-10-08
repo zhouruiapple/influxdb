@@ -2,6 +2,7 @@
 import {normalize} from 'normalizr'
 import {Dispatch} from 'react'
 import {push} from 'connected-react-router'
+import {get} from 'lodash'
 
 // APIs
 import * as dashAPI from 'src/dashboards/apis'
@@ -40,6 +41,9 @@ import {
 import {updateViewAndVariables} from 'src/views/actions/thunks'
 import {setLabelOnResource} from 'src/labels/actions/creators'
 import * as creators from 'src/dashboards/actions/creators'
+import {updateView} from 'src/views/actions/thunks'
+import {setNoteState, Action as NoteAction} from 'src/dashboards/actions/notes'
+import {createView} from 'src/views/helpers'
 
 // Utils
 import {filterUnusedVars} from 'src/shared/utils/filterUnusedVars'
@@ -71,6 +75,8 @@ import {
   VariableEntities,
   Variable,
   LabelEntities,
+  NoteEditorMode,
+  MarkdownViewProperties,
 } from 'src/types'
 import {CellsWithViewProperties} from 'src/client'
 import {arrayOfVariables} from 'src/schemas/variables'
@@ -366,9 +372,6 @@ export const getDashboard = (
       throw new Error(resp.data.message)
     }
 
-    const skipCache = true
-    dispatch(hydrateVariables(skipCache, controller))
-
     const normDash = normalize<Dashboard, DashboardEntities, string>(
       resp.data,
       dashboardSchema
@@ -394,6 +397,12 @@ export const getDashboard = (
         creators.setDashboard(dashboardID, RemoteDataState.Done, normDash)
       )
       dispatch(updateTimeRangeFromQueryParams(dashboardID))
+
+      // prevent all the variables from being hydrated if the dashboard is empty
+      if (cellViews.length > 0) {
+        const skipCache = true
+        dispatch(hydrateVariables(skipCache, controller))
+      }
     }, 0)
   } catch (error) {
     if (error.name === 'AbortError') {
@@ -576,4 +585,78 @@ export const saveVEOView = (dashboardID: string) => async (
     dispatch(notify(copy.cellAddFailed(error.message)))
     throw error
   }
+}
+
+export const loadNote = (id: string) => (
+  dispatch: Dispatch<NoteAction>,
+  getState: GetState
+) => {
+  const state = getState()
+  const currentViewState = getByID<View>(state, ResourceType.Views, id)
+
+  if (!currentViewState) {
+    return
+  }
+
+  const view = currentViewState
+
+  const note: string = get(view, 'properties.note', '')
+  const showNoteWhenEmpty: boolean = get(
+    view,
+    'properties.showNoteWhenEmpty',
+    false
+  )
+
+  const initialState = {
+    viewID: view.id,
+    note,
+    showNoteWhenEmpty,
+    mode: NoteEditorMode.Editing,
+  }
+
+  dispatch(setNoteState(initialState))
+}
+
+export const updateViewNote = (id: string) => (
+  dispatch: Dispatch<NoteAction | ReturnType<typeof updateView>>,
+  getState: GetState
+) => {
+  const state = getState()
+  const {note, showNoteWhenEmpty} = state.noteEditor
+  const view = getByID<View>(state, ResourceType.Views, id)
+
+  if (view.properties.type === 'check') {
+    throw new Error(
+      `view type "${view.properties.type}" does not support notes`
+    )
+  }
+
+  const updatedView = {
+    ...view,
+    properties: {...view.properties, note, showNoteWhenEmpty},
+  }
+
+  return dispatch(updateView(view.dashboardID, updatedView))
+}
+
+export const createNoteCell = (dashboardID: string) => (
+  dispatch: Dispatch<NoteAction | ReturnType<typeof createCellWithView>>,
+  getState: GetState
+) => {
+  const dashboard = getByID<Dashboard>(
+    getState(),
+    ResourceType.Dashboards,
+    dashboardID
+  )
+
+  if (!dashboard) {
+    throw new Error(`could not find dashboard with id "${dashboardID}"`)
+  }
+
+  const {note} = getState().noteEditor
+  const view = createView<MarkdownViewProperties>('markdown')
+
+  view.properties.note = note
+
+  return dispatch(createCellWithView(dashboard.id, view))
 }

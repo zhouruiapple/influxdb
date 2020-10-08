@@ -3,11 +3,8 @@ import React, {Component, RefObject, CSSProperties} from 'react'
 import {isEqual} from 'lodash'
 import {connect, ConnectedProps} from 'react-redux'
 import {withRouter, RouteComponentProps} from 'react-router-dom'
-import {
-  default as fromFlux,
-  FromFluxResult,
-} from 'src/shared/utils/fromFlux.legacy'
-import {fromFlux as fromFluxGiraffe} from '@influxdata/giraffe'
+import {default as fromFlux} from 'src/shared/utils/fromFlux.legacy'
+import {fromFlux as fromFluxGiraffe, FromFluxResult} from '@influxdata/giraffe'
 import {isFlagEnabled} from 'src/shared/utils/featureFlag'
 
 // API
@@ -245,10 +242,7 @@ class TimeSeries extends Component<Props, State> {
         const windowVars = getWindowVars(text, vars)
         const extern = buildVarsOption([...vars, ...windowVars])
         event('runQuery', {context: 'TimeSeries'})
-        if (
-          isCurrentPageDashboard &&
-          isFlagEnabled('queryCacheForDashboards')
-        ) {
+        if (isCurrentPageDashboard) {
           return onGetCachedResultsThunk(orgID, text)
         }
         const queryID = hashCode(text)

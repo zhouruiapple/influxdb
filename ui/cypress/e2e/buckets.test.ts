@@ -73,7 +73,25 @@ describe('Buckets', () => {
 
     describe('Searching and Sorting', () => {
       it('can sort by name and retention', () => {
-        const buckets = ['defbuck', '_tasks', '_monitoring']
+        const buckets = [
+          'Website Monitoring Bucket',
+          'defbuck',
+          '_tasks',
+          '_monitoring',
+        ]
+        const retentionDesc = [
+          '_monitoring',
+          'Website Monitoring Bucket',
+          '_tasks',
+          'defbuck',
+        ]
+        const retentionAsc = [
+          'defbuck',
+          '_tasks',
+          '_monitoring',
+          'Website Monitoring Bucket',
+        ]
+
         cy.getByTestID('resource-sorter--button')
           .click()
           .then(() => {
@@ -94,13 +112,9 @@ describe('Buckets', () => {
             ).click()
           })
           .then(() => {
-            const asc_buckets = buckets
-              .slice()
-              .sort((a, b) => a.localeCompare(b))
-
             cy.get('[data-testid*="bucket-card"]').each((val, index) => {
               const testID = val.attr('data-testid')
-              expect(testID).to.include(asc_buckets[index])
+              expect(testID).to.include(retentionDesc[index])
             })
           })
 
@@ -112,14 +126,9 @@ describe('Buckets', () => {
             ).click()
           })
           .then(() => {
-            const asc_buckets = buckets
-              .slice()
-              .sort((a, b) => a.localeCompare(b))
-
-              .reverse()
             cy.get('[data-testid*="bucket-card"]').each((val, index) => {
               const testID = val.attr('data-testid')
-              expect(testID).to.include(asc_buckets[index])
+              expect(testID).to.include(retentionAsc[index])
             })
           })
 
@@ -286,10 +295,7 @@ describe('Buckets', () => {
         // writing a well-formed line is accepted
         cy.getByTestID('add-data--button').click()
         cy.getByTestID('bucket-add-client-library').click()
-        cy.location('pathname').should(
-          'be',
-          `/orgs/${orgID}/load-data/client-libraries`
-        )
+        cy.location('pathname').should('be', `/orgs/${orgID}/load-data/`)
         cy.go('back')
         cy.getByTestID('add-data--button').click()
 
@@ -382,11 +388,11 @@ describe('Buckets', () => {
 
       cy.getByTestID('daterange--apply-btn').click()
 
-      cy.fixture('user.json').then(({bucket}) => {
-        cy.getByTestID(`selector-list ${bucket}`).click()
-        // mymeasurement comes from fixtures/data.txt
-        cy.getByTestID('selector-list mymeasurement').should('exist')
-      })
+      //TODO replace this with proper health checks
+      cy.wait(1000)
+      cy.getByTestID(`selector-list ${Cypress.env('bucket')}`).click()
+      // mymeasurement comes from fixtures/data.txt
+      cy.getByTestID('selector-list mymeasurement').should('exist')
     })
   })
 })

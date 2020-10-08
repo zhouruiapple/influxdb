@@ -1,7 +1,7 @@
 import {Organization} from '../../src/types'
 
 // a generous commitment to delivering this page in a loaded state
-const PAGE_LOAD_SLA = 10000
+const PAGE_LOAD_SLA = 80000
 
 describe('Collectors', () => {
   beforeEach(() => {
@@ -50,12 +50,10 @@ describe('Collectors', () => {
           .click()
       })
 
-      cy.fixture('user').then(({bucket}) => {
-        cy.getByTestID('resource-card')
-          .should('have.length', 1)
-          .and('contain', newConfig)
-          .and('contain', bucket)
-      })
+      cy.getByTestID('resource-card')
+        .should('have.length', 1)
+        .and('contain', newConfig)
+        .and('contain', Cypress.env('bucket'))
     })
 
     it('allows the user to view just the output', () => {
@@ -111,9 +109,12 @@ describe('Collectors', () => {
         const telegrafConfigName = 'New Config'
         const description = 'Config Description'
         cy.get('@org').then(({id}: Organization) => {
-          cy.fixture('user').then(({bucket}) => {
-            cy.createTelegraf(telegrafConfigName, description, id, bucket)
-          })
+          cy.createTelegraf(
+            telegrafConfigName,
+            description,
+            id,
+            Cypress.env('bucket')
+          )
         })
 
         cy.reload()
@@ -282,10 +283,10 @@ describe('Collectors', () => {
       })
 
       it('can add and delete urls', () => {
-        cy.getByTestID('input-field').type('http://localhost:8086')
+        cy.getByTestID('input-field').type('http://localhost:9999')
         cy.contains('Add').click()
 
-        cy.contains('http://localhost:8086').should('exist', () => {
+        cy.contains('http://localhost:9999').should('exist', () => {
           cy.getByTestID('input-field').type('http://example.com')
           cy.contains('Add').click()
 

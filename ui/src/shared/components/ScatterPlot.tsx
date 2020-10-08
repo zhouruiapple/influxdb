@@ -7,6 +7,10 @@ import EmptyGraphMessage from 'src/shared/components/EmptyGraphMessage'
 
 // Utils
 import {
+  useLegendOpacity,
+  useLegendOrientationThreshold,
+} from 'src/shared/utils/useLegendOrientation'
+import {
   useVisXDomainSettings,
   useVisYDomainSettings,
 } from 'src/shared/utils/useVisDomainSettings'
@@ -22,12 +26,11 @@ import {DEFAULT_LINE_COLORS} from 'src/shared/constants/graphColorPalettes'
 import {INVALID_DATA_COPY} from 'src/shared/copy/cell'
 
 // Types
-import {ScatterViewProperties, TimeZone, TimeRange, Theme} from 'src/types'
+import {ScatterViewProperties, TimeZone, Theme} from 'src/types'
 
 interface Props {
   children: (config: Config) => JSX.Element
   fluxGroupKeyUnion?: string[]
-  timeRange: TimeRange | null
   table: Table
   timeZone: TimeZone
   viewProperties: ScatterViewProperties
@@ -36,7 +39,6 @@ interface Props {
 
 const ScatterPlot: FunctionComponent<Props> = ({
   children,
-  timeRange,
   timeZone,
   table,
   viewProperties: {
@@ -54,6 +56,8 @@ const ScatterPlot: FunctionComponent<Props> = ({
     xColumn: storedXColumn,
     yColumn: storedYColumn,
     timeFormat,
+    legendOpacity,
+    legendOrientationThreshold,
   },
   theme,
 }) => {
@@ -65,10 +69,14 @@ const ScatterPlot: FunctionComponent<Props> = ({
 
   const columnKeys = table.columnKeys
 
+  const tooltipOpacity = useLegendOpacity(legendOpacity)
+  const tooltipOrientationThreshold = useLegendOrientationThreshold(
+    legendOrientationThreshold
+  )
+
   const [xDomain, onSetXDomain, onResetXDomain] = useVisXDomainSettings(
     storedXDomain,
-    table.getColumn(xColumn, 'number'),
-    timeRange
+    table.getColumn(xColumn, 'number')
   )
 
   const [yDomain, onSetYDomain, onResetYDomain] = useVisYDomainSettings(
@@ -118,6 +126,8 @@ const ScatterPlot: FunctionComponent<Props> = ({
     yDomain,
     onSetYDomain,
     onResetYDomain,
+    legendOpacity: tooltipOpacity,
+    legendOrientationThreshold: tooltipOrientationThreshold,
     valueFormatters: {
       [xColumn]: xFormatter,
       [yColumn]: yFormatter,

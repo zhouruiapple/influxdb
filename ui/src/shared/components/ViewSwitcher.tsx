@@ -31,7 +31,7 @@ import {
 } from 'src/types'
 
 interface Props {
-  giraffeResult: Omit<FromFluxResult, 'schema'>
+  giraffeResult: FromFluxResult
   files?: string[]
   properties: QueryViewProperties | CheckViewProperties
   timeZone: TimeZone
@@ -206,7 +206,6 @@ const ViewSwitcher: FunctionComponent<Props> = ({
     case 'scatter':
       return (
         <ScatterPlot
-          timeRange={timeRange}
           table={table}
           viewProperties={properties}
           timeZone={timeZone}

@@ -23,6 +23,8 @@ export const HTTP_UNAUTHORIZED = 401
 export const HTTP_FORBIDDEN = 403
 export const HTTP_NOT_FOUND = 404
 
+export const ALLOW_IMPORT_FROM_TEMPLATE = false
+
 export const AUTOREFRESH_DEFAULT_INTERVAL = 0 // in milliseconds
 export const AUTOREFRESH_DEFAULT_STATUS = AutoRefreshStatus.Paused
 export const AUTOREFRESH_DEFAULT = {
@@ -37,6 +39,7 @@ export const NOTIFICATION_TRANSITION = 250
 export const FIVE_SECONDS = 5000
 export const TEN_SECONDS = 10000
 export const FIFTEEN_SECONDS = 15000
+export const INDEFINITE = Infinity
 
 export const HOMEPAGE_PATHNAME = 'me'
 
@@ -111,3 +114,12 @@ export const GIRAFFE_COLOR_SCHEMES = [
 export const BAND_LINE_OPACITY = 0.7
 export const BAND_LINE_WIDTH = 3
 export const BAND_SHADE_OPACITY = 0.3
+
+export const LEGEND_OPACITY_MINIMUM = 0.2
+export const LEGEND_OPACITY_MAXIMUM = 1.0
+export const LEGEND_OPACITY_DEFAULT = LEGEND_OPACITY_MAXIMUM
+export const LEGEND_OPACITY_STEP = 0.01
+export const LEGEND_ORIENTATION_THRESHOLD_DEFAULT = 10
+
+export const QUERY_BUILDER_MODE = 'builder'
+export const SCRIPT_EDITOR_MODE = 'advanced'

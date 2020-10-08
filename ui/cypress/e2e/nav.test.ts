@@ -38,11 +38,28 @@ describe('navigation', () => {
     cy.getByTestID('tree-nav--header').click()
     cy.getByTestID('home-page--header').should('exist')
 
+    // 404
+    cy.visit('/not-a-route')
+    cy.getByTestID('not-found').should('exist')
+    cy.visit('/')
+
+    cy.getByTestID('user-nav').should('exist')
+    cy.get('@orgID').then(orgID => {
+      cy.visit(`/orgs/${orgID}/not-a-route`)
+      cy.getByTestID('not-found').should('exist')
+    })
+
+    /**\
+
+      OSS Only Feature
+
     // User Nav -- Members
     cy.getByTestID('user-nav').click()
     cy.getByTestID('user-nav-item-members').click()
     cy.getByTestID('member-page--header').should('exist')
     cy.url().should('contain', 'members')
+
+    \**/
 
     // User Nav -- About
     cy.getByTestID('user-nav').click()
@@ -50,11 +67,21 @@ describe('navigation', () => {
     cy.getByTestID('member-page--header').should('exist')
     cy.url().should('contain', 'about')
 
+    /**\
+
+      OSS Only Feature
+
     // User Nav -- Switch Orgs
     cy.getByTestID('user-nav').click()
     cy.getByTestID('user-nav-item-switch-orgs').click()
     cy.getByTestID('switch-overlay--header').should('exist')
     cy.get('.cf-overlay--dismiss').click()
+
+    \**/
+
+    /**\
+
+      OSS Only Feature
 
     // User Nav -- Create Orgs
     cy.getByTestID('user-nav').click()
@@ -62,9 +89,17 @@ describe('navigation', () => {
     cy.getByTestID('create-org-overlay--header').should('exist')
     cy.get('.cf-overlay--dismiss').click()
 
+    \**/
+
+    /**\
+
+      OSS Only Feature
+
     // User Nav -- Log Out
     cy.getByTestID('user-nav').click()
     cy.getByTestID('user-nav-item-logout').click()
     cy.getByTestID('signin-page').should('exist')
+
+    \**/
   })
 })

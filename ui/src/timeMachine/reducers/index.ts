@@ -434,6 +434,36 @@ export const timeMachineReducer = (
       return setViewProperties(state, {position})
     }
 
+    case 'SET_UPPER_COLUMN': {
+      const {upperColumn} = action.payload
+
+      return setViewProperties(state, {upperColumn})
+    }
+
+    case 'SET_MAIN_COLUMN': {
+      const {mainColumn} = action.payload
+
+      return setViewProperties(state, {mainColumn})
+    }
+
+    case 'SET_LOWER_COLUMN': {
+      const {lowerColumn} = action.payload
+
+      return setViewProperties(state, {lowerColumn})
+    }
+
+    case 'SET_LEGEND_OPACITY': {
+      const {legendOpacity} = action.payload
+
+      return setViewProperties(state, {legendOpacity})
+    }
+
+    case 'SET_LEGEND_ORIENTATION_THRESHOLD': {
+      const {legendOrientationThreshold} = action.payload
+
+      return setViewProperties(state, {legendOrientationThreshold})
+    }
+
     case 'SET_BIN_COUNT': {
       const {binCount} = action.payload
 

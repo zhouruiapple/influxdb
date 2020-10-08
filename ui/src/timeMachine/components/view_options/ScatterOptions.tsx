@@ -1,11 +1,12 @@
 // Libraries
-import React, {SFC} from 'react'
+import React, {FunctionComponent} from 'react'
 import {connect, ConnectedProps} from 'react-redux'
 
 // Components
 import {Form, Input, Grid, MultiSelectDropdown} from '@influxdata/clockface'
 import AxisAffixes from 'src/timeMachine/components/view_options/AxisAffixes'
 import TimeFormat from 'src/timeMachine/components/view_options/TimeFormat'
+import LegendOrientation from 'src/timeMachine/components/view_options/LegendOrientation'
 
 // Actions
 import {
@@ -16,10 +17,13 @@ import {
   setAxisPrefix,
   setAxisSuffix,
   setColorHexes,
+  setXDomain,
   setYDomain,
   setXColumn,
   setYColumn,
   setTimeFormat,
+  setLegendOpacity,
+  setLegendOrientationThreshold,
 } from 'src/timeMachine/actions'
 
 // Utils
@@ -63,7 +67,7 @@ interface OwnProps {
 type ReduxProps = ConnectedProps<typeof connector>
 type Props = OwnProps & ReduxProps
 
-const ScatterOptions: SFC<Props> = props => {
+const ScatterOptions: FunctionComponent<Props> = props => {
   const {
     fillColumns,
     symbolColumns,
@@ -76,10 +80,14 @@ const ScatterOptions: SFC<Props> = props => {
     onSetColors,
     onSetYAxisLabel,
     onSetXAxisLabel,
+    xPrefix,
+    xSuffix,
     yPrefix,
     ySuffix,
     onUpdateAxisSuffix,
     onUpdateAxisPrefix,
+    xDomain,
+    onSetXDomain,
     yDomain,
     onSetYDomain,
     xColumn,
@@ -89,6 +97,8 @@ const ScatterOptions: SFC<Props> = props => {
     onSetYColumn,
     onSetTimeFormat,
     timeFormat,
+    onSetLegendOpacity,
+    onSetLegendOrientationThreshold,
   } = props
 
   const groupDropdownStatus = availableGroupColumns.length
@@ -173,6 +183,20 @@ const ScatterOptions: SFC<Props> = props => {
           onChange={e => onSetXAxisLabel(e.target.value)}
         />
       </Form.Element>
+      <Grid.Row>
+        <AxisAffixes
+          prefix={xPrefix}
+          suffix={xSuffix}
+          axisName="x"
+          onUpdateAxisPrefix={prefix => onUpdateAxisPrefix(prefix, 'x')}
+          onUpdateAxisSuffix={suffix => onUpdateAxisSuffix(suffix, 'x')}
+        />
+      </Grid.Row>
+      <AutoDomainInput
+        domain={xDomain as [number, number]}
+        onSetDomain={onSetXDomain}
+        label="X Axis Domain"
+      />
       <h5 className="view-options--header">Y Axis</h5>
       <Form.Element label="Y Axis Label">
         <Input
@@ -193,6 +217,10 @@ const ScatterOptions: SFC<Props> = props => {
         domain={yDomain as [number, number]}
         onSetDomain={onSetYDomain}
         label="Y Axis Domain"
+      />
+      <LegendOrientation
+        onLegendOpacityChange={onSetLegendOpacity}
+        onLegendOrientationThresholdChange={onSetLegendOrientationThreshold}
       />
     </Grid.Column>
   )
@@ -229,10 +257,13 @@ const mdtp = {
   onSetXAxisLabel: setXAxisLabel,
   onUpdateAxisPrefix: setAxisPrefix,
   onUpdateAxisSuffix: setAxisSuffix,
+  onSetXDomain: setXDomain,
   onSetYDomain: setYDomain,
   onSetXColumn: setXColumn,
   onSetYColumn: setYColumn,
   onSetTimeFormat: setTimeFormat,
+  onSetLegendOpacity: setLegendOpacity,
+  onSetLegendOrientationThreshold: setLegendOrientationThreshold,
 }
 
 const connector = connect(mstp, mdtp)

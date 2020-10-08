@@ -1,17 +1,24 @@
 // Libraries
 import React, {FC, useMemo} from 'react'
+import {connect, ConnectedProps} from 'react-redux'
 import {Config, Table} from '@influxdata/giraffe'
+import {get} from 'lodash'
 
 // Components
 import EmptyGraphMessage from 'src/shared/components/EmptyGraphMessage'
 
 // Utils
 import {
+  useLegendOpacity,
+  useLegendOrientationThreshold,
+} from 'src/shared/utils/useLegendOrientation'
+import {
   useVisXDomainSettings,
   useVisYDomainSettings,
 } from 'src/shared/utils/useVisDomainSettings'
 import {
   getFormatter,
+  getMainColumnName,
   geomToInterpolation,
   filterNoisyColumns,
   parseXBounds,
@@ -19,12 +26,14 @@ import {
   defaultXColumn,
   defaultYColumn,
 } from 'src/shared/utils/vis'
+import {getActiveQueryIndex} from 'src/timeMachine/selectors'
 
 // Constants
 import {
   BAND_LINE_OPACITY,
   BAND_LINE_WIDTH,
   BAND_SHADE_OPACITY,
+  QUERY_BUILDER_MODE,
   VIS_THEME,
   VIS_THEME_LIGHT,
 } from 'src/shared/constants'
@@ -32,9 +41,15 @@ import {DEFAULT_LINE_COLORS} from 'src/shared/constants/graphColorPalettes'
 import {INVALID_DATA_COPY} from 'src/shared/copy/cell'
 
 // Types
-import {BandViewProperties, TimeZone, TimeRange, Theme} from 'src/types'
+import {
+  AppState,
+  BandViewProperties,
+  TimeZone,
+  TimeRange,
+  Theme,
+} from 'src/types'
 
-interface Props {
+interface OwnProps {
   children: (config: Config) => JSX.Element
   fluxGroupKeyUnion: string[]
   timeRange?: TimeRange | null
@@ -44,7 +59,11 @@ interface Props {
   theme: Theme
 }
 
+type ReduxProps = ConnectedProps<typeof connector>
+type Props = ReduxProps & OwnProps
+
 const BandPlot: FC<Props> = ({
+  activeQueryIndex,
   children,
   fluxGroupKeyUnion,
   timeRange,
@@ -57,7 +76,10 @@ const BandPlot: FC<Props> = ({
     yColumn: storedYColumn,
     upperColumn: upperColumnName,
     lowerColumn: lowerColumnName,
+    mainColumn,
     hoverDimension,
+    legendOpacity,
+    legendOrientationThreshold,
     axes: {
       x: {
         label: xAxisLabel,
@@ -75,9 +97,35 @@ const BandPlot: FC<Props> = ({
       },
     },
     timeFormat,
+    queries,
   },
   theme,
 }) => {
+  const mainColumnName = useMemo(() => {
+    const editMode = get(queries, `${activeQueryIndex}.editMode`, 'unknown')
+    if (editMode !== QUERY_BUILDER_MODE) {
+      return mainColumn
+    }
+
+    const aggregateFunctions = get(
+      queries,
+      `${activeQueryIndex}.builderConfig.functions`,
+      []
+    )
+    const selectedFunctions = aggregateFunctions.map(f => f.name)
+    return getMainColumnName(
+      selectedFunctions,
+      upperColumnName,
+      mainColumn,
+      lowerColumnName
+    )
+  }, [activeQueryIndex, queries, upperColumnName, mainColumn, lowerColumnName])
+
+  const tooltipOpacity = useLegendOpacity(legendOpacity)
+  const tooltipOrientationThreshold = useLegendOrientationThreshold(
+    legendOrientationThreshold
+  )
+
   const storedXDomain = useMemo(() => parseXBounds(xBounds), [xBounds])
   const storedYDomain = useMemo(() => parseYBounds(yBounds), [yBounds])
   const xColumn = storedXColumn || defaultXColumn(table, '_time')
@@ -110,7 +158,7 @@ const BandPlot: FC<Props> = ({
 
   const memoizedYColumnData = useMemo(
     () => table.getColumn(yColumn, 'number'),
-    [table, yColumn, xColumn, colorHexes, groupKey]
+    [table, yColumn]
   )
 
   const [yDomain, onSetYDomain, onResetYDomain] = useVisYDomainSettings(
@@ -153,6 +201,8 @@ const BandPlot: FC<Props> = ({
     onSetYDomain,
     onResetYDomain,
     legendColumns,
+    legendOpacity: tooltipOpacity,
+    legendOrientationThreshold: tooltipOrientationThreshold,
     valueFormatters: {
       [xColumn]: xFormatter,
       [yColumn]: yFormatter,
@@ -170,6 +220,7 @@ const BandPlot: FC<Props> = ({
         shadeOpacity: BAND_SHADE_OPACITY,
         hoverDimension,
         upperColumnName,
+        mainColumnName,
         lowerColumnName,
       },
     ],
@@ -182,4 +233,9 @@ const BandPlot: FC<Props> = ({
   return children(config)
 }
 
-export default BandPlot
+const mstp = (state: AppState) => ({
+  activeQueryIndex: getActiveQueryIndex(state),
+})
+
+const connector = connect(mstp)
+export default connector(BandPlot)

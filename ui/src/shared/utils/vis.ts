@@ -166,9 +166,7 @@ export const extent = (xs: number[]): [number, number] | null => {
   return [low, high]
 }
 
-export const checkResultsLength = (
-  giraffeResult: Omit<FromFluxResult, 'schema'>
-): boolean => {
+export const checkResultsLength = (giraffeResult: FromFluxResult): boolean => {
   return get(giraffeResult, 'table.length', 0) > 0
 }
 
@@ -340,4 +338,27 @@ export const clamp = (value: number, domain: number[]) => {
   }
 
   return value
+}
+
+export const getMainColumnName = (
+  selectedFunctions: string[],
+  upperColumn: string,
+  mainColumn: string,
+  lowerColumn: string
+): string => {
+  const hasMainColumn = selectedFunctions.some(
+    funcName => funcName === mainColumn
+  )
+
+  if (hasMainColumn) {
+    return mainColumn
+  }
+
+  for (let i = 0; i < selectedFunctions.length; i += 1) {
+    const func = selectedFunctions[i]
+    if (func !== upperColumn && func !== lowerColumn) {
+      return func
+    }
+  }
+  return ''
 }

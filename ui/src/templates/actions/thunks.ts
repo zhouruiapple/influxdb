@@ -3,7 +3,7 @@ import {normalize} from 'normalizr'
 
 // APIs
 import {client} from 'src/utils/api'
-import {fetchStacks} from 'src/templates/api'
+import {fetchStacks, fetchReadMe} from 'src/templates/api'
 import {createDashboardFromTemplate} from 'src/dashboards/actions/thunks'
 import {createVariableFromTemplate} from 'src/variables/actions/thunks'
 import {createTaskFromTemplate} from 'src/tasks/actions/thunks'
@@ -21,6 +21,7 @@ import {
   setExportTemplate,
   setTemplatesStatus,
   setTemplateSummary,
+  setTemplateReadMe,
   Action as TemplateAction,
 } from 'src/templates/actions/creators'
 
@@ -48,6 +49,8 @@ import {
 import {templateToExport} from 'src/shared/utils/resourceToTemplate'
 import {getOrg} from 'src/organizations/selectors'
 import {getLabels, getStatus} from 'src/resources/selectors'
+import {reportErrorThroughHoneyBadger} from 'src/shared/utils/errors'
+import {readMeFormatter} from 'src/templates/utils'
 
 type Action = TemplateAction | NotifyAction
 
@@ -93,20 +96,6 @@ export const createTemplate = (template: DocumentCreate) => async (
   } catch (error) {
     console.error(error)
     dispatch(notify(copy.importTemplateFailed(error)))
-  }
-}
-
-export const createTemplateFromResource = (
-  resource: DocumentCreate,
-  resourceName: string
-) => async (dispatch: Dispatch<Action>, getState: GetState) => {
-  try {
-    const org = getOrg(getState())
-    await client.templates.create({...resource, orgID: org.id})
-    dispatch(notify(copy.resourceSavedAsTemplate(resourceName)))
-  } catch (error) {
-    console.error(error)
-    dispatch(notify(copy.saveResourceAsTemplateFailed(resourceName, error)))
   }
 }
 
@@ -287,5 +276,25 @@ export const fetchAndSetStacks = (orgID: string) => async (
     dispatch(setStacks(stacks))
   } catch (error) {
     console.error(error)
+  }
+}
+
+export const fetchAndSetReadme = (name: string, directory: string) => async (
+  dispatch: Dispatch<Action>
+): Promise<void> => {
+  try {
+    const response = await fetchReadMe(directory)
+    const readme = readMeFormatter(response)
+    dispatch(setTemplateReadMe(name, readme))
+  } catch (error) {
+    reportErrorThroughHoneyBadger(error, {
+      name: `The community template github readme fetch failed for ${name}`,
+    })
+    dispatch(
+      setTemplateReadMe(
+        name,
+        "###### We can't find the readme associated with this template"
+      )
+    )
   }
 }

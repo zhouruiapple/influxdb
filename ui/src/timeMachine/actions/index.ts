@@ -85,6 +85,11 @@ export type Action =
   | SetBinCountAction
   | SetHistogramPositionAction
   | ReturnType<typeof setLinePosition>
+  | ReturnType<typeof setUpperColumn>
+  | ReturnType<typeof setMainColumn>
+  | ReturnType<typeof setLowerColumn>
+  | ReturnType<typeof setLegendOpacity>
+  | ReturnType<typeof setLegendOrientationThreshold>
   | SetXDomainAction
   | SetYDomainAction
   | SetXAxisLabelAction
@@ -557,7 +562,7 @@ interface SetHoverDimensionAction {
   payload: {hoverDimension}
 }
 
-export const SetHoverDimension = (
+export const setHoverDimension = (
   hoverDimension: 'auto' | 'x' | 'y' | 'xy'
 ): SetHoverDimensionAction => ({
   type: 'SET_HOVER_DIMENSION',
@@ -663,6 +668,33 @@ interface SetXAxisLabelAction {
 export const setXAxisLabel = (xAxisLabel: string): SetXAxisLabelAction => ({
   type: 'SET_X_AXIS_LABEL',
   payload: {xAxisLabel},
+})
+
+export const setUpperColumn = (upperColumn: string) => ({
+  type: 'SET_UPPER_COLUMN' as 'SET_UPPER_COLUMN',
+  payload: {upperColumn},
+})
+
+export const setMainColumn = (mainColumn: string) => ({
+  type: 'SET_MAIN_COLUMN' as 'SET_MAIN_COLUMN',
+  payload: {mainColumn},
+})
+
+export const setLowerColumn = (lowerColumn: string) => ({
+  type: 'SET_LOWER_COLUMN' as 'SET_LOWER_COLUMN',
+  payload: {lowerColumn},
+})
+
+export const setLegendOpacity = (legendOpacity: number) => ({
+  type: 'SET_LEGEND_OPACITY' as 'SET_LEGEND_OPACITY',
+  payload: {legendOpacity},
+})
+
+export const setLegendOrientationThreshold = (
+  legendOrientationThreshold: number
+) => ({
+  type: 'SET_LEGEND_ORIENTATION_THRESHOLD' as 'SET_LEGEND_ORIENTATION_THRESHOLD',
+  payload: {legendOrientationThreshold},
 })
 
 export const loadNewVEO = () => (
