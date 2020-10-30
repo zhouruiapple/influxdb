@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -1417,10 +1418,58 @@ func (s *Store) WriteToShardWithContext(ctx context.Context, shardID uint64, poi
 	return sh.WritePointsWithContext(ctx, points)
 }
 
+type MeasurementDetail struct {
+	Database          string
+	Measurement       string
+	ReplicationPolicy string
+}
+
+func (s *Store) MeasurementByRP(auth query.Authorizer, cond influxql.Expr) ([]MeasurementDetail, error) {
+	// get all databases
+	dbs := s.Databases()
+
+	// get all shards by db
+	s.mu.RLock()
+	shards := []*Shard{}
+	for _, db := range dbs {
+		shards = append(shards, s.filterShards(byDatabase(db))...)
+	}
+	s.mu.RUnlock()
+
+	for _, s := range shards {
+		log.Printf(">> %+v", *s)
+	}
+
+	log.Printf("measurements:")
+	for _, shard := range shards {
+		bs, err := s.MeasurementNamesPrivate(auth, shard.database, cond)
+		if err != nil {
+			log.Printf("err: %v", err)
+			continue
+		}
+		for _, n := range bs {
+			log.Printf(">> database: %q, measurement: %q, retention: %q", shard.database, string(n), shard.retentionPolicy)
+		}
+
+	}
+
+	// get all replication policies for database
+
+	// get all measurements per rp
+
+	return nil, nil
+}
+
+func (s *Store) MeasurementNames(auth query.Authorizer, database string, cond influxql.Expr) ([][]byte, error) {
+	s.MeasurementByRP(auth, cond)
+	return s.MeasurementNamesPrivate(auth, database, cond)
+}
+
 // MeasurementNames returns a slice of all measurements. Measurements accepts an
 // optional condition expression. If cond is nil, then all measurements for the
 // database will be returned.
-func (s *Store) MeasurementNames(auth query.Authorizer, database string, cond influxql.Expr) ([][]byte, error) {
+func (s *Store) MeasurementNamesPrivate(auth query.Authorizer, database string, cond influxql.Expr) ([][]byte, error) {
+
 	s.mu.RLock()
 	shards := s.filterShards(byDatabase(database))
 	s.mu.RUnlock()
