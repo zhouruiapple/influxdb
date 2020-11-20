@@ -491,47 +491,7 @@ workflows:
   e2e:
     jobs:
       - e2e
-  hourly-e2e:
-    triggers:
-      - schedule:
-          cron: "0 * * * *"
-          filters:
-            branches:
-              only:
-                - master
-    jobs:
-      - e2e
-  nightly:
-    triggers:
-      - schedule:
-          cron: "0 5 * * *"
-          filters:
-            branches:
-              only:
-                - master
-                - feat/use-algo-w
-    jobs:
-      - gotest
-      - golint
-      - jstest
-      - jslint
-      - deploy-nightly:
-          requires:
-            - gotest
-            - golint
-            - jstest
-            - jslint
-          filters:
-            branches:
-              only:
-                - master
-                - feat/use-algo-w
-      - litmus_nightly:
-          requires:
-            - deploy-nightly
-      - selenium_accept:
-          requires:
-            - deploy-nightly
+  
   release:
     jobs:
       - gotest:
