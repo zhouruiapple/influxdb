@@ -7,6 +7,7 @@ v1.8.4 [2021-01-27]
 ### Bugfixes
 
 -	[#19696](https://github.com/influxdata/influxdb/pull/19697): fix(flux): add durations to Flux logging
+	[#20276](https://github.com/influxdata/influxdb/pull/20276): fix(error): unsupported value: +Inf" error not handled gracefully
 
 v1.8.3 [2020-09-30]
 -------------------
