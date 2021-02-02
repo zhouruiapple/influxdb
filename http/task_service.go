@@ -1046,6 +1046,10 @@ func decodeGetRunsRequest(ctx context.Context, r *http.Request) (*getRunsRequest
 			return nil, err
 		}
 
+		if i < 1 {
+			i = influxdb.DefaultPageSize
+		}
+
 		if i < 1 || i > influxdb.TaskMaxPageSize {
 			return nil, influxdb.ErrOutOfBoundsLimit
 		}
@@ -1611,6 +1615,10 @@ func (t TaskService) FindRuns(ctx context.Context, filter influxdb.RunFilter) ([
 
 	if filter.After != nil {
 		params = append(params, [2]string{"after", filter.After.String()})
+	}
+
+	if filter.Limit == 0 {
+		filter.Limit = influxdb.TaskMaxPageSize
 	}
 
 	if filter.Limit < 0 || filter.Limit > influxdb.TaskMaxPageSize {

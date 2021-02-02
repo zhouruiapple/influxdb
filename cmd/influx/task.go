@@ -43,6 +43,7 @@ type cmdTaskBuilder struct {
 	taskUpdateFlags      taskUpdateFlags
 	taskRunFindFlags     taskRunFindFlags
 	org                  organization
+	taskDryRun           bool
 }
 
 func newCmdTaskBuilder(svcsFn taskSVCsFn, f *globalFlags, opts genericCLIOpts) *cmdTaskBuilder {
@@ -230,6 +231,7 @@ func (b *cmdTaskBuilder) taskRetryFailedCmd() *cobra.Command {
 	b.globalFlags.registerFlags(b.opts.viper, cmd)
 	registerPrintOptions(b.opts.viper, cmd, &b.taskPrintFlags.hideHeaders, &b.taskPrintFlags.json)
 	cmd.Flags().StringVarP(&b.taskID, "id", "i", "", "task ID")
+	cmd.Flags().BoolVarP(&b.taskDryRun, "dry-run", "d", false, "dry run operation")
 	cmd.Flags().StringVar(&b.taskRerunFailedFlags.before, "before", "", "runs before this time")
 	cmd.Flags().StringVar(&b.taskRerunFailedFlags.after, "after", "", "runs after this time")
 
@@ -258,11 +260,17 @@ func (b *cmdTaskBuilder) taskRetryFailedF(*cobra.Command, []string) error {
 	}
 
 	for _, run := range failedRuns {
-		newRun, err := tskSvc.RetryRun(context.Background(), run.TaskID, run.ID)
-		if err != nil {
-			return err
+		if !b.taskDryRun {
+			newRun, err := tskSvc.RetryRun(context.Background(), run.TaskID, run.ID)
+			if err != nil {
+				return err
+			}
+
+			fmt.Printf("Retry for task %s's run %s queued as run %s.\n", run.TaskID, run.ID, newRun.ID)
+			continue
 		}
-		fmt.Printf("Retry for task %s's run %s queued as run %s.\n", run.TaskID, run.ID, newRun.ID)
+
+		fmt.Printf("Retry for task %s's run %s\n", run.TaskID, run.ID)
 	}
 	return nil
 
@@ -283,6 +291,7 @@ func (b *cmdTaskBuilder) getFailedRunsTaskID() ([]*influxdb.Run, error) {
 	runFilter.Task = *id
 	runFilter.BeforeTime = b.taskRerunFailedFlags.before
 	runFilter.AfterTime = b.taskRerunFailedFlags.after
+	runFilter.Limit = 500
 	allRuns, _, err := tskSvc.FindRuns(context.Background(), runFilter)
 	if err != nil {
 		return nil, err
