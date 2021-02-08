@@ -3,4 +3,4 @@
 //
 // If you're looking for the Go HTTP client for InfluxDB,
 // see package github.com/influxdata/influxdb/client/v2.
-package influxdb // import "github.com/influxdata/influxdb"
+package influxdb // import "github.com/influxdata/influxdb/influxdb"

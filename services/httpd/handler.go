@@ -27,7 +27,7 @@ import (
 	"github.com/golang/snappy"
 	"github.com/influxdata/flux"
 	"github.com/influxdata/flux/lang"
-	"github.com/influxdata/influxdb"
+	"github.com/influxdata/influxdb/influxdb"
 	"github.com/influxdata/influxdb/logger"
 	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/influxdb/monitor"
