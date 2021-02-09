@@ -3,7 +3,7 @@ import {useMemo, FunctionComponent} from 'react'
 import {flatMap} from 'lodash'
 
 // Utils
-import {parseResponse} from 'src/shared/parsing/flux/response'
+import {parseResponseWithFromFlux} from 'src/shared/parsing/flux/response'
 
 // Types
 import {FluxTable} from 'src/types'
@@ -14,7 +14,9 @@ interface Props {
 }
 
 const FluxTablesTransform: FunctionComponent<Props> = ({files, children}) => {
-  const tables = useMemo(() => flatMap(files, parseResponse), [files])
+  const tables = useMemo(() => flatMap(files, parseResponseWithFromFlux), [
+    files,
+  ])
   return children(tables)
 }
 

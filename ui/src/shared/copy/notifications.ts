@@ -2,13 +2,18 @@
 import {binaryPrefixFormatter} from '@influxdata/giraffe'
 
 // Types
-import {Notification, NotificationStyle} from 'src/types'
+import {
+  Notification,
+  NotificationStyle,
+  NotificationButtonElement,
+} from 'src/types'
 
 // Constants
 import {
   FIVE_SECONDS,
   TEN_SECONDS,
   FIFTEEN_SECONDS,
+  INDEFINITE,
 } from 'src/shared/constants/index'
 import {QUICKSTART_SCRAPER_TARGET_URL} from 'src/dataLoaders/constants/pluginConfigs'
 import {QUICKSTART_DASHBOARD_NAME} from 'src/onboarding/constants/index'
@@ -25,19 +30,24 @@ type NotificationExcludingMessage = Pick<
   Exclude<keyof Notification, 'message'>
 >
 
+const defaultButtonElement = () => null
+
 const defaultErrorNotification: NotificationExcludingMessage = {
+  buttonElement: defaultButtonElement,
   style: NotificationStyle.Error,
   icon: IconFont.AlertTriangle,
   duration: TEN_SECONDS,
 }
 
 const defaultSuccessNotification: NotificationExcludingMessage = {
+  buttonElement: defaultButtonElement,
   style: NotificationStyle.Success,
   icon: IconFont.Checkmark,
   duration: FIVE_SECONDS,
 }
 
 const defaultDeletionNotification: NotificationExcludingMessage = {
+  buttonElement: defaultButtonElement,
   style: NotificationStyle.Primary,
   icon: IconFont.Trash,
   duration: FIVE_SECONDS,
@@ -47,6 +57,7 @@ const defaultDeletionNotification: NotificationExcludingMessage = {
 //  ----------------------------------------------------------------------------
 
 export const newVersion = (version: string): Notification => ({
+  ...defaultSuccessNotification,
   style: NotificationStyle.Info,
   icon: IconFont.Cubouniform,
   message: `Welcome to the latest Chronograf${version}. Local settings cleared.`,
@@ -58,6 +69,7 @@ export const loadLocalSettingsFailed = (error: string): Notification => ({
 })
 
 export const presentationMode = (): Notification => ({
+  ...defaultSuccessNotification,
   style: NotificationStyle.Primary,
   icon: IconFont.ExpandB,
   duration: 7500,
@@ -65,14 +77,15 @@ export const presentationMode = (): Notification => ({
 })
 
 export const sessionTimedOut = (): Notification => ({
+  ...defaultSuccessNotification,
   style: NotificationStyle.Primary,
   icon: IconFont.Triangle,
+  duration: FIFTEEN_SECONDS,
   message: 'Your session has timed out. Log in again to continue.',
 })
 
 export const resultTooLarge = (bytesRead: number): Notification => ({
-  style: NotificationStyle.Error,
-  icon: IconFont.Triangle,
+  ...defaultErrorNotification,
   duration: FIVE_SECONDS,
   message: `Large response truncated to first ${bytesFormatter(bytesRead)}`,
 })
@@ -311,16 +324,6 @@ export const copyToClipboardFailed = (
 })
 
 // Templates
-export const addTemplateLabelFailed = (): Notification => ({
-  ...defaultErrorNotification,
-  message: 'Failed to add label to template',
-})
-
-export const removeTemplateLabelFailed = (): Notification => ({
-  ...defaultErrorNotification,
-  message: 'Failed to remove label from template',
-})
-
 export const TelegrafDashboardCreated = (configs: string[]): Notification => ({
   ...defaultSuccessNotification,
   message: `Successfully created dashboards for telegraf plugin${
@@ -353,11 +356,6 @@ export const importDashboardFailed = (error: string): Notification => ({
   message: `Failed to import dashboard: ${error}`,
 })
 
-export const importTemplateSucceeded = (): Notification => ({
-  ...defaultSuccessNotification,
-  message: `Successfully imported template.`,
-})
-
 export const importTemplateFailed = (error: string): Notification => ({
   ...defaultErrorNotification,
   message: `Failed to import template: ${error}`,
@@ -368,41 +366,9 @@ export const createTemplateFailed = (error: string): Notification => ({
   message: `Failed to  resource as template: ${error}`,
 })
 
-export const createResourceFromTemplateFailed = (
-  error: string
-): Notification => ({
-  ...defaultErrorNotification,
-  message: `Failed to create from template: ${error}`,
-})
-
-export const updateTemplateSucceeded = (): Notification => ({
-  ...defaultSuccessNotification,
-  message: `Successfully updated template.`,
-})
-
 export const updateTemplateFailed = (error: string): Notification => ({
   ...defaultErrorNotification,
   message: `Failed to update template: ${error}`,
-})
-
-export const deleteTemplateFailed = (error: string): Notification => ({
-  ...defaultErrorNotification,
-  message: `Failed to delete template: ${error}`,
-})
-
-export const deleteTemplateSuccess = (): Notification => ({
-  ...defaultSuccessNotification,
-  message: 'Template was deleted successfully',
-})
-
-export const cloneTemplateFailed = (error: string): Notification => ({
-  ...defaultErrorNotification,
-  message: `Failed to clone template: ${error}`,
-})
-
-export const cloneTemplateSuccess = (): Notification => ({
-  ...defaultSuccessNotification,
-  message: 'Template cloned successfully',
 })
 
 export const resourceSavedAsTemplate = (
@@ -455,6 +421,14 @@ export const getBucketFailed = (
   message: `Failed to fetch bucket with id ${bucketID}: ${error}`,
 })
 
+export const getSchemaFailed = (
+  bucketName: string,
+  error: string
+): Notification => ({
+  ...defaultErrorNotification,
+  message: `Failed to fetch schema for bucket with id ${bucketName}: ${error}`,
+})
+
 // Demodata buckets
 
 export const demoDataAddBucketFailed = (
@@ -475,24 +449,34 @@ export const demoDataDeleteBucketFailed = (
 
 export const demoDataSucceeded = (
   bucketName: string,
-  link: string
+  buttonElement: NotificationButtonElement
 ): Notification => ({
   ...defaultSuccessNotification,
   message: `Successfully added demodata bucket ${bucketName}, and demodata dashboard.`,
   duration: FIFTEEN_SECONDS,
-  linkText: 'Go to dashboard',
-  link,
+  buttonElement,
 })
 
-export const demoDataAvailability = (error: {
-  message: string
-  linkText?: string
-  link?: string
-}): Notification => ({
+export const demoDataAvailability = (
+  message: string,
+  buttonElement?: NotificationButtonElement
+): Notification => ({
   ...defaultErrorNotification,
-  ...error,
+  message,
+  buttonElement,
   duration: TEN_SECONDS,
   type: 'demoDataAvailabilityError',
+})
+
+export const updateAggregateType = (
+  message: string,
+  buttonElement?: NotificationButtonElement
+): Notification => ({
+  ...defaultErrorNotification,
+  message,
+  buttonElement,
+  duration: TEN_SECONDS,
+  type: 'aggregateTypeError',
 })
 
 // Limits
@@ -794,10 +778,16 @@ export const passwordResetSuccessfully = (message: string): Notification => ({
   If you haven't received an email, please ensure that the email you provided is correct.`,
 })
 
-export const authorizationCreateFailed = (): Notification => ({
-  ...defaultErrorNotification,
-  message: 'Failed to create tokens',
-})
+export const authorizationCreateFailed = (
+  errorMessage?: string
+): Notification => {
+  const defaultMsg = 'Failed to create tokens'
+  const message = errorMessage ? `${defaultMsg}: ${errorMessage}` : defaultMsg
+  return {
+    ...defaultErrorNotification,
+    message,
+  }
+}
 
 export const authorizationUpdateSuccess = (): Notification => ({
   ...defaultSuccessNotification,
@@ -971,9 +961,10 @@ export const communityTemplateInstallSucceeded = (
 })
 
 export const communityTemplateInstallFailed = (
-  errorMessage: string
+  errorMessage: string = ''
 ): Notification => ({
   ...defaultErrorNotification,
+  duration: INDEFINITE,
   message: `There was a problem installing the template: ${errorMessage}`,
 })
 
@@ -1006,4 +997,44 @@ export const communityTemplateUnsupportedFormatError = (): Notification => ({
 export const communityTemplateRenameFailed = (): Notification => ({
   ...defaultErrorNotification,
   message: `We've successfully installed your template but weren't able to name it properly. It may appear as a blank template.`,
+})
+
+// Notebooks
+
+export const notebookRunSuccess = (
+  runMode: string,
+  projectName: string
+): Notification => ({
+  ...defaultSuccessNotification,
+  message: `${projectName} ${runMode.toLowerCase()} successful!`,
+})
+
+export const notebookRunFail = (
+  runMode: string,
+  projectName: string
+): Notification => ({
+  ...defaultErrorNotification,
+  message: `${projectName} ${runMode.toLowerCase()} failed`,
+})
+
+export const notebookCreateFail = (): Notification => ({
+  ...defaultErrorNotification,
+  message: `Failed to create Notebook, please try again.`,
+})
+
+export const notebookUpdateFail = (): Notification => ({
+  ...defaultErrorNotification,
+  message: `Failed to save changes to Notebook, please try again.`,
+})
+
+export const notebookDeleteFail = (): Notification => ({
+  ...defaultErrorNotification,
+  message: `Failed to delete Notebook, please try again.`,
+})
+
+export const csvUploaderErrorNotification = (
+  message: string
+): Notification => ({
+  ...defaultErrorNotification,
+  message: `Failed to upload the selected CSV: ${message}`,
 })

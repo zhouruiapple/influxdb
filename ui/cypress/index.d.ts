@@ -26,26 +26,34 @@ import {
   fluxEqual,
   createTelegraf,
   createToken,
-  createDashboardTemplate,
+  fillInOSSLoginFormWithDefaults,
   writeData,
+  wrapEnvironmentVariablesForCloud,
+  wrapEnvironmentVariablesForOss,
   getByTestIDSubStr,
   createEndpoint,
   createDashWithCell,
   createDashWithViewAndVar,
   createRule,
+  clickAttached,
 } from './support/commands'
 
 declare global {
+  interface Window extends Window {
+    influx: {
+      set: (flag: string, value: boolean) => void
+    }
+  }
   namespace Cypress {
     interface Chainable {
       signin: typeof signin
       setupUser: typeof setupUser
+      clickAttached: typeof clickAttached
       createSource: typeof createSource
       createCSVVariable: typeof createCSVVariable
       createQueryVariable: typeof createQueryVariable
       createTask: typeof createTask
       createMapVariable: typeof createMapVariable
-      createDashboardTemplate: typeof createDashboardTemplate
       createDashboard: typeof createDashboard
       createCell: typeof createCell
       createDashWithCell: typeof createDashWithCell
@@ -67,6 +75,9 @@ declare global {
       createTelegraf: typeof createTelegraf
       createToken: typeof createToken
       writeData: typeof writeData
+      wrapEnvironmentVariablesForCloud: typeof wrapEnvironmentVariablesForCloud
+      wrapEnvironmentVariablesForOss: typeof wrapEnvironmentVariablesForOss
+      fillInOSSLoginFormWithDefaults: typeof fillInOSSLoginFormWithDefaults
       createEndpoint: typeof createEndpoint
       createRule: typeof createRule
     }

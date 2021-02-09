@@ -18,7 +18,7 @@ describe('fromFlux', () => {
 #default,_result,,,,,,,,,
 ,result,table,_start,_stop,_time,_value,_field,_measurement,cpu,host
 ,,2,2019-02-01T23:38:32.524234Z,2019-02-01T23:39:02.524234Z,2019-02-01T23:38:33Z,thirty,usage_guest,cpu,cpu0,oox4k.local
-,,3,2019-02-01T23:38:32.524234Z,2019-02-01T23:39:02.524234Z,2019-02-01T23:38:43Z,forty,usage_guest,cpu,cpu0,oox4k.local`
+,,3,2019-02-01T23:38:32.524234Z,2019-02-01T23:39:02.524234Z,2019-02-01T23:38:43Z,fourty,usage_guest,cpu,cpu0,oox4k.local`
 
     const actual = fromFlux(CSV)
 
@@ -61,7 +61,7 @@ describe('fromFlux', () => {
       undefined,
       undefined,
       'thirty',
-      'forty',
+      'fourty',
     ])
 
     expect(actual.table.columns['_field'].data).toEqual([
@@ -94,9 +94,9 @@ describe('fromFlux', () => {
 
     expect(actual.table.columns['table'].data).toEqual([0, 1, 2, 3])
 
-    //expect(actual.table.getColumnName('_value (number)')).toEqual('_value')
+    // expect(actual.table.getColumnName('_value (number)')).toEqual('_value')
 
-    //expect(actual.table.getColumnName('_value (string)')).toEqual('_value')
+    // expect(actual.table.getColumnName('_value (string)')).toEqual('_value')
 
     expect(actual.fluxGroupKeyUnion).toEqual([
       '_value (number)',

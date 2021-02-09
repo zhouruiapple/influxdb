@@ -193,6 +193,38 @@ export const updateTaskName = (name: string, taskID: string) => async (
   }
 }
 
+type UpdateTaskParams = {
+  script: string
+  preamble: string
+  task: Task
+  interval: string
+}
+
+export const updateTask = ({
+  script,
+  interval,
+  preamble,
+  task,
+}: UpdateTaskParams) => async (dispatch: Dispatch<Action>) => {
+  try {
+    const fluxScript = await insertPreambleInScript(script, preamble)
+    const resp = await api.patchTask({
+      taskID: task.id,
+      data: {...task, offset: '0s', every: interval, flux: fluxScript},
+    })
+
+    if (resp.status !== 200) {
+      throw new Error(resp.data.message)
+    }
+
+    dispatch(notify(copy.taskUpdateSuccess()))
+  } catch (e) {
+    console.error(e)
+    const message = getErrorMessage(e)
+    dispatch(notify(copy.taskUpdateFailed(message)))
+  }
+}
+
 export const deleteTask = (taskID: string) => async (
   dispatch: Dispatch<Action>
 ) => {
@@ -358,7 +390,6 @@ export const saveNewScript = (script: string, preamble: string) => async (
 
     dispatch(setNewScript(''))
     dispatch(clearTask())
-    dispatch(goToTasks())
     dispatch(notify(copy.taskCreatedSuccess()))
     dispatch(checkTaskLimits())
   } catch (error) {

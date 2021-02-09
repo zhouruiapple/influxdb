@@ -12,6 +12,8 @@ import GraphTips from 'src/shared/components/graph_tips/GraphTips'
 import RenamablePageTitle from 'src/pageLayout/components/RenamablePageTitle'
 import TimeZoneDropdown from 'src/shared/components/TimeZoneDropdown'
 import {Button, IconFont, ComponentColor, Page} from '@influxdata/clockface'
+import {AnnotationsToggleButton} from 'src/annotations/components/AnnotationsToggleButton'
+import {FeatureFlag} from 'src/shared/utils/featureFlag'
 
 // Actions
 import {toggleShowVariablesControls as toggleShowVariablesControlsAction} from 'src/userSettings/actions'
@@ -28,7 +30,6 @@ import {
 // Utils
 import {event} from 'src/cloud/utils/reporting'
 import {resetQueryCache} from 'src/shared/apis/queryCache'
-import {isFlagEnabled} from 'src/shared/utils/featureFlag'
 
 // Selectors
 import {getTimeRange} from 'src/dashboards/selectors'
@@ -106,9 +107,7 @@ const DashboardHeader: FC<Props> = ({
   }
 
   const handleChooseTimeRange = (timeRange: TimeRange) => {
-    if (isFlagEnabled('queryCacheForDashboards')) {
-      resetQueryCache()
-    }
+    resetQueryCache()
     setDashboardTimeRange(dashboard.id, timeRange)
     updateQueryParams({
       lower: timeRange.lower,
@@ -132,9 +131,7 @@ const DashboardHeader: FC<Props> = ({
 
   const resetCacheAndRefresh = (): void => {
     // We want to invalidate the existing cache when a user manually refreshes the dashboard
-    if (isFlagEnabled('queryCacheForDashboards')) {
-      resetQueryCache()
-    }
+    resetQueryCache()
     onManualRefresh()
   }
 
@@ -174,6 +171,9 @@ const DashboardHeader: FC<Props> = ({
                 : ComponentColor.Default
             }
           />
+          <FeatureFlag name="annotations">
+            <AnnotationsToggleButton />
+          </FeatureFlag>
           <DashboardLightModeToggle />
           <PresentationModeToggle />
           <GraphTips />

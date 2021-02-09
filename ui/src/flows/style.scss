@@ -1,0 +1,298 @@
+@import '@influxdata/clockface/dist/variables.scss';
+@import '~src/flows/FlowVariables.scss';
+
+.flow {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.flow--add-cell-label {
+  user-select: none;
+  margin: 0 $cf-marg-c 0 0;
+  font-size: 14px;
+  font-weight: $cf-font-weight--medium;
+}
+
+.flow-main,
+.flow-empty {
+  flex: 1 0 0;
+}
+
+.flow-empty {
+  padding: 0 $flow-panel--gutter;
+}
+
+.flow-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  border-radius: $cf-radius;
+  background-color: $flow-panel--bg;
+
+  // Vertical line on left side of panel
+  &::after {
+    content: '';
+    position: absolute;
+    width: $cf-border;
+    background-color: $g5-pepper;
+    // Ensures there is no visible gap
+    bottom: 0;
+    top: 0;
+    left: ($flow-panel--node-gap / 2) - ($cf-border / 2);
+  }
+
+  &:first-child::after {
+    top: ($flow-header-height - $flow-panel--node-dot) / 2;
+  }
+}
+
+.flow-panel--header,
+.flow-panel--body,
+.flow-panel--results {
+  transition: background-color 0.25s ease;
+}
+
+.flow-panel--header {
+  border-radius: $cf-radius $cf-radius 0 0;
+  padding: $cf-marg-b;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.flow-panel--hover-control,
+.flow-panel--persistent-control {
+  display: flex;
+  align-items: center;
+
+  > * {
+    margin-left: $cf-marg-a;
+  }
+}
+
+.flow-panel--hover-control {
+  order: 4;
+  flex: 1 0 100%;
+  padding-left: 28px;
+
+  & > * {
+    margin-top: $cf-marg-a;
+  }
+}
+
+.flow-panel__focus,
+.flow-panel:hover {
+  .flow-panel--hover-control > * {
+    opacity: 1;
+  }
+}
+
+.flow-panel--persistent-control {
+  justify-content: flex-end;
+  order: 3;
+  flex-grow: 1;
+}
+
+.flow-panel--node-wrapper {
+  order: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  align-content: center;
+  flex-basis: 24px;
+  width: 24px;
+  position: relative;
+  z-index: 2;
+}
+
+.flow-panel--node {
+  width: $flow-panel--node-dot;
+  height: $flow-panel--node-dot;
+  border-radius: 50%;
+  background-color: $flow-panel--bg;
+  border: $cf-border solid $g5-pepper;
+  position: relative;
+}
+
+.flow-panel--title,
+.flow-panel--data-source {
+  font-size: 14px;
+  font-weight: $cf-font-weight--medium;
+  user-select: none;
+  margin-right: $cf-marg-b !important;
+}
+
+.flow-panel--data-source {
+  color: $c-laser;
+}
+
+.flow-panel--title {
+  order: 2;
+  color: $g15-platinum;
+  width: 230px;
+  flex: 0 0 230px;
+  height: $cf-form-sm-height;
+  position: relative;
+  margin-left: $cf-marg-b;
+}
+
+.flow-panel--title-input {
+  background-color: transparent;
+  border: $cf-border solid $flow-panel--bg;
+  color: $g15-platinum;
+  font-size: 14px;
+  font-family: $cf-text-font;
+  font-weight: $cf-font-weight--medium;
+  transition: color 0.25s ease, background-color 0.25s ease,
+    border-color 0.25s ease, box-shadow 0.25s ease;
+  outline: none;
+  width: 100%;
+  height: $cf-form-sm-height;
+  border-radius: $cf-radius;
+
+  &:hover {
+    border-color: $g5-pepper;
+  }
+
+  &:hover,
+  &:focus {
+    color: $g20-white;
+  }
+
+  &:focus {
+    background-color: $cf-input-background--focused;
+    border-color: $cf-input-border--focused;
+    box-shadow: $cf-input--box-shadow;
+  }
+}
+
+.flow-panel--title-icon {
+  position: absolute;
+  top: 50%;
+  right: $cf-form-sm-height / 2;
+  transform: translate(50%, -50%);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+  color: $g11-sidewalk;
+}
+
+.flow-panel--title:hover .flow-panel--title-icon {
+  opacity: 1;
+}
+
+.flow-panel--data-caret {
+  display: inline-block;
+  margin-left: $cf-marg-a;
+  font-size: 0.8em;
+  position: relative;
+  top: -2px;
+}
+
+.flow-panel--body,
+.flow-panel--results {
+  border-radius: 0 0 $cf-radius $cf-radius;
+  padding: $cf-marg-b;
+  padding-left: $flow-panel--node-gap;
+  padding-top: 0;
+  position: relative;
+}
+
+.flow-panel--results {
+  width: 100%;
+  position: relative;
+}
+
+/*
+  Flow Panel Modes
+  ------------------------------------------------------------------------------
+*/
+
+.flow-panel__hidden {
+  height: $flow-header-height + ($cf-border * 2);
+
+  .flow-panel--body,
+  .flow-panel--results {
+    display: none;
+  }
+
+  .flow-panel--header {
+    border-radius: $cf-radius;
+  }
+}
+
+.flow-panel__visible {
+  min-height: $flow-header-height;
+}
+
+/*
+  Visualization Panel
+  ------------------------------------------------------------------------------
+*/
+
+.flow-panel--visualization {
+  width: 100%;
+  height: 320px;
+  display: flex;
+  align-items: stretch;
+  flex-direction: row;
+}
+
+.flow-panel--view {
+  flex: 1 0 0;
+  position: relative;
+}
+
+// Special styling for view options inside flow panel
+.flow-panel--body .view-options--wrap {
+  flex: 0 0 340px;
+  border-radius: 0;
+  background-color: transparent;
+  margin-right: 0;
+}
+.flow-panel--body .view-options {
+  padding: $cf-marg-c;
+}
+
+.flow-header--buttons {
+  display: inline-flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+
+  > * {
+    margin-left: $cf-marg-a;
+  }
+}
+
+.flows-early-access-feedback {
+  font-size: 1.25em;
+  font-weight: $cf-font-weight--medium;
+  margin-left: $cf-marg-b;
+}
+
+// Responsive Layout
+// The 1200px number is somewhat arbitrary but works with the current design
+// Adjust as needed
+@media screen and (min-width: 1200px) {
+  .flow-panel--hover-control {
+    flex: 1 0 0;
+    order: 3;
+    justify-content: flex-end;
+    padding-left: 0;
+
+    & > * {
+      margin-top: 0;
+      opacity: 0;
+    }
+  }
+
+  .flow-panel--persistent-control {
+    flex: initial;
+    order: 4;
+  }
+}

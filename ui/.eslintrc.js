@@ -29,7 +29,8 @@ module.exports = {
     },
   },
   rules: {
-    'curly': ['error', 'all'],
+    'spaced-comment': ['error', 'always'],
+    curly: ['error', 'all'],
     'no-console': ['error', {allow: ['warn', 'error']}],
     'no-empty': 'off',
     'getter-return': 'off',
@@ -50,6 +51,7 @@ module.exports = {
     '@typescript-eslint/array-type': 'off',
     '@typescript-eslint/no-inferrable-types': 'off',
     '@typescript-eslint/no-var-requires': 'off',
+    '@typescript-eslint/no-empty-function': 'off',
     '@typescript-eslint/prefer-interface': 'off',
     '@typescript-eslint/camelcase': 'off',
     '@typescript-eslint/member-delimiter-style': 'off',

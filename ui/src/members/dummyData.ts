@@ -1,6 +1,6 @@
 import {ResourceOwner, User} from '@influxdata/influx'
 
-export const resourceOwner: ResourceOwner[] = [
+export const resouceOwner: ResourceOwner[] = [
   {
     id: '1',
     name: 'John',

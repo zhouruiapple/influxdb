@@ -1,4 +1,5 @@
 import Deferred from '../utils/Deferred'
+import {fromFlux} from '@influxdata/giraffe'
 import {
   LSPResponse,
   parseResponse,
@@ -21,12 +22,11 @@ import {AppState, LocalStorage} from 'src/types'
 import {getAllVariables, asAssignment} from 'src/variables/selectors'
 import {buildVarsOption} from 'src/variables/utils/buildVarsOption'
 import {runQuery} from 'src/shared/apis/query'
-import {parseResponse as parse} from 'src/shared/parsing/flux/response'
 import {getOrg} from 'src/organizations/selectors'
 import {fetchAllBuckets} from 'src/buckets/actions/thunks'
 import {event} from 'src/cloud/utils/reporting'
 
-import {store} from 'src/index'
+import {getStore} from 'src/store/configureStore'
 
 import {Store} from 'redux'
 import {
@@ -57,8 +57,8 @@ import {format_from_js_file} from '@influxdata/flux'
 
 // NOTE: parses table then select measurements from the _value column
 const parseQueryResponse = response => {
-  const data = (parse(response.csv) || [{data: [{}]}])[0].data
-  return data.slice(1).map(r => r[3])
+  const {table} = fromFlux(response.csv)
+  return table.getColumn('_value', 'string') || []
 }
 
 const queryMeasurements = async (orgID, bucket) => {
@@ -118,7 +118,7 @@ export class LSPServer {
   private documentVersions: {[key: string]: number} = {}
   public store: Store<AppState & LocalStorage>
 
-  constructor(server: WASMServer, reduxStore = store) {
+  constructor(server: WASMServer, reduxStore = getStore()) {
     this.server = server
     this.server.register_buckets_callback(this.getBuckets)
     this.server.register_measurements_callback(this.getMeasurements)

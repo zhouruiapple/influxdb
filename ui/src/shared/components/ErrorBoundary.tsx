@@ -1,17 +1,22 @@
 // Libraries
-import React, {Component, ErrorInfo} from 'react'
+import React, {Component, ErrorInfo, memo, ReactChild} from 'react'
+import {isEqual} from 'lodash'
 
 // Components
 import DefaultErrorMessage from 'src/shared/components/DefaultErrorMessage'
 
 // Utils
-import {reportError, parseComponentName} from 'src/shared/utils/errors'
+import {
+  reportErrorThroughHoneyBadger,
+  parseComponentName,
+} from 'src/shared/utils/errors'
 
 // Types
 import {ErrorMessageComponent} from 'src/types'
 
 interface ErrorBoundaryProps {
   errorComponent: ErrorMessageComponent
+  children: ReactChild | ReactChild[]
 }
 
 interface ErrorBoundaryState {
@@ -28,7 +33,9 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    reportError(error, {component: parseComponentName(errorInfo)})
+    reportErrorThroughHoneyBadger(error, {
+      component: parseComponentName(errorInfo),
+    })
   }
 
   public render() {
@@ -42,4 +49,4 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
 }
 
-export default ErrorBoundary
+export default memo(ErrorBoundary, (prev, next) => isEqual(prev, next))

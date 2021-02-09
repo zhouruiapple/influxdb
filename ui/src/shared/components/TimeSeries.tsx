@@ -3,11 +3,8 @@ import React, {Component, RefObject, CSSProperties} from 'react'
 import {isEqual} from 'lodash'
 import {connect, ConnectedProps} from 'react-redux'
 import {withRouter, RouteComponentProps} from 'react-router-dom'
-import {
-  default as fromFlux,
-  FromFluxResult,
-} from 'src/shared/utils/fromFlux.legacy'
-import {fromFlux as fromFluxGiraffe} from '@influxdata/giraffe'
+import {default as fromFlux} from 'src/shared/utils/fromFlux.legacy'
+import {fromFlux as fromFluxGiraffe, FromFluxResult} from '@influxdata/giraffe'
 import {isFlagEnabled} from 'src/shared/utils/featureFlag'
 
 // API
@@ -30,10 +27,11 @@ import {getAll} from 'src/resources/selectors'
 import {getOrgIDFromBuckets} from 'src/timeMachine/actions/queries'
 import {
   isDemoDataAvailabilityError,
-  demoDataError,
+  demoDataErrorMessage,
 } from 'src/cloud/utils/demoDataErrors'
 import {hashCode} from 'src/shared/apis/queryCache'
 import {RunQueryPromiseMutex} from 'src/shared/apis/singleQuery'
+import {getDemoDataErrorButton} from 'src/shared/components/notifications/NotificationButtons'
 
 // Constants
 import {
@@ -58,6 +56,7 @@ import {
   DashboardQuery,
   AppState,
   CancelBox,
+  NotificationButtonElement,
 } from 'src/types'
 import {event} from 'src/cloud/utils/reporting'
 
@@ -245,10 +244,7 @@ class TimeSeries extends Component<Props, State> {
         const windowVars = getWindowVars(text, vars)
         const extern = buildVarsOption([...vars, ...windowVars])
         event('runQuery', {context: 'TimeSeries'})
-        if (
-          isCurrentPageDashboard &&
-          isFlagEnabled('queryCacheForDashboards')
-        ) {
+        if (isCurrentPageDashboard) {
           return onGetCachedResultsThunk(orgID, text)
         }
         const queryID = hashCode(text)
@@ -279,9 +275,11 @@ class TimeSeries extends Component<Props, State> {
       for (const result of results) {
         if (result.type === 'UNKNOWN_ERROR') {
           if (isDemoDataAvailabilityError(result.code, result.message)) {
-            notify(
-              demoDataAvailability(demoDataError(this.props.match.params.orgID))
-            )
+            const message = demoDataErrorMessage()
+            const buttonElement: NotificationButtonElement = onDismiss =>
+              getDemoDataErrorButton(onDismiss)
+
+            notify(demoDataAvailability(message, buttonElement))
           }
           errorMessage = result.message
           throw new Error(result.message)

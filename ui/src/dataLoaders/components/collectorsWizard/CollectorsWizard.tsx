@@ -7,15 +7,8 @@ import {withRouter, RouteComponentProps} from 'react-router-dom'
 // Components
 import {ErrorHandling} from 'src/shared/decorators/errors'
 import {Overlay} from '@influxdata/clockface'
-import TelegrafEditorFooter from 'src/dataLoaders/components/TelegrafEditorFooter'
 
 const spinner = <div />
-const TelegrafEditor = Loadable({
-  loader: () => import('src/dataLoaders/components/TelegrafEditor'),
-  loading() {
-    return spinner
-  },
-})
 const CollectorsStepSwitcher = Loadable({
   loader: () =>
     import(
@@ -25,7 +18,6 @@ const CollectorsStepSwitcher = Loadable({
     return spinner
   },
 })
-import {isFlagEnabled, FeatureFlag} from 'src/shared/utils/featureFlag'
 
 // Actions
 import {notify as notifyAction} from 'src/shared/actions/notifications'
@@ -37,12 +29,7 @@ import {
   clearSteps,
 } from 'src/dataLoaders/actions/steps'
 
-import {
-  clearDataLoaders,
-  setActiveTelegrafPlugin,
-  setPluginConfiguration,
-} from 'src/dataLoaders/actions/dataLoaders'
-import {reset} from 'src/dataLoaders/actions/telegrafEditor'
+import {clearDataLoaders} from 'src/dataLoaders/actions/dataLoaders'
 
 // Types
 import {AppState, Bucket, ResourceType} from 'src/types'
@@ -77,8 +64,6 @@ class CollectorsWizard extends PureComponent<Props> {
   }
 
   public render() {
-    const {buckets} = this.props
-
     return (
       <Overlay visible={true}>
         <Overlay.Container maxWidth={1200}>
@@ -87,19 +72,8 @@ class CollectorsWizard extends PureComponent<Props> {
             onDismiss={this.handleDismiss}
           />
           <Overlay.Body className="data-loading--overlay">
-            <FeatureFlag name="telegrafEditor">
-              <TelegrafEditor />
-            </FeatureFlag>
-            <FeatureFlag name="telegrafEditor" equals={false}>
-              <CollectorsStepSwitcher
-                stepProps={this.stepProps}
-                buckets={buckets}
-              />
-            </FeatureFlag>
+            <CollectorsStepSwitcher stepProps={this.stepProps} />
           </Overlay.Body>
-          <Overlay.Footer>
-            <TelegrafEditorFooter onDismiss={this.handleDismiss} />
-          </Overlay.Footer>
         </Overlay.Container>
       </Overlay>
     )
@@ -107,15 +81,9 @@ class CollectorsWizard extends PureComponent<Props> {
 
   private handleDismiss = () => {
     const {history, org} = this.props
-
-    if (isFlagEnabled('telegrafEditor')) {
-      const {onClearTelegrafEditor} = this.props
-      onClearTelegrafEditor()
-    } else {
-      const {onClearDataLoaders, onClearSteps} = this.props
-      onClearDataLoaders()
-      onClearSteps()
-    }
+    const {onClearDataLoaders, onClearSteps} = this.props
+    onClearDataLoaders()
+    onClearSteps()
     history.push(`/orgs/${org.id}/load-data/telegrafs`)
   }
 
@@ -177,9 +145,6 @@ const mdtp = {
   onSetCurrentStepIndex: setCurrentStepIndex,
   onClearDataLoaders: clearDataLoaders,
   onClearSteps: clearSteps,
-  onClearTelegrafEditor: reset,
-  onSetActiveTelegrafPlugin: setActiveTelegrafPlugin,
-  onSetPluginConfiguration: setPluginConfiguration,
 }
 
 const connector = connect(mstp, mdtp)

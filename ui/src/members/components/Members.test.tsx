@@ -1,30 +1,31 @@
 // Libraries
 import React from 'react'
-import {shallow} from 'enzyme'
+import {screen} from '@testing-library/react'
 
 // Components
 import MemberList from 'src/members/components/MemberList'
 
 // Constants
-import {resourceOwner} from 'src/members/dummyData'
+import {resouceOwner} from 'src/members/dummyData'
+
+import {renderWithReduxAndRouter} from 'src/mockState'
 
 const setup = (override?) => {
   const props = {
-    members: resourceOwner,
+    members: resouceOwner,
     emptyState: <></>,
     ...override,
   }
 
-  const wrapper = shallow(<MemberList {...props} />)
-
-  return {wrapper}
+  renderWithReduxAndRouter(<MemberList {...props} />)
 }
 
 describe('MemberList', () => {
   describe('rendering', () => {
-    it('renders', () => {
-      const {wrapper} = setup()
-      expect(wrapper.exists()).toBe(true)
+    it('renders', async () => {
+      setup()
+      const elm = await screen.getByTestId('resource-list--body')
+      expect(elm).toBeVisible()
     })
   })
 })

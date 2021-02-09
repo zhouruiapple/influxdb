@@ -1,15 +1,20 @@
 import {ErrorInfo} from 'react'
 import HoneyBadger from 'honeybadger-js'
-import {CLOUD, GIT_SHA} from 'src/shared/constants'
+import {
+  CLOUD,
+  GIT_SHA,
+  HONEYBADGER_KEY,
+  HONEYBADGER_ENV,
+} from 'src/shared/constants'
 
 import {getUserFlags} from 'src/shared/utils/featureFlag'
 import {event} from 'src/cloud/utils/reporting'
 
 if (CLOUD) {
   HoneyBadger.configure({
-    apiKey: process.env.HONEYBADGER_KEY,
+    apiKey: HONEYBADGER_KEY,
     revision: GIT_SHA,
-    environment: process.env.HONEYBADGER_ENV,
+    environment: HONEYBADGER_ENV,
   })
 }
 
@@ -22,7 +27,7 @@ interface HoneyBadgerAdditionalOptions {
   params?: {[key: string]: any}
 }
 
-export const reportError = (
+export const reportErrorThroughHoneyBadger = (
   error: Error,
   additionalOptions?: HoneyBadgerAdditionalOptions
 ): void => {
@@ -61,7 +66,7 @@ export const reportError = (
 
 /*
   Parse React's error boundary info message to provide the name of the
-  component an error occurred in.
+  component an error occured in.
 
   For example, given the following info message:
 

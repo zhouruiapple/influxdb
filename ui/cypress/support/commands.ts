@@ -1,20 +1,122 @@
 import {NotificationEndpoint} from '../../src/types'
+import {Bucket, Organization} from '../../src/client'
 import 'cypress-file-upload'
 
 export const signin = (): Cypress.Chainable<Cypress.Response> => {
-  return cy.fixture('user').then(({username, password}) => {
+  /* \ OSS login
     return cy.setupUser().then(body => {
       return cy
         .request({
           method: 'POST',
           url: '/api/v2/signin',
-          auth: {user: username, pass: password},
+          auth: {user: Cypress.env('username'), pass: Cypress.env('password')},
         })
         .then(() => {
           return cy.wrap(body)
         })
     })
+  \*/
+  return cy.setupUser().then(response => {
+    // const route = Cypress.env('inkind') ? '/' : '/api/v2/signin'
+    wrapDefaultUser()
+      .then(() => wrapDefaultPassword())
+      .then(() =>
+        cy
+          .visit('/')
+          .then(() => {
+            cy.get<string>('@defaultUser').then((defaultUser: string) => {
+              const username = Cypress._.get(
+                response,
+                'body.user.name',
+                defaultUser
+              )
+              cy.get('#login').type(username)
+            })
+          })
+          .then(() => {
+            cy.get<string>('@defaultPassword')
+              .then((defaultPassword: string) => {
+                cy.get('#password').type(defaultPassword)
+              })
+              .then(() => cy.get('#submit-login').click())
+              .then(() => {
+                cy.get('body').then($body => {
+                  /**
+                   * we are conditionally rendering this test case since it's only
+                   * relevant to CLOUD tests in order to click the `Grant Access` button
+                   * that's rendered by Dex in the CLOUD development environment.
+                   *
+                   * We are using this conditional test based on the following doc suggestions:
+                   * https://docs.cypress.io/guides/core-concepts/conditional-testing.html#Element-existence
+                   **/
+                  if ($body.find('.theme-btn--success').length) {
+                    cy.get('.theme-btn--success').click()
+                  }
+                })
+              })
+              .then(() => cy.location('pathname').should('not.eq', '/signin'))
+          })
+          .then(() => wrapEnvironmentVariablesForCloud())
+      )
   })
+}
+
+export const wrapEnvironmentVariablesForCloud = (): Cypress.Chainable<Cypress.Response> => {
+  return cy
+    .request({
+      method: 'GET',
+      url: '/api/v2/orgs',
+    })
+    .then(orgsResponse => {
+      const org = orgsResponse.body.orgs[0] as Organization
+      cy.wrap(org).as('org')
+
+      cy.request({
+        method: 'GET',
+        url: '/api/v2/buckets',
+        qs: {orgID: org.id},
+      }).then(bucketsResponse => {
+        const buckets = bucketsResponse.body.buckets as Array<Bucket>
+        const bucket = buckets.find(
+          b =>
+            b.orgID === org.id &&
+            b.name !== '_tasks' &&
+            b.name !== '_monitoring'
+        )
+        cy.wrap(bucket).as('bucket')
+        wrapDefaultBucket()
+      })
+    })
+}
+
+export const wrapEnvironmentVariablesForOss = (): Cypress.Chainable => {
+  return wrapDefaultBucket()
+    .then(() => wrapDefaultUser())
+    .then(() => wrapDefaultPassword())
+    .then(() => {
+      return cy.wrap('InfluxData').as('defaultOrg')
+    })
+}
+
+export const wrapDefaultBucket = (): Cypress.Chainable => {
+  return cy
+    .wrap('defbuck')
+    .as('defaultBucket')
+    .then(defaultBucket => {
+      cy.wrap('selector-list '.concat(defaultBucket)).as(
+        'defaultBucketListSelector'
+      )
+    })
+}
+
+export const wrapDefaultUser = (): Cypress.Chainable => {
+  const username = Cypress.env('username') ?? 'dev_user'
+  return cy.wrap(username).as('defaultUser')
+}
+
+export const wrapDefaultPassword = (): Cypress.Chainable => {
+  const password = Cypress.env('password') ?? 'CHECKMEOUTASUPERSECRETPASSWORD'
+  return cy.wrap(password).as('defaultPassword')
 }
 
 export const createDashboard = (
@@ -81,37 +183,6 @@ export const createDashWithViewAndVar = (
       createView(dashboard.id, cell.id)
     )
   )
-}
-
-export const createDashboardTemplate = (
-  orgID?: string,
-  name: string = 'Bashboard'
-): Cypress.Chainable<Cypress.Response> => {
-  return cy.request({
-    method: 'POST',
-    url: '/api/v2/documents/templates',
-    body: {
-      content: {
-        data: {
-          attributes: {name, description: ''},
-          relationships: {
-            label: {data: []},
-            cell: {data: []},
-            variable: {data: []},
-          },
-          type: 'dashboard',
-        },
-        included: [],
-      },
-      labels: [],
-      meta: {
-        description: `template created from dashboard: ${name}`,
-        version: '1',
-        name: `${name}-Template`,
-      },
-      orgID,
-    },
-  })
 }
 
 export const createOrg = (
@@ -426,19 +497,15 @@ export const createToken = (
 
 // TODO: have to go through setup because we cannot create a user w/ a password via the user API
 export const setupUser = (): Cypress.Chainable<Cypress.Response> => {
-  return cy.fixture('user').then(({username, password, org, bucket}) => {
-    return cy.request({
-      method: 'POST',
-      url: '/api/v2/setup',
-      body: {username, password, org, bucket},
-    })
+  return cy.request({
+    method: 'GET',
+    url: '/debug/provision',
   })
 }
 
 export const flush = () => {
-  cy.request({
-    method: 'GET',
-    url: '/debug/flush',
+  cy.request('/debug/flush').then(response => {
+    expect(response.status).to.eq(200)
   })
 }
 
@@ -465,18 +532,25 @@ export const lines = (numLines = 3) => {
 export const writeData = (
   lines: string[]
 ): Cypress.Chainable<Cypress.Response> => {
-  return cy.fixture('user').then(({org, bucket}) => {
-    cy.request({
-      method: 'POST',
-      url: '/api/v2/write?org=' + org + '&bucket=' + bucket,
-      body: lines.join('\n'),
+  return cy.get<Organization>('@org').then((org: Organization) => {
+    return cy.get<Bucket>('@bucket').then((bucket: Bucket) => {
+      return cy.request({
+        method: 'POST',
+        url: '/api/v2/write?org=' + org.name + '&bucket=' + bucket.name,
+        body: lines.join('\n'),
+      })
     })
   })
 }
 
 // DOM node getters
-export const getByTestID = (dataTest: string): Cypress.Chainable => {
-  return cy.get(`[data-testid="${dataTest}"]`)
+export const getByTestID = (
+  dataTest: string,
+  options?: Partial<
+    Cypress.Loggable & Cypress.Timeoutable & Cypress.Withinable & Cypress.Shadow
+  >
+): Cypress.Chainable => {
+  return cy.get(`[data-testid="${dataTest}"]`, options)
 }
 
 export const getByTestIDSubStr = (dataTest: string): Cypress.Chainable => {
@@ -493,6 +567,26 @@ export const getByInputValue = (value: string): Cypress.Chainable => {
 
 export const getByTitle = (name: string): Cypress.Chainable => {
   return cy.get(`[title="${name}"]`)
+}
+
+// Helper function for filling in login details on OSS.
+
+export const fillInOSSLoginFormWithDefaults = () => {
+  cy.get<string>('@defaultUser').then((defaultUser: string) => {
+    cy.getByTestID('input-field--username').type(defaultUser)
+  })
+  cy.get<string>('@defaultPassword').then((defaultPassword: string) => {
+    cy.getByTestID('input-field--password').type(defaultPassword)
+    cy.getByTestID('input-field--password-chk').type(defaultPassword)
+  })
+
+  cy.get<string>('@defaultOrg').then((defaultOrg: string) => {
+    cy.getByTestID('input-field--orgname').type(defaultOrg)
+  })
+
+  cy.get<string>('@defaultBucket').then((defaultBucket: string) => {
+    cy.getByTestID('input-field--bucketname').type(defaultBucket)
+  })
 }
 
 // custom assertions
@@ -519,6 +613,24 @@ export const createEndpoint = (
   return cy.request('POST', 'api/v2/notificationEndpoints', endpoint)
 }
 
+// helpers
+// Re-query elements that are found 'detached' from the DOM
+// https://github.com/cypress-io/cypress/issues/7306
+export const clickAttached = (subject?: JQuery<HTMLElement>) => {
+  if (!subject) {
+    console.error('no element provided to "clickAttached"')
+    return
+  }
+
+  cy.wrap(subject).should($el => {
+    // ensure the element is attached
+    expect(Cypress.dom.isDetached($el)).to.be.false
+
+    // using Jquery click here so no queuing from cypress side and not chance for the element to detach
+    $el.trigger('click')
+  })
+}
+
 /* eslint-disable */
 // notification endpoints
 Cypress.Commands.add('createEndpoint', createEndpoint)
@@ -540,10 +652,17 @@ Cypress.Commands.add('signin', signin)
 
 // setup
 Cypress.Commands.add('setupUser', setupUser)
+Cypress.Commands.add(
+  'wrapEnvironmentVariablesForCloud',
+  wrapEnvironmentVariablesForCloud
+)
+Cypress.Commands.add(
+  'wrapEnvironmentVariablesForOss',
+  wrapEnvironmentVariablesForOss
+)
 
 // dashboards
 Cypress.Commands.add('createDashboard', createDashboard)
-Cypress.Commands.add('createDashboardTemplate', createDashboardTemplate)
 Cypress.Commands.add('createCell', createCell)
 Cypress.Commands.add('createDashWithCell', createDashWithCell)
 Cypress.Commands.add('createDashWithViewAndVar', createDashWithViewAndVar)
@@ -582,4 +701,11 @@ Cypress.Commands.add('createAndAddLabel', createAndAddLabel)
 
 // test
 Cypress.Commands.add('writeData', writeData)
+
+// helpers
+Cypress.Commands.add('clickAttached', {prevSubject: 'element'}, clickAttached)
+Cypress.Commands.add(
+  'fillInOSSLoginFormWithDefaults',
+  fillInOSSLoginFormWithDefaults
+)
 /* eslint-enable */

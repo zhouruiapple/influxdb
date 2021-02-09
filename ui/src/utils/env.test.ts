@@ -1,6 +1,6 @@
 const {formatStatic, formatBase} = require('./env')
 
-describe('environment normalization', () => {
+describe('enviroment normalization', () => {
   describe('static path formatter', () => {
     it('should strip the first slash', () => {
       expect(formatStatic('/neateo/')).toBe('neateo/')

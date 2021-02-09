@@ -1,13 +1,9 @@
 // Libraries
 import {parse} from 'src/external/parser'
-import {get} from 'lodash'
+import {get, sortBy} from 'lodash'
 
 // API
-import {
-  runQuery,
-  RunQueryResult,
-  RunQuerySuccessResult,
-} from 'src/shared/apis/query'
+import {runQuery, RunQuerySuccessResult} from 'src/shared/apis/query'
 import {
   getCachedResultsOrRunQuery,
   resetQueryCacheByQuery,
@@ -23,6 +19,7 @@ import {
   rateLimitReached,
   resultTooLarge,
   demoDataAvailability,
+  updateAggregateType,
 } from 'src/shared/copy/notifications'
 
 // Utils
@@ -34,9 +31,16 @@ import {buildVarsOption} from 'src/variables/utils/buildVarsOption'
 import {findNodes} from 'src/shared/utils/ast'
 import {
   isDemoDataAvailabilityError,
-  demoDataError,
+  demoDataErrorMessage,
 } from 'src/cloud/utils/demoDataErrors'
+import {isAggregateTypeError} from 'src/utils/aggregateTypeErrors'
 import {event} from 'src/cloud/utils/reporting'
+import {asSimplyKeyValueVariables, hashCode} from 'src/shared/apis/queryCache'
+import {filterUnusedVarsBasedOnQuery} from 'src/shared/utils/filterUnusedVars'
+import {
+  getAggregateTypeErrorButton,
+  getDemoDataErrorButton,
+} from 'src/shared/components/notifications/NotificationButtons'
 
 // Types
 import {CancelBox} from 'src/types/promises'
@@ -49,6 +53,8 @@ import {
   Bucket,
   QueryEditMode,
   BuilderTagsType,
+  Variable,
+  NotificationButtonElement,
 } from 'src/types'
 
 // Selectors
@@ -86,7 +92,6 @@ export const setQueryResults = (
   },
 })
 
-let pendingResults: Array<CancelBox<RunQueryResult>> = []
 let pendingCheckStatuses: CancelBox<StatusRow[][]> = null
 
 export const getOrgIDFromBuckets = (
@@ -104,7 +109,7 @@ export const getOrgIDFromBuckets = (
   return get(bucketMatch, 'orgID', null)
 }
 
-//We only need a minimum of one bucket, function, and tag,
+// We only need a minimum of one bucket, function, and tag,
 export const getQueryFromFlux = (text: string) => {
   const ast = parse(text)
 
@@ -181,6 +186,65 @@ const isFromTag = (node: Node) => {
   )
 }
 
+export const generateHashedQueryID = (
+  query: string,
+  vars: Variable[],
+  orgID: string
+): string => {
+  const hashedQuery = `${hashCode(query)}`
+  const usedVars = filterUnusedVarsBasedOnQuery(vars, [query])
+  const variables = sortBy(usedVars, ['name'])
+  const simplifiedVariables = variables.map(v => asSimplyKeyValueVariables(v))
+  const stringifiedVars = JSON.stringify(simplifiedVariables)
+  // create the queryID based on the query & vars
+  const hashedVariables = `${hashCode(stringifiedVars)}`
+
+  return `${hashedQuery}_${hashedVariables}_${hashCode(orgID)}`
+}
+
+const queryReference = {}
+
+export const cancelQueryByHashID = (queryID: string): void => {
+  if (queryID in queryReference) {
+    queryReference[queryID].cancel()
+    delete queryReference[queryID]
+  }
+}
+
+const cancelQuerysByHashIDs = (queryIDs?: string[]): void => {
+  if (queryIDs.length > 0) {
+    queryIDs.forEach(queryID => cancelQueryByHashID(queryID))
+  }
+  Object.keys(queryReference).forEach((queryID: string) => {
+    cancelQueryByHashID(queryID)
+  })
+}
+
+export const cancelAllRunningQueries = () => dispatch => {
+  cancelQuerysByHashIDs(Object.keys(queryReference))
+  dispatch(setQueryResults(RemoteDataState.Done, null, null))
+}
+
+export const setQueryByHashID = (queryID: string, result: any): void => {
+  queryReference[queryID] = {
+    cancel: result.cancel,
+    issuedAt: Date.now(),
+    promise: result.promise,
+    status: RemoteDataState.Loading,
+  }
+  result.promise
+    .then(() => {
+      queryReference[queryID].status = RemoteDataState.Done
+    })
+    .catch(error => {
+      if (error.name === 'CancellationError' || error.name === 'AbortError') {
+        queryReference[queryID].status = RemoteDataState.Done
+        return
+      }
+      queryReference[queryID].status = RemoteDataState.Error
+    })
+}
+
 export const executeQueries = (abortController?: AbortController) => async (
   dispatch,
   getState: GetState
@@ -201,20 +265,23 @@ export const executeQueries = (abortController?: AbortController) => async (
   }
 
   try {
+    // Cancel pending queries before issuing new ones
+    cancelAllRunningQueries()
+
     dispatch(setQueryResults(RemoteDataState.Loading, [], null))
 
     await dispatch(hydrateVariables())
 
-    const variableAssignments = getAllVariables(state)
+    const allVariables = getAllVariables(state)
+
+    const variableAssignments = allVariables
       .map(v => asAssignment(v))
       .filter(v => !!v)
 
     const startTime = window.performance.now()
     const startDate = Date.now()
 
-    pendingResults.forEach(({cancel}) => cancel())
-
-    pendingResults = queries.map(({text}) => {
+    const pendingResults = queries.map(({text}) => {
       event('executeQueries query', {}, {query: text})
       const orgID = getOrgIDFromBuckets(text, allBuckets) || getOrg(state).id
 
@@ -227,15 +294,23 @@ export const executeQueries = (abortController?: AbortController) => async (
       const extern = buildVarsOption(variableAssignments)
 
       event('runQuery', {context: 'timeMachine'})
-      if (
-        isCurrentPageDashboard(state) &&
-        isFlagEnabled('queryCacheForDashboards')
-      ) {
+
+      const queryID = generateHashedQueryID(text, allVariables, orgID)
+      if (isCurrentPageDashboard(state)) {
         // reset any existing matching query in the cache
         resetQueryCacheByQuery(text)
-        return getCachedResultsOrRunQuery(orgID, text, state)
+        const result = getCachedResultsOrRunQuery(
+          orgID,
+          text,
+          getAllVariables(state)
+        )
+        setQueryByHashID(queryID, result)
+
+        return result
       }
-      return runQuery(orgID, text, extern, abortController)
+      const result = runQuery(orgID, text, extern, abortController)
+      setQueryByHashID(queryID, result)
+      return result
     })
     const results = await Promise.all(pendingResults.map(r => r.promise))
 
@@ -257,9 +332,19 @@ export const executeQueries = (abortController?: AbortController) => async (
     for (const result of results) {
       if (result.type === 'UNKNOWN_ERROR') {
         if (isDemoDataAvailabilityError(result.code, result.message)) {
-          dispatch(
-            notify(demoDataAvailability(demoDataError(getOrg(state).id)))
-          )
+          const message = demoDataErrorMessage()
+          const buttonElement: NotificationButtonElement = onDismiss =>
+            getDemoDataErrorButton(onDismiss)
+          dispatch(notify(demoDataAvailability(message, buttonElement)))
+        }
+        if (
+          isAggregateTypeError(result.code, result.message) &&
+          state.currentExplorer.isAutoFunction
+        ) {
+          const message = `It looks like you're trying to apply a number-based aggregate function to a string, which cannot be processed. You can fix this by selecting the Aggregate Function "Last"`
+          const buttonElement: NotificationButtonElement = onDismiss =>
+            getAggregateTypeErrorButton(onDismiss)
+          dispatch(notify(updateAggregateType(message, buttonElement)))
         }
 
         throw new Error(result.message)

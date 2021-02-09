@@ -1,13 +1,16 @@
 // Libraries
-import React, {PureComponent, ChangeEvent} from 'react'
+import React, {lazy, Suspense, PureComponent, ChangeEvent} from 'react'
 import {connect, ConnectedProps} from 'react-redux'
+import {
+  RemoteDataState,
+  SpinnerContainer,
+  TechnoSpinner,
+} from '@influxdata/clockface'
 
 // Components
 import TaskForm from 'src/tasks/components/TaskForm'
 import TaskHeader from 'src/tasks/components/TaskHeader'
 import {Page} from '@influxdata/clockface'
-
-import FluxEditor from 'src/shared/components/FluxMonacoEditor'
 
 // Actions
 import {
@@ -15,7 +18,7 @@ import {
   setTaskOption,
   clearTask,
 } from 'src/tasks/actions/creators'
-import {saveNewScript, cancel} from 'src/tasks/actions/thunks'
+import {saveNewScript, goToTasks, cancel} from 'src/tasks/actions/thunks'
 
 // Utils
 import {
@@ -29,6 +32,10 @@ import {AppState, TaskOptionKeys, TaskSchedule} from 'src/types'
 
 type ReduxProps = ConnectedProps<typeof connector>
 type Props = ReduxProps
+
+const FluxMonacoEditor = lazy(() =>
+  import('src/shared/components/FluxMonacoEditor')
+)
 
 class TaskPage extends PureComponent<Props> {
   constructor(props) {
@@ -68,10 +75,19 @@ class TaskPage extends PureComponent<Props> {
               />
             </div>
             <div className="task-form--editor">
-              <FluxEditor
-                script={newScript}
-                onChangeScript={this.handleChangeScript}
-              />
+              <Suspense
+                fallback={
+                  <SpinnerContainer
+                    loading={RemoteDataState.Loading}
+                    spinnerComponent={<TechnoSpinner />}
+                  />
+                }
+              >
+                <FluxMonacoEditor
+                  script={newScript}
+                  onChangeScript={this.handleChangeScript}
+                />
+              </Suspense>
             </div>
           </div>
         </Page.Contents>
@@ -104,7 +120,9 @@ class TaskPage extends PureComponent<Props> {
     const script: string = addDestinationToFluxScript(newScript, taskOptions)
     const preamble = `${taskOption}`
 
-    this.props.saveNewScript(script, preamble)
+    this.props.saveNewScript(script, preamble).then(() => {
+      this.props.goToTasks()
+    })
   }
 
   private handleCancel = () => {
@@ -134,6 +152,7 @@ const mdtp = {
   saveNewScript,
   setTaskOption,
   clearTask,
+  goToTasks,
   cancel,
 }
 

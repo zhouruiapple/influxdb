@@ -1,10 +1,10 @@
 // APIs
 import {runQuery} from 'src/shared/apis/query'
+import {fromFlux} from '@influxdata/giraffe'
 
 // Utils
 import {resolveSelectedKey} from 'src/variables/utils/resolveSelectedValue'
 import {formatVarsOption} from 'src/variables/utils/formatVarsOption'
-import {parseResponse} from 'src/shared/parsing/flux/response'
 import {buildVarsOption} from 'src/variables/utils/buildVarsOption'
 import {event} from 'src/cloud/utils/reporting'
 
@@ -35,31 +35,21 @@ export const extractValues = (
   prevSelection?: string,
   defaultSelection?: string
 ): VariableValues => {
-  const [table] = parseResponse(csv)
-
-  if (!table || !table.data.length) {
+  const {table} = fromFlux(csv)
+  if (!table || !table.getColumn('_value', 'string')) {
     return {
       values: [],
       valueType: 'string',
       selected: [],
     }
   }
-
-  const [headerRow] = table.data
-  const valueColIndex = headerRow.indexOf('_value')
-
-  if (valueColIndex === -1) {
-    throw new Error("variable response does not contain a '_value' column")
-  }
-
-  let values = table.data.slice(1).map(row => row[valueColIndex])
-
+  let values = table.getColumn('_value', 'string') || []
   values = [...new Set(values)]
   values.sort()
 
   return {
     values,
-    valueType: table.dataTypes._value as FluxColumnType,
+    valueType: table.getColumnType('_value') as FluxColumnType,
     selected: [resolveSelectedKey(values, prevSelection, defaultSelection)],
   }
 }

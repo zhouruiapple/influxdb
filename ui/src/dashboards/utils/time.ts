@@ -1,7 +1,7 @@
 import {CustomTimeRange, TimeRange, DurationTimeRange} from 'src/types/queries'
 
 import {SELECTABLE_TIME_RANGES} from 'src/shared/constants/timeRanges'
-import {isDurationWithNowParsable} from 'src/shared/utils/duration'
+import {isDurationWithNowParseable} from 'src/shared/utils/duration'
 
 interface InputTimeRange {
   seconds?: number
@@ -56,7 +56,7 @@ export const validateAndTypeRange = (timeRange: {
     } as CustomTimeRange
   }
 
-  if (isDurationWithNowParsable(lower)) {
+  if (isDurationWithNowParseable(lower)) {
     const selectableTimeRange = SELECTABLE_TIME_RANGES.find(
       r => r.lower === lower
     )

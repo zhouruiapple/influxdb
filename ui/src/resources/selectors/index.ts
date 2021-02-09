@@ -2,7 +2,7 @@
 import {get} from 'lodash'
 
 // Types
-import {AppState, ResourceType, RemoteDataState, Label} from 'src/types'
+import {AppState, ResourceType, RemoteDataState, Label, Task} from 'src/types'
 
 export const getStatus = (
   {resources}: AppState,
@@ -17,8 +17,14 @@ export const getAll = <R>(
 ): R[] => {
   const allIDs: string[] = resources[resource].allIDs
   const byID: {[uuid: string]: R} = resources[resource].byID
-  return allIDs.map(id => byID[id])
+  return (allIDs ?? []).map(id => byID[id])
 }
+
+export const getAllTasks = (state: AppState): Task[] =>
+  getAll(state, ResourceType.Tasks) || []
+
+export const hasNoTasks = (state: AppState): boolean =>
+  getAll(state, ResourceType.Tasks).length === 0
 
 export const getToken = (state: AppState): string =>
   get(state, 'dataLoading.dataLoaders.token', '') || ''

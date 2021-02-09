@@ -1,0 +1,39 @@
+@import '@influxdata/clockface/dist/variables.scss';
+
+.flow-visualization {
+  background-color: $g2-kevlar;
+  border-radius: $cf-radius;
+  display: flex;
+  align-items: stretch;
+  height: 100%;
+}
+
+.flow-visualization--view {
+  width: 100%;
+  border-radius: $cf-radius-sm;
+  background-color: $g0-obsidian;
+  padding: $cf-marg-b + $cf-marg-a;
+
+  .empty-graph-error {
+    height: 200px;
+  }
+}
+
+.flow-visualization .view-options {
+  background-color: $g2-kevlar;
+  border-radius: $cf-radius;
+  margin-top: $cf-marg-b;
+  padding: $cf-marg-c;
+
+  h5.view-options--header {
+    margin-top: 0;
+  }
+}
+
+.flow-visualization--export-warning {
+  margin: $cf-marg-b 0;
+
+  > .cf-panel--body {
+    padding: $cf-marg-b $cf-marg-c;
+  }
+}

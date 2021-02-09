@@ -4,7 +4,7 @@ import {PostCheck} from 'src/client'
 
 // Utils
 import {checkThresholdsValid} from './checkValidate'
-import {isDurationParsable} from 'src/shared/utils/duration'
+import {isDurationParseable} from 'src/shared/utils/duration'
 import {getActiveTimeMachine} from 'src/timeMachine/selectors'
 import {getOrg} from 'src/organizations/selectors'
 
@@ -57,7 +57,7 @@ const toDeadManPostCheck = (
     activeStatus,
   } = alertBuilder
 
-  if (!isDurationParsable(timeSince) || !isDurationParsable(staleTime)) {
+  if (!isDurationParseable(timeSince) || !isDurationParseable(staleTime)) {
     throw new Error('Duration fields must contain valid duration')
   }
 
@@ -102,11 +102,11 @@ const toThresholdPostCheck = (
 }
 
 const validateBuilder = (alertBuilder: AlertBuilder) => {
-  if (!isDurationParsable(alertBuilder.offset)) {
+  if (!isDurationParseable(alertBuilder.offset)) {
     throw new Error('Check offset must be a valid duration')
   }
 
-  if (!isDurationParsable(alertBuilder.every)) {
+  if (!isDurationParseable(alertBuilder.every)) {
     throw new Error('Check every must be a valid duration')
   }
 }

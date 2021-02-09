@@ -1,7 +1,7 @@
 // Libraries
 import React, {FC, ReactNode} from 'react'
 import {useParams} from 'react-router-dom'
-import ReactMarkdown, {Renderer} from 'react-markdown'
+import {Renderer} from 'react-markdown'
 
 // Components
 import {Page} from '@influxdata/clockface'
@@ -21,6 +21,7 @@ import {pageTitleSuffixer} from 'src/shared/utils/pageTitles'
 
 // Styles
 import 'src/writeData/components/WriteDataDetailsView.scss'
+import {MarkdownRenderer} from 'src/shared/components/views/MarkdownRenderer'
 
 interface Props {
   section: WriteDataSection
@@ -48,7 +49,7 @@ const WriteDataDetailsView: FC<Props> = ({section, children}) => {
 
   if (markdown) {
     pageContent = (
-      <ReactMarkdown source={markdown} renderers={{code: codeRenderer}} />
+      <MarkdownRenderer text={markdown} cloudRenderers={{code: codeRenderer}} />
     )
   }
 

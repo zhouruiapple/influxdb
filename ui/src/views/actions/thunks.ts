@@ -1,6 +1,5 @@
 // Libraries
 import {normalize} from 'normalizr'
-import {isFlagEnabled} from 'src/shared/utils/featureFlag'
 
 // APIs
 import {
@@ -15,6 +14,7 @@ import {viewSchema} from 'src/schemas'
 
 // Utils
 import applyAutoAggregateRequirements from 'src/utils/autoAggregateRequirements'
+import {getAllVariables} from 'src/variables/selectors'
 
 // Actions
 import {notify} from 'src/shared/actions/notifications'
@@ -127,24 +127,22 @@ export const getViewAndResultsForVEO = (
       })
     )
 
-    if (isFlagEnabled('queryCacheForDashboards')) {
-      const queries = view.properties.queries.filter(({text}) => !!text.trim())
-      if (!queries.length) {
-        dispatch(setQueryResults(RemoteDataState.Done, [], null))
-      }
-      const {id: orgID} = getOrg(state)
-      const pendingResults = queries.map(({text}) => {
-        return getCachedResultsOrRunQuery(orgID, text, state)
-      })
+    const queries = view.properties.queries.filter(({text}) => !!text.trim())
+    if (!queries.length) {
+      dispatch(setQueryResults(RemoteDataState.Done, [], null))
+    }
+    const {id: orgID} = getOrg(state)
+    const pendingResults = queries.map(({text}) =>
+      getCachedResultsOrRunQuery(orgID, text, getAllVariables(state))
+    )
 
-      // Wait for new queries to complete
-      const results = await Promise.all(pendingResults.map(r => r.promise))
-      const files = (results as RunQuerySuccessResult[]).map(r => r.csv)
+    // Wait for new queries to complete
+    const results = await Promise.all(pendingResults.map(r => r.promise))
+    const files = (results as RunQuerySuccessResult[]).map(r => r.csv)
 
-      if (files) {
-        dispatch(setQueryResults(RemoteDataState.Done, files, null, null))
-        return
-      }
+    if (files) {
+      dispatch(setQueryResults(RemoteDataState.Done, files, null, null))
+      return
     }
 
     dispatch(executeQueries())

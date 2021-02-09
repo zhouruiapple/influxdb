@@ -1,17 +1,16 @@
 // Libraries
 import React, {FC} from 'react'
-import {connect} from 'react-redux'
+import {connect, ConnectedProps} from 'react-redux'
 import {get, find} from 'lodash'
 import classnames from 'classnames'
 
 // Components
 import {
+  Button,
   FlexBox,
-  JustifyContent,
-  LinkButton,
-  ComponentColor,
-  ButtonShape,
   ComponentSize,
+  JustifyContent,
+  ComponentColor,
 } from '@influxdata/clockface'
 import CloudUpgradeButton from 'src/shared/components/CloudUpgradeButton'
 
@@ -21,70 +20,81 @@ import {
   PAID_ORG_HIDE_UPGRADE_SETTING,
 } from 'src/cloud/constants'
 
+// Actions
+import {showOverlay, dismissOverlay} from 'src/overlays/actions/overlays'
+
 // Types
 import {AppState, OrgSetting} from 'src/types'
-
-interface StateProps {
-  showUpgrade: boolean
-}
 
 interface OwnProps {
   className?: string
 }
-type Props = StateProps & OwnProps
 
-const RateLimitAlertContent: FC<Props> = ({showUpgrade, className}) => {
+type ReduxProps = ConnectedProps<typeof connector>
+
+const RateLimitAlertContent: FC<OwnProps & ReduxProps> = ({
+  className,
+  showUpgrade,
+  onShowOverlay,
+  onDismissOverlay,
+}) => {
   const rateLimitAlertContentClass = classnames('rate-alert--content', {
     [`${className}`]: className,
   })
 
+  const handleShowOverlay = () => {
+    onShowOverlay('rate-limit', null, onDismissOverlay)
+  }
+
   if (showUpgrade) {
     return (
-      <div className={`${rateLimitAlertContentClass} rate-alert--content_free`}>
+      <div
+        className={`${rateLimitAlertContentClass} rate-alert--content__free`}
+      >
         <span>
-          You've reached the maximum{' '}
+          Oh no! You hit the{' '}
           <a
-            href="https://v2.docs.influxdata.com/v2.0/reference/glossary/#series-cardinality"
+            href="https://docs.influxdata.com/influxdb/v2.0/write-data/best-practices/resolve-high-cardinality/"
+            className="rate-alert--docs-link"
             target="_blank"
           >
             series cardinality
           </a>{' '}
-          available in your plan. Need to write more data?
+          limit and your data stopped writing. Don’t lose important metrics.
         </span>
         <FlexBox
           justifyContent={JustifyContent.Center}
           className="rate-alert--button"
         >
-          <CloudUpgradeButton />
+          <CloudUpgradeButton className="upgrade-payg--button__rate-alert" />
         </FlexBox>
       </div>
     )
   }
 
   return (
-    <div className={`${rateLimitAlertContentClass} rate-alert--content_payg`}>
+    <div className={`${rateLimitAlertContentClass} rate-alert--content__payg`}>
       <span>
-        You've reached the maximum{' '}
+        Data in has stopped because you've hit the{' '}
         <a
-          href="https://v2.docs.influxdata.com/v2.0/reference/glossary/#series-cardinality"
+          href="https://docs.influxdata.com/influxdb/v2.0/write-data/best-practices/resolve-high-cardinality/"
+          className="rate-alert--docs-link"
           target="_blank"
         >
           series cardinality
         </a>{' '}
-        available in your plan. Need to write more data?
+        limit. Let's get it flowing again.
       </span>
       <FlexBox
         justifyContent={JustifyContent.Center}
         className="rate-alert--button"
       >
-        <LinkButton
-          className="contact-support--button"
+        <Button
+          className="rate-alert-overlay-button"
           color={ComponentColor.Primary}
           size={ComponentSize.Small}
-          shape={ButtonShape.Default}
-          href="https://support.influxdata.com/s/"
-          target="_blank"
-          text="Contact Support"
+          onClick={handleShowOverlay}
+          text="Inspect Series Cardinality"
         />
       </FlexBox>
     </div>
@@ -106,4 +116,11 @@ const mstp = (state: AppState) => {
   return {showUpgrade: false}
 }
 
-export default connect<StateProps>(mstp)(RateLimitAlertContent)
+const mdtp = {
+  onShowOverlay: showOverlay,
+  onDismissOverlay: dismissOverlay,
+}
+
+const connector = connect(mstp, mdtp)
+
+export default connector(RateLimitAlertContent)

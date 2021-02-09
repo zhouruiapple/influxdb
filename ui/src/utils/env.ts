@@ -1,8 +1,8 @@
 module.exports = (() => {
   const GIT_SHA =
-    process.env.INFLUXDB_SHA ||
+    process.env.UI_SHA ||
     require('child_process')
-      .execSync('git rev-parse HEAD')
+      .execSync('git rev-parse --sq HEAD')
       .toString()
 
   // Webpack has some specific rules about formatting

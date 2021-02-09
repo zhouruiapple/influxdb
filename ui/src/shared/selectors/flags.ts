@@ -10,12 +10,12 @@ export const OSS_FLAGS = {
   downloadCellCSV: false,
   fluxParser: false,
   matchingNotificationRules: false,
-  notebooks: false,
-  telegrafEditor: false,
+  flows: false,
   streamEvents: false,
-  'notebook-move-cells': false,
-  'notebook-panel--spotify': false,
-  'notebook-panel--test-flux': false,
+  'flow-move-cells': false,
+  'flow-panel--spotify': false,
+  'flow-panel--youtube': false,
+  'flow-panel--test-flux': false,
   disableDefaultTableSort: false,
   'load-data-client-libraries': true,
   'load-data-telegraf-plugins': true,
@@ -23,6 +23,7 @@ export const OSS_FLAGS = {
   'load-data-flux-sources': false,
   'load-data-integrations': false,
   'notification-endpoint-telegram': false,
+  'molly-first': false,
 }
 
 export const CLOUD_FLAGS = {
@@ -34,12 +35,12 @@ export const CLOUD_FLAGS = {
   downloadCellCSV: false,
   fluxParser: false,
   matchingNotificationRules: false,
-  notebooks: false,
-  telegrafEditor: false,
+  flows: false,
   streamEvents: false,
-  'notebook-move-cells': false,
-  'notebook-panel--spotify': false,
-  'notebook-panel--test-flux': false,
+  'flow-move-cells': false,
+  'flow-panel--spotify': false,
+  'flow-panel--youtube': false,
+  'flow-panel--test-flux': false,
   disableDefaultTableSort: false,
   'load-data-client-libraries': true,
   'load-data-telegraf-plugins': true,
@@ -47,6 +48,8 @@ export const CLOUD_FLAGS = {
   'load-data-flux-sources': false,
   'load-data-integrations': false,
   'notification-endpoint-telegram': false,
+  unity: false,
+  'molly-first': false,
 }
 
 export const activeFlags = (state: AppState): FlagMap => {

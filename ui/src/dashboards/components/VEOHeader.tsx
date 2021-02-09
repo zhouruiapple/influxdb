@@ -11,7 +11,7 @@ import {
   Page,
 } from '@influxdata/clockface'
 import VisOptionsButton from 'src/timeMachine/components/VisOptionsButton'
-import ViewTypeDropdown from 'src/timeMachine/components/view_options/ViewTypeDropdown'
+import ViewTypeDropdown from 'src/timeMachine/components/ViewTypeDropdown'
 
 // Constants
 import {

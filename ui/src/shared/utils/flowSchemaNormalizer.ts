@@ -1,13 +1,14 @@
 // Types
-import {Schema, Tag} from 'src/types'
-import {PipeData} from 'src/notebooks'
+import {NormalizedSchema, NormalizedTag, Schema, Tag} from 'src/types'
+import {PipeData} from 'src/types/flows'
 
-export const dedupeTags = (tags: Tag[]) => {
+export const dedupeTags = (tags: Tag[]): NormalizedTag[] => {
   const cache = {}
   const set = new Set()
   let results = []
   tags.forEach(tag => {
-    Object.entries(tag).forEach(([tagName, tagValues]) => {
+    Object.entries(tag).forEach(([tagName, values]) => {
+      const tagValues = [...values]
       // sorting tagValues to check for exact matches when doing string comparisons
       tagValues.sort()
       const vals = JSON.stringify(tagValues)
@@ -45,7 +46,10 @@ const filterFields = (
   })
 }
 
-const filterTags = (tags: Tag[], searchTerm: string): any[] =>
+const filterTags = (
+  tags: NormalizedTag[],
+  searchTerm: string
+): NormalizedTag[] =>
   tags.filter(
     tag =>
       Object.entries(tag).filter(([tagName, tagValues]) => {
@@ -56,29 +60,27 @@ const filterTags = (tags: Tag[], searchTerm: string): any[] =>
       }).length !== 0
   )
 
-const dedupeArray = (array: string[]): string[] => {
-  const cache = {}
-  return array.filter(m => {
-    if (m in cache) {
-      return false
-    }
-    cache[m] = true
-    return true
-  })
-}
-
 export const normalizeSchema = (
   schema: Schema,
   data: PipeData,
   searchTerm: string
-) => {
+): NormalizedSchema => {
+  if (!schema) {
+    return {
+      measurements: [],
+      fields: [],
+      tags: [],
+    }
+  }
   const lowerCasedSearchTerm = searchTerm.toLowerCase()
   const selectedMeasurement = data.measurement
   const selectedField = data.field
   const selectedTags = data?.tags
+
   const measurements = []
   let fieldResults = []
   let tagResults = []
+
   Object.entries(schema)
     .filter(([measurement, values]) => {
       if (!!selectedMeasurement) {
@@ -103,13 +105,14 @@ export const normalizeSchema = (
       ) {
         return true
       }
-      return Object.entries(tags).some(([tag, tagValues]) => {
+      return Object.entries(tags).some(([tag, values]) => {
         if (tag.toLowerCase().includes(lowerCasedSearchTerm)) {
           return true
         }
+        const tagValues = [...values]
         return (
           tagValues?.some(tagValue =>
-            tagValue.toLowerCase().includes(lowerCasedSearchTerm)
+            `${tagValue}`.toLowerCase().includes(lowerCasedSearchTerm)
           ) || false
         )
       })
@@ -123,15 +126,45 @@ export const normalizeSchema = (
 
   const dedupedTags = dedupeTags(tagResults)
   const filteredFields = filterFields(
-    dedupeArray(fieldResults),
+    [...new Set(fieldResults)],
     lowerCasedSearchTerm,
     data?.field
   )
 
-  const filteredTags = filterTags(dedupedTags, lowerCasedSearchTerm)
+  const dedupedMeasurements = [...new Set(measurements)].filter(a =>
+    a.toLowerCase().includes(lowerCasedSearchTerm)
+  )
+
+  dedupedMeasurements.sort((a, b) => a.localeCompare(b))
+
+  const filteredTags = filterTags(dedupedTags, lowerCasedSearchTerm).map(
+    tag => {
+      const key = Object.keys(tag)[0]
+
+      return {
+        [key]: tag[key].sort((a, b) => a.localeCompare(b)),
+      }
+    }
+  )
+
+  filteredFields
+    .filter(a => a.toLowerCase().includes(lowerCasedSearchTerm))
+    .sort((a, b) => a.localeCompare(b))
+  filteredTags
+    .filter(a =>
+      Object.keys(a)[0]
+        .toLowerCase()
+        .includes(lowerCasedSearchTerm)
+    )
+    .sort((a, b) => {
+      const keyA = Object.keys(a)[0].toLowerCase()
+      const keyB = Object.keys(b)[0].toLowerCase()
+
+      return keyA.localeCompare(keyB)
+    })
 
   return {
-    measurements: dedupeArray(measurements),
+    measurements: dedupedMeasurements,
     fields: filteredFields,
     tags: filteredTags,
   }

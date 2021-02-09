@@ -2,13 +2,18 @@ import React from 'react'
 import {Provider} from 'react-redux'
 import {Router} from 'react-router-dom'
 import {createMemoryHistory} from 'history'
+import {createStore} from 'redux'
 
 import {render} from '@testing-library/react'
 import {initialState as initialVariablesState} from 'src/variables/reducers'
 import {initialState as initialUserSettingsState} from 'src/userSettings/reducers'
-import {default as configureStore, clearStore} from 'src/store/configureStore'
+import {configureStoreForTests} from 'src/store/configureStore'
 import {RemoteDataState, TimeZone, LocalStorage, ResourceType} from 'src/types'
 import {pastFifteenMinTimeRange} from './shared/constants/timeRanges'
+import {mockAppState} from 'src/mockAppState'
+
+// Redux
+import {templatesReducer} from 'src/templates/reducers/index'
 
 const {Orgs} = ResourceType
 const {Done} = RemoteDataState
@@ -25,7 +30,6 @@ export const localState: LocalStorage = {
       navBarState: 'expanded',
       timeZone: 'Local' as TimeZone,
       theme: 'dark',
-      notebookMiniMapState: 'expanded',
     },
   },
   flags: {
@@ -56,11 +60,7 @@ export const localState: LocalStorage = {
 }
 
 export function renderWithRedux(ui, initialState = s => s) {
-  clearStore()
-  const seedStore = configureStore(localState)
-  const seedState = seedStore.getState()
-  clearStore()
-  const store = configureStore(initialState(seedState))
+  const store = configureStoreForTests(initialState(localState))
 
   return {
     ...render(<Provider store={store}>{ui}</Provider>),
@@ -68,13 +68,16 @@ export function renderWithRedux(ui, initialState = s => s) {
   }
 }
 
-export function renderWithReduxAndRouter(ui, initialState = s => s) {
-  clearStore()
+export function renderWithReduxAndRouter(ui, initialState?) {
+  const templatesStore = createStore(templatesReducer)
+  const defaultInitialState = function() {
+    const appState = {...mockAppState} as any
+    appState.resources.templates = templatesStore.getState()
+    return appState
+  }
+  initialState = initialState ?? defaultInitialState
   const history = createMemoryHistory({initialEntries: ['/']})
-  const seedStore = configureStore(localState)
-  const seedState = seedStore.getState()
-  clearStore()
-  const store = configureStore(initialState(seedState))
+  const store = configureStoreForTests(initialState(localState))
 
   return {
     ...render(

@@ -8,10 +8,11 @@ import {fromFlux, Table} from '@influxdata/giraffe'
 import {
   defaultXColumn,
   defaultYColumn,
-  mosaicYcolumn,
+  mosaicYColumn,
   getNumericColumns as getNumericColumnsUtil,
   getGroupableColumns as getGroupableColumnsUtil,
   getStringColumns as getStringColumnsUtil,
+  getMainColumnName,
 } from 'src/shared/utils/vis'
 import {
   getWindowPeriod,
@@ -24,16 +25,18 @@ import {
   millisecondsToDuration,
 } from 'src/shared/utils/duration'
 
-//Selectors
+// Selectors
 import {getAllVariables, asAssignment} from 'src/variables/selectors'
 import {getTimeRange} from 'src/dashboards/selectors'
 
 // Types
 import {
-  QueryView,
-  DashboardQuery,
   AppState,
+  BandViewProperties,
   DashboardDraftQuery,
+  DashboardQuery,
+  NewView,
+  QueryView,
   TimeRange,
 } from 'src/types'
 
@@ -63,6 +66,14 @@ export const getActiveQuery = (state: AppState): DashboardDraftQuery => {
 
   const {draftQueries, activeQueryIndex} = tm
   return draftQueries[activeQueryIndex]
+}
+
+export const getActiveQueryIndex = (state: AppState): number => {
+  const activeTimeMachine = getActiveTimeMachine(state)
+  if (activeTimeMachine) {
+    return activeTimeMachine.activeQueryIndex
+  }
+  return 0
 }
 
 /*
@@ -147,7 +158,7 @@ export const getYColumnSelection = (state: AppState): string => {
       'view.properties.ySeriesColumns[0]'
     )
 
-    return mosaicYcolumn(table, preferredYColumnKey)
+    return mosaicYColumn(table, preferredYColumnKey)
   }
 
   preferredYColumnKey = get(
@@ -193,15 +204,15 @@ export const getFillColumnsSelection = (state: AppState): string[] => {
   )
 
   if (graphType === 'mosaic') {
-    //user hasn't selected a fill column yet
+    // user hasn't selected a fill column yet
     if (preference === null) {
-      //check if value is a string[]
+      // check if value is a string[]
       for (const key of validFillColumns) {
         if (key.startsWith('_value')) {
           return [key]
         }
       }
-      //check if value is a numeric column
+      // check if value is a numeric column
       if (table.columnKeys.includes('_value')) {
         return []
       }
@@ -285,6 +296,20 @@ export const getActiveTimeRange = (
   return null
 }
 
+const getMainColumn = (state: AppState) => {
+  const {builderConfig} = getActiveQuery(state)
+  const {functions} = builderConfig
+  const selectedFunctions = functions.map(f => f.name)
+  const view = getActiveTimeMachine(state).view as NewView<BandViewProperties>
+  const {upperColumn, mainColumn, lowerColumn} = view.properties
+  return getMainColumnName(
+    selectedFunctions,
+    upperColumn,
+    mainColumn,
+    lowerColumn
+  )
+}
+
 export const getSaveableView = (state: AppState): QueryView & {id?: string} => {
   const {view, draftQueries} = getActiveTimeMachine(state)
 
@@ -362,6 +387,17 @@ export const getSaveableView = (state: AppState): QueryView & {id?: string} => {
         ...saveableView.properties,
         xColumn: getXColumnSelection(state),
         yColumn: getYColumnSelection(state),
+        mainColumn: getMainColumn(state),
+        // 'upperColumn' should NOT be saved here, see below
+        // 'lowerColumn' should NOT be saved here, see below
+        /*
+          REASON:
+            In the aggregate function selector of the editor,
+            there is no way to tell which aggregate function will be an upper or lower column.
+
+            The only way to tell is to wait until the user explicitly sets
+            upper and lower columns inside the Band Options -- which saves them.
+        */
       },
     }
   }
