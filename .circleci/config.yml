@@ -1,7 +1,92 @@
-version: 2
+version: 2.1
+orbs:
+  aws-s3: circleci/aws-s3@2.0.0
 
 jobs:
-  build:
+  build_binaries:
+    machine:
+      enabled: true
+      docker_layer_caching: true
+    steps:
+      - checkout
+      - run:
+          name: Build source tarballs
+          command: |
+            WORKING_DIR=$(pwd)
+            mkdir -p ${WORKING_DIR}/tarball
+            "${WORKING_DIR}/releng/source-tarball/build.bash" \
+              -p "${WORKING_DIR}/.git" \
+              -s "${CIRCLE_SHA1}" \
+              -b "${CIRCLE_BRANCH}" \
+              -v "${CIRCLE_BRANCH}-${CIRCLE_SHA1}" \
+              -o "${WORKING_DIR}/tarball"
+      - store_artifacts:
+          path: tarball/
+      - run:
+          name: Build binaries
+          command: |
+            WORKING_DIR=$(pwd)
+            OUTDIR=${WORKING_DIR}/bins
+            mkdir -p ${OUTDIR}
+            GOOS=linux GOARCH=amd64 "${WORKING_DIR}/releng/raw-binaries/build.bash" \
+              -i "${WORKING_DIR}/tarball/influxdb-src-${CIRCLE_SHA1}.tar.gz" \
+              -o "$OUTDIR"
+      - store_artifacts:
+          path: bins/
+      - run:
+          name: Build packages
+          command: |
+            WORKING_DIR=$(pwd)
+            OUTDIR=${WORKING_DIR}/oss-packages
+            BINDIR=${WORKING_DIR}/bins
+            mkdir -p ${OUTDIR}
+            mkdir -p ${BINDIR}
+            "${WORKING_DIR}/releng/packages/build.bash" \
+              -s "${WORKING_DIR}/tarball/influxdb-src-${CIRCLE_SHA1}.tar.gz" \
+              -b "${BINDIR}/influxdb_bin_linux_amd64-${CIRCLE_SHA1}.tar.gz" \
+              -O linux -A amd64 \
+              -o "$OUTDIR"
+      - store_artifacts:
+          path: oss-packages/
+      - when:
+          condition:
+            and: 
+              - equal: [ master-1.x, << pipeline.git.branch >> ]
+              - << pipeline.git.tag >>
+          steps:
+            - aws-s3/copy:
+                arguments: |
+                  --aws-region us-east-1
+                from: 'tarball'
+                to: 's3://dl.influxdata.com/influxdb/releases'
+            - aws-s3/copy:
+                arguments: |
+                  --aws-region us-east-1
+                from: 'bins'
+                to: 's3://dl.influxdata.com/influxdb/releases'
+            - aws-s3/copy:
+                arguments: |
+                  --aws-region us-east-1
+                from: 'oss-packages'
+                to: 's3://dl.influxdata.com/influxdb/releases'
+  #build_container:
+  #build_image:
+  #register_image:
+  #unittest_docker:
+  oss_release_candidate:
+    machine:
+      enabled: true
+      docker_layer_caching: true
+    #parallelism: 3 # How many CircleCI test containers
+    steps:
+      - checkout
+      - run:
+          name: Execute test
+          command: |
+            echo "TODO: Run checks to determine if this build is a release candidate"
+            ls ./
+          no_output_timeout: 1500s
+  test:
     machine:
       enabled: true
       docker_layer_caching: true
@@ -17,3 +102,28 @@ jobs:
           name: Execute test
           command: ./test.sh $CIRCLE_NODE_INDEX
           no_output_timeout: 1500s
+
+workflows:
+  version: 2.1
+  on_push:
+    jobs:
+      - test
+      - build_binaries
+      - oss_release_candidate:
+          requires:
+            - build_binaries
+  daily:
+    triggers:
+      - schedule:
+          # run weekdays at 4am -- note: use spaces, not tabs
+          cron: "0 4 * * 1-5"
+          filters:
+            branches:
+              only:
+                - perftest-1.x
+                #- master-1.x
+    jobs:
+      - build_binaries
+      - oss_release_candidate:
+          requires:
+            - build_binaries

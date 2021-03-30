@@ -1,4 +1,4 @@
-FROM ubuntu:xenial
+FROM ubuntu:focal
 
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     asciidoc \
@@ -11,9 +11,9 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     make \
     mercurial \
     pkg-config \
-    python \
-    python-boto \
-    python-software-properties \
+    python3 \
+    python3-boto \
+    python3-software-properties \
     rpm \
     ruby \
     ruby-dev \
