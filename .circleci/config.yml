@@ -1,18 +1,54 @@
 version: 2.1
 orbs:
   aws-s3: circleci/aws-s3@2.0.0
+parameters:
+  go-version:
+    type: string
+    default: "1.15"
+
+commands:
+  source-vars:
+    description: source the environment variables from the temp workspace
+    steps:
+      - run: |
+          set -x
+          cat /tmp/workspace/env_vars.sh >> $BASH_ENV
+          source $BASH_ENV
 
 jobs:
-  build_binaries:
+  export_vars:
     machine:
       enabled: true
       docker_layer_caching: true
     steps:
       - checkout
       - run:
+          name: Export environment variables to bash environment
+          command: |
+            set -x
+            go_ver=$(grep -r '^go ' go.mod | cut -d ' ' -f2)
+            test -n "$go_ver"
+            working_dir=/home/circleci/project
+            touch env_vars.sh
+            echo "export WORKING_DIR=$working_dir" >> env_vars.sh
+            echo "export GO_VERSION=$go_ver" >> env_vars.sh
+      - persist_to_workspace:
+          root: .
+          paths:
+            - env_vars.sh
+  build_binaries:
+    machine:
+      enabled: true
+      docker_layer_caching: true
+    steps:
+      - attach_workspace:
+          at: /tmp/workspace
+      - source-vars
+      - checkout
+      - run:
           name: Build source tarballs
           command: |
-            WORKING_DIR=$(pwd)
+            set -x
             mkdir -p ${WORKING_DIR}/tarball
             "${WORKING_DIR}/releng/source-tarball/build.bash" \
               -p "${WORKING_DIR}/.git" \
@@ -25,7 +61,6 @@ jobs:
       - run:
           name: Build binaries
           command: |
-            WORKING_DIR=$(pwd)
             OUTDIR=${WORKING_DIR}/bins
             mkdir -p ${OUTDIR}
             GOOS=linux GOARCH=amd64 "${WORKING_DIR}/releng/raw-binaries/build.bash" \
@@ -36,7 +71,6 @@ jobs:
       - run:
           name: Build packages
           command: |
-            WORKING_DIR=$(pwd)
             OUTDIR=${WORKING_DIR}/oss-packages
             BINDIR=${WORKING_DIR}/bins
             mkdir -p ${OUTDIR}
@@ -50,7 +84,7 @@ jobs:
           path: oss-packages/
       - when:
           condition:
-            and: 
+            and:
               - equal: [ master-1.x, << pipeline.git.branch >> ]
               - << pipeline.git.tag >>
           steps:
@@ -69,10 +103,26 @@ jobs:
                   --aws-region us-east-1
                 from: 'oss-packages'
                 to: 's3://dl.influxdata.com/influxdb/releases'
-  #build_container:
-  #build_image:
-  #register_image:
-  #unittest_docker:
+  changelog:
+    docker:
+      - image: jsternberg/changelog:latest
+    steps:
+      - checkout
+      - run:
+          name: changelog-magic
+          command: |
+            set -ex
+            if [ -n << pipeline.git.base_revision >> ]; then
+              sh "git changelog << pipeline.git.base_revision >>"
+            else
+              sh "git changelog"
+            fi
+
+            if ! git diff --quiet; then
+              git config remote.origin.pushurl git@github.com:influxdata/influxdb.git
+              git commit -am 'Update changelog'
+              git push origin HEAD:${CIRCLE_BRANCH}
+            fi
   oss_release_candidate:
     machine:
       enabled: true
@@ -81,7 +131,7 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Execute test
+          name: Check OSS release candidacy
           command: |
             echo "TODO: Run checks to determine if this build is a release candidate"
             ls ./
@@ -94,6 +144,9 @@ jobs:
       - PARALLELISM: 4 # Amount of parallelism within each test (not the number of tests)
     parallelism: 3 # How many CircleCI test containers
     steps:
+      - attach_workspace:
+          at: /tmp/workspace
+      - source-vars
       - checkout
       - run:
           name: Ensure CircleCI parallelism matches "./test.sh count"
@@ -107,11 +160,14 @@ workflows:
   version: 2.1
   on_push:
     jobs:
-      - test
-      - build_binaries
-      - oss_release_candidate:
+      - export_vars
+      - changelog:
+          filters:
+            branches:
+              only: /^1(.\d+)*$/
+      - test:
           requires:
-            - build_binaries
+            - export_vars
   daily:
     triggers:
       - schedule:
@@ -120,10 +176,21 @@ workflows:
           filters:
             branches:
               only:
-                - perftest-1.x
-                #- master-1.x
+                - "master-1.x"
+                - "1.8"
+                - "1.7"
     jobs:
-      - build_binaries
+      - export_vars
+      - changelog:
+          filters:
+            branches:
+              only: /^1(.\d+)*$/
+      - test:
+          requires:
+            - export_vars
+      - build_binaries:
+          requires:
+            - test
       - oss_release_candidate:
           requires:
             - build_binaries
