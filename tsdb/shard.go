@@ -723,17 +723,22 @@ func (s *Shard) createFieldsAndMeasurements(fieldsToCreate []*FieldCreate) error
 	if err != nil {
 		return err
 	}
-
+	fieldsByMeasurement := make(map[*MeasurementFields][]*FieldCreate)
 	// add fields
 	for _, f := range fieldsToCreate {
 		mf := engine.MeasurementFields(f.Measurement)
-		if err := mf.CreateFieldIfNotExists([]byte(f.Field.Name), f.Field.Type); err != nil {
+		if s, ok := fieldsByMeasurement[mf] ; ok {
+			fieldsByMeasurement[mf] = append(s, f)
+		} else {
+			// TODO: DSB - make a bigger capacity slice here for efficiency?
+			fieldsByMeasurement[mf] = []*FieldCreate {f}
+		}
+	}
+	for mf, sfc := range fieldsByMeasurement {
+		if err := mf.CreateManyFieldsIfNotExist(s, sfc); err != nil {
 			return err
 		}
-
-		s.index.SetFieldName(f.Measurement, f.Field.Name)
 	}
-
 	return engine.MeasurementFieldSet().Save()
 }
 
@@ -1544,8 +1549,7 @@ func (m *MeasurementFields) bytes() int {
 }
 
 // CreateFieldIfNotExists creates a new field with an autoincrementing ID.
-// Returns an error if 255 fields have already been created on the measurement or
-// the fields already exists with a different type.
+// Returns an error if the field already exists with a different type.
 func (m *MeasurementFields) CreateFieldIfNotExists(name []byte, typ influxql.DataType) error {
 	fields := m.fields.Load().(map[string]*Field)
 
@@ -1582,6 +1586,39 @@ func (m *MeasurementFields) CreateFieldIfNotExists(name []byte, typ influxql.Dat
 	fieldsUpdate[string(name)] = f
 	m.fields.Store(fieldsUpdate)
 
+	return nil
+}
+// CreateManyFieldsIfNotExist creates new fields with an autoincrementing ID.
+// Returns an error if any field already existw with a different type.
+func (m *MeasurementFields) CreateManyFieldsIfNotExist(s *Shard, fieldsToCreate []*FieldCreate) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	fields := m.fields.Load().(map[string]*Field)
+	fieldsUpdate := make(map[string]*Field, len(fields)+len(fieldsToCreate))
+	for k, v := range fields {
+		fieldsUpdate[k] = v
+	}
+
+	for _, fc := range fieldsToCreate {
+		// Check field and type under write lock.
+		if f := fields[fc.Field.Name]; f != nil {
+			if f.Type != fc.Field.Type {
+				return ErrFieldTypeConflict
+			}
+			continue
+		}
+
+		// Create and append a new field.
+		f := &Field{
+			ID:   uint8(len(fieldsUpdate) + 1),
+			Name: fc.Field.Name,
+			Type: fc.Field.Type,
+		}
+		fieldsUpdate[fc.Field.Name] = f
+		s.index.SetFieldName(fc.Measurement, fc.Field.Name)
+	}
+	m.fields.Store(fieldsUpdate)
 	return nil
 }
 
