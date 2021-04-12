@@ -727,11 +727,11 @@ func (s *Shard) createFieldsAndMeasurements(fieldsToCreate []*FieldCreate) error
 	// add fields
 	for _, f := range fieldsToCreate {
 		mf := engine.MeasurementFields(f.Measurement)
-		if s, ok := fieldsByMeasurement[mf] ; ok {
+		if s, ok := fieldsByMeasurement[mf]; ok {
 			fieldsByMeasurement[mf] = append(s, f)
 		} else {
 			// TODO: DSB - make a bigger capacity slice here for efficiency?
-			fieldsByMeasurement[mf] = []*FieldCreate {f}
+			fieldsByMeasurement[mf] = []*FieldCreate{f}
 		}
 	}
 	for mf, sfc := range fieldsByMeasurement {
@@ -1588,6 +1588,7 @@ func (m *MeasurementFields) CreateFieldIfNotExists(name []byte, typ influxql.Dat
 
 	return nil
 }
+
 // CreateManyFieldsIfNotExist creates new fields with an autoincrementing ID.
 // Returns an error if any field already existw with a different type.
 func (m *MeasurementFields) CreateManyFieldsIfNotExist(s *Shard, fieldsToCreate []*FieldCreate) error {
