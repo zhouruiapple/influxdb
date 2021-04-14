@@ -1590,7 +1590,7 @@ func (m *MeasurementFields) CreateFieldIfNotExists(name []byte, typ influxql.Dat
 }
 
 // CreateManyFieldsIfNotExist creates new fields with an autoincrementing ID.
-// Returns an error if any field already existw with a different type.
+// Returns an error if any field already exists with a different type.
 func (m *MeasurementFields) CreateManyFieldsIfNotExist(s *Shard, fieldsToCreate []*FieldCreate) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
