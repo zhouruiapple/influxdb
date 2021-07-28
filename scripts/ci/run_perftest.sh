@@ -68,7 +68,7 @@ fi
 go version
 
 # clone influxdb comparisons
-git clone https://github.com/influxdata/influxdb-comparisons.git $working_dir/influxdb-comparisons
+git clone -b query-gen-by-version https://github.com/influxdata/influxdb-comparisons.git $working_dir/influxdb-comparisons
 cd $working_dir/influxdb-comparisons
 
 # install cmds

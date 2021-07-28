@@ -49,6 +49,7 @@ workflows:
             branches:
               only:
                 - "2.0"
+                - "perftest-checkout-alt-branch-2.0"
       - e2e:
           requires:
             - build
