@@ -185,17 +185,27 @@ func TestServer_Query_ShowDatabases(t *testing.T) {
 }
 
 func TestServer_Query_Subquery(t *testing.T) {
+	const (
+		timeZero = "1970-01-01T00:00:00Z"
+		timeOne = "2004-04-09T01:00:00Z"
+		timeTwo = "2004-04-09T01:00:10Z"
+		timeThree = "2004-04-09T01:00:20Z"
+		timeFour = "2004-04-09T01:00:30Z"
+		timeFive = "2004-04-09T01:00:40Z"
+	)
+	times := []string {timeZero, timeOne, timeTwo, timeThree, timeFour, timeFive}
+	
 	writes := []string{
-		fmt.Sprintf(`request,region=west,status=200 duration_ms=100 %d`, mustParseTime(time.RFC3339Nano, "2004-04-09T01:00:00Z").UnixNano()),
-		fmt.Sprintf(`request,region=west,status=200 duration_ms=100 %d`, mustParseTime(time.RFC3339Nano, "2004-04-09T01:00:10Z").UnixNano()),
-		fmt.Sprintf(`request,region=west,status=200 duration_ms=100 %d`, mustParseTime(time.RFC3339Nano, "2004-04-09T01:00:20Z").UnixNano()),
-		fmt.Sprintf(`request,region=west,status=204 duration_ms=100 %d`, mustParseTime(time.RFC3339Nano, "2004-04-09T01:00:30Z").UnixNano()),
-		fmt.Sprintf(`request,region=west,status=204 duration_ms=100 %d`, mustParseTime(time.RFC3339Nano, "2004-04-09T01:00:40Z").UnixNano()),
-		fmt.Sprintf(`request,region=west,status=500 duration_ms=200 %d`, mustParseTime(time.RFC3339Nano, "2004-04-09T01:00:00Z").UnixNano()),
-		fmt.Sprintf(`request,region=west,status=500 duration_ms=200 %d`, mustParseTime(time.RFC3339Nano, "2004-04-09T01:00:10Z").UnixNano()),
-		fmt.Sprintf(`request,region=west,status=500 duration_ms=200 %d`, mustParseTime(time.RFC3339Nano, "2004-04-09T01:00:20Z").UnixNano()),
-		fmt.Sprintf(`request,region=west,status=504 duration_ms=200 %d`, mustParseTime(time.RFC3339Nano, "2004-04-09T01:00:30Z").UnixNano()),
-		fmt.Sprintf(`request,region=west,status=504 duration_ms=200 %d`, mustParseTime(time.RFC3339Nano, "2004-04-09T01:00:40Z").UnixNano()),
+		fmt.Sprintf(`request,region=west,status=200 duration_ms=100 %d`, mustParseTime(time.RFC3339Nano, times[1]).UnixNano()),
+		fmt.Sprintf(`request,region=west,status=200 duration_ms=100 %d`, mustParseTime(time.RFC3339Nano, times[2]).UnixNano()),
+		fmt.Sprintf(`request,region=west,status=200 duration_ms=100 %d`, mustParseTime(time.RFC3339Nano, times[3]).UnixNano()),
+		fmt.Sprintf(`request,region=west,status=204 duration_ms=100 %d`, mustParseTime(time.RFC3339Nano, times[4]).UnixNano()),
+		fmt.Sprintf(`request,region=west,status=204 duration_ms=100 %d`, mustParseTime(time.RFC3339Nano, times[5]).UnixNano()),
+		fmt.Sprintf(`request,region=west,status=500 duration_ms=200 %d`, mustParseTime(time.RFC3339Nano, times[1]).UnixNano()),
+		fmt.Sprintf(`request,region=west,status=500 duration_ms=200 %d`, mustParseTime(time.RFC3339Nano, times[2]).UnixNano()),
+		fmt.Sprintf(`request,region=west,status=500 duration_ms=200 %d`, mustParseTime(time.RFC3339Nano, times[3]).UnixNano()),
+		fmt.Sprintf(`request,region=west,status=504 duration_ms=200 %d`, mustParseTime(time.RFC3339Nano, times[4]).UnixNano()),
+		fmt.Sprintf(`request,region=west,status=504 duration_ms=200 %d`, mustParseTime(time.RFC3339Nano, times[5]).UnixNano()),
 	}
 
 	ctx := context.Background()
@@ -219,7 +229,7 @@ func TestServer_Query_Subquery(t *testing.T) {
 		WHERE status =~ /^5.*$/ AND region = 'west'
 	)
 `,
-			exp: `{"results":[{"statement_id":0,"series":[{"name":"request","columns":["time","sum_success","sum_fail"],"values":[["1970-01-01T00:00:00Z",500,1000]]}]}]}`,
+			exp: `{"results":[{"statement_id":0,"series":[{"name":"request","columns":["time","sum_success","sum_fail"],"values":[["` + timeZero + `",500,1000]]}]}]}`,
 		},
 		{
 			name:   "different time predicates for same field",
@@ -229,14 +239,14 @@ func TestServer_Query_Subquery(t *testing.T) {
 	FROM (
 		SELECT duration_ms as r1
 		FROM request
-		WHERE time >= '2004-04-09T01:00:00Z' AND time <= '2004-04-09T01:00:20Z'
+		WHERE time >= '` + times[1] + `' AND time <= '` + times[3] + `'
 	), (
 		SELECT duration_ms as r2
 		FROM request
-		WHERE time >= '2004-04-09T01:00:10Z' AND time <= '2004-04-09T01:00:40Z'
+		WHERE time >= '` + times[2] + `' AND time <= '` + times[5] + `'
 	)
 `,
-			exp: `{"results":[{"statement_id":0,"series":[{"name":"request","columns":["time","r1","r2"],"values":[["1970-01-01T00:00:00Z",6,8]]}]}]}`,
+			exp: `{"results":[{"statement_id":0,"series":[{"name":"request","columns":["time","r1","r2"],"values":[["` + timeZero + `",6,8]]}]}]}`,
 		},
 		{
 			name:   "outer query with narrower time range than subqueries",
@@ -246,15 +256,15 @@ func TestServer_Query_Subquery(t *testing.T) {
 	FROM (
 		SELECT duration_ms as r1
 		FROM request
-		WHERE time >= '2004-04-09T01:00:00Z' AND time <= '2004-04-09T01:00:20Z'
+		WHERE time >= '` + times[1] + `' AND time <= '` + times[3] + `'
 	), (
 		SELECT duration_ms as r2
 		FROM request
-		WHERE time >= '2004-04-09T01:00:10Z' AND time <= '2004-04-09T01:00:40Z'
+		WHERE time >= '` + times[2] + `' AND time <= '` + times[5] + `'
 	)
-	WHERE time >= '2004-04-09T01:00:20Z' AND time <= '2004-04-09T01:00:30Z'
+	WHERE time >= '` + times[3] + `' AND time <= '` + times[4] + `'
 `,
-			exp: `{"results":[{"statement_id":0,"series":[{"name":"request","columns":["time","r1","r2"],"values":[["2004-04-09T01:00:20Z",2,4]]}]}]}`,
+			exp: `{"results":[{"statement_id":0,"series":[{"name":"request","columns":["time","r1","r2"],"values":[["` + times[3] + `",2,4]]}]}]}`,
 		},
 		{
 			name:   "outer query with narrower time range than subqueries using aggregates",
@@ -264,15 +274,15 @@ func TestServer_Query_Subquery(t *testing.T) {
 	FROM (
 		SELECT COUNT(duration_ms) as r1
 		FROM request
-		WHERE time >= '2004-04-09T01:00:00Z' AND time <= '2004-04-09T01:00:20Z'
+		WHERE time >= '` + times[1] + `' AND time <= '` + times[3] + `'
 	), (
 		SELECT COUNT(duration_ms) as r2
 		FROM request
-		WHERE time >= '2004-04-09T01:00:10Z' AND time <= '2004-04-09T01:00:40Z'
+		WHERE time >= '` + times[3] + `' AND time <= '` + times[4] + `'
 	)
-	WHERE time >= '2004-04-09T01:00:20Z' AND time <= '2004-04-09T01:00:30Z'
+	WHERE time >= '` + times[3] + `' AND time <= '` + times[4] + `'
 `,
-			exp: `{"results":[{"statement_id":0,"series":[{"name":"request","columns":["time","r1","r2"],"values":[["2004-04-09T01:00:20Z",2,null],["2004-04-09T01:00:20Z",null,4]]}]}]}`,
+			exp: `{"results":[{"statement_id":0,"series":[{"name":"request","columns":["time","r1","r2"],"values":[["` + times[3] + `",2,null],["` + times[3] + `",null,4]]}]}]}`,
 		},
 		{
 			name:   "outer query with no time range and subqueries using aggregates",
@@ -282,11 +292,11 @@ func TestServer_Query_Subquery(t *testing.T) {
 	FROM (
 		SELECT COUNT(duration_ms) as r1
 		FROM request
-		WHERE time >= '2004-04-09T01:00:00Z' AND time <= '2004-04-09T01:00:20Z'
+		WHERE time >= '` + times[1] + `' AND time <= '` + times[3] + `'
 	), (
 		SELECT COUNT(duration_ms) as r2
 		FROM request
-		WHERE time >= '2004-04-09T01:00:10Z' AND time <= '2004-04-09T01:00:40Z'
+		WHERE time >= '` + times[2] + `' AND time <= '` + times[5] + `'
 	)
 `,
 			exp: `{"results":[{"statement_id":0,"series":[{"name":"request","columns":["time","r1","r2"],"values":[["2004-04-09T01:00:00Z",6,null],["2004-04-09T01:00:10Z",null,8]]}]}]}`,
