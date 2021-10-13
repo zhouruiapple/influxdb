@@ -185,16 +185,21 @@ func TestServer_Query_ShowDatabases(t *testing.T) {
 }
 
 func TestServer_Query_Subquery(t *testing.T) {
+	// Set up the time constants.
 	const (
-		timeZero = "1970-01-01T00:00:00Z"
-		timeOne = "2004-04-09T01:00:00Z"
-		timeTwo = "2004-04-09T01:00:10Z"
+		timeZero  = "1970-01-01T00:00:00Z"
+		timeOne   = "2004-04-09T01:00:00Z"
+		timeTwo   = "2004-04-09T01:00:10Z"
 		timeThree = "2004-04-09T01:00:20Z"
-		timeFour = "2004-04-09T01:00:30Z"
-		timeFive = "2004-04-09T01:00:40Z"
+		timeFour  = "2004-04-09T01:00:30Z"
+		timeFive  = "2004-04-09T01:00:40Z"
 	)
-	times := []string {timeZero, timeOne, timeTwo, timeThree, timeFour, timeFive}
-	
+	// Put the time constants in an ordered slice, so we no longer care about their
+	// actual values, we just know that smaller slice indices are earlier times.
+	// It is much easier to reason about them when they are represented by single-digit
+	// integers and we don't have to parse them every time we read them.
+	times := []string{timeZero, timeOne, timeTwo, timeThree, timeFour, timeFive}
+
 	writes := []string{
 		fmt.Sprintf(`request,region=west,status=200 duration_ms=100 %d`, mustParseTime(time.RFC3339Nano, times[1]).UnixNano()),
 		fmt.Sprintf(`request,region=west,status=200 duration_ms=100 %d`, mustParseTime(time.RFC3339Nano, times[2]).UnixNano()),
@@ -299,7 +304,7 @@ func TestServer_Query_Subquery(t *testing.T) {
 		WHERE time >= '` + times[2] + `' AND time <= '` + times[5] + `'
 	)
 `,
-			exp: `{"results":[{"statement_id":0,"series":[{"name":"request","columns":["time","r1","r2"],"values":[["2004-04-09T01:00:00Z",6,null],["2004-04-09T01:00:10Z",null,8]]}]}]}`,
+			exp: `{"results":[{"statement_id":0,"series":[{"name":"request","columns":["time","r1","r2"],"values":[["` + times[1] + `",6,null],["` + times[2] + `",null,8]]}]}]}`,
 		},
 		{
 			name:   "outer query with narrower time range than subqueries no aggregate",
@@ -309,13 +314,13 @@ func TestServer_Query_Subquery(t *testing.T) {
 	FROM (
 		SELECT duration_ms as r1
 		FROM request
-		WHERE time >= '2004-04-09T01:00:00Z' AND time <= '2004-04-09T01:00:20Z'
+		WHERE time >= '` + times[1] + `' AND time <= '` + times[3] + `'
 	), (
 		SELECT duration_ms as r2
 		FROM request
-		WHERE time >= '2004-04-09T01:00:10Z' AND time <= '2004-04-09T01:00:40Z'
+		WHERE time >= '` + times[2] + `' AND time <= '` + times[5] + `'
 	)
-	WHERE time >= '2004-04-09T01:00:20Z' AND time <= '2004-04-09T01:00:30Z'
+		WHERE time >= '` + times[3] + `' AND time <= '` + times[4] + `'
 `,
 			exp: `{"results":[{"statement_id":0,"series":[{"name":"request","columns":["time","r1","r2"],"values":[["2004-04-09T01:00:20Z",100,null],["2004-04-09T01:00:20Z",null,100],["2004-04-09T01:00:20Z",200,null],["2004-04-09T01:00:20Z",null,200],["2004-04-09T01:00:30Z",null,200],["2004-04-09T01:00:30Z",null,100]]}]}]}`,
 		},
@@ -331,9 +336,9 @@ func TestServer_Query_Subquery(t *testing.T) {
 		SELECT duration_ms as r2
 		FROM request
 	)
-	WHERE time >= '2004-04-09T01:00:20Z' AND time <= '2004-04-09T01:00:30Z'
+	WHERE time >= '` + times[3] + `' AND time <= '` + times[4] + `'
 `,
-			exp: `{"results":[{"statement_id":0,"series":[{"name":"request","columns":["time","r1","r2"],"values":[["2004-04-09T01:00:20Z",4,4]]}]}]}`,
+			exp: `{"results":[{"statement_id":0,"series":[{"name":"request","columns":["time","r1","r2"],"values":[["` + times[3] + `",4,4]]}]}]}`,
 		},
 	}
 
