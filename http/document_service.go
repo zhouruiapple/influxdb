@@ -7,12 +7,13 @@ import (
 	"path"
 
 	"github.com/influxdata/httprouter"
+	"go.uber.org/zap"
+
 	"github.com/influxdata/influxdb/v2"
 	"github.com/influxdata/influxdb/v2/kit/platform"
 	"github.com/influxdata/influxdb/v2/kit/platform/errors"
 	"github.com/influxdata/influxdb/v2/kit/tracing"
 	"github.com/influxdata/influxdb/v2/pkg/httpc"
-	"go.uber.org/zap"
 )
 
 const prefixDocuments = "/api/v2/documents"
@@ -105,6 +106,8 @@ func newDocumentsResponse(ns string, docs []*influxdb.Document) *documentsRespon
 
 // handleGetDocuments is the HTTP handler for the GET /api/v2/documents/:ns route.
 func (h *DocumentHandler) handleGetDocuments(w http.ResponseWriter, r *http.Request) {
+	h.log.Warn("/api/v2/documents is deprecated and will be removed in a future release. Please update your API calls to avoid problems with future breaking changes.")
+
 	ctx := r.Context()
 	req, err := decodeGetDocumentsRequest(ctx, r)
 	if err != nil {
