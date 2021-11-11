@@ -917,7 +917,7 @@ jobs:
             docker push quay.io/influxdb/oss-acceptance:latest
   changelog:
     docker:
-      - image: quay.io/influxdb/changelogger:cf2648551b43797458d21e061501f60590b31daa
+      - image: quay.io/influxdb/changelogger:wb-test
     steps:
       - checkout
       - run:
@@ -934,23 +934,17 @@ jobs:
               BRANCH="$(echo "$DOCS_LINKS_VERSION" | sed 's/v//' )"
             fi
 
+            if [[ "$BRANCH" == "master" ]] ;  then
+              VERSION="dev"
+            fi
+
             mkdir changelog_artifacts
 
             echo -e "CHANGELOG for InfluxDB OSS $VERSION commit ${CIRCLE_SHA1}\n" > changelog_artifacts/CHANGELOG.md
-
             if [[ ! "$BRANCH" == "master" ]] ;  then
               echo -e "In addition to the list of changes below, please also see the [official release notes](https://docs.influxdata.com/influxdb/$DOCS_LINKS_VERSION/reference/release-notes/influxdb/) for other important information about this release.\n" >> changelog_artifacts/CHANGELOG.md
             fi
-
-            if [[ "$BRANCH" == "master" ]] ;  then
-               LATEST_21X="$(git tag | grep '^v2\.1\.[0-9]*$' | sort -V | tail -1)"
-               # build 2.1.0 to 2.1.x changelog, plus unreleased from master
-               build-multibranch-changelog.sh HEAD "$LATEST_21X" v2.1.0 >> changelog_artifacts/CHANGELOG.md
-            elif [[ "$BRANCH" == "2.1" ]] ;  then
-               # build 2.1.0 to current 2.1 changelog
-               build-simple-changelog.sh HEAD v2.1.0 >> changelog_artifacts/CHANGELOG.md
-            fi
-
+            build-changelog-by-tags.sh v2.1.1 >> changelog_artifacts/CHANGELOG.md
             cat ./scripts/ci/CHANGELOG_frozen.md >> changelog_artifacts/CHANGELOG.md
       - store_artifacts:
           path: changelog_artifacts/
