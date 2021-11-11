@@ -2,4 +2,4 @@ The Changelog has moved!
 
 You can find it at the following URL:
 
-https://dl.influxdata.com/platform/nightlies/master/CHANGELOG.md
+https://dl.influxdata.com/platform/nightlies/2.1/CHANGELOG.md
