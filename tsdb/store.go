@@ -1391,9 +1391,9 @@ func (s *Store) DeleteSeries(database string, sources []influxql.Source, conditi
 	epochs := s.epochsForShards(shards)
 	s.mu.RUnlock()
 
-	// Limit to 1 delete for each shard since expanding the measurement into the list
+	// Limit to 2 deletes for each shard since expanding the measurement into the list
 	// of series keys can be very memory intensive if run concurrently.
-	limit := limiter.NewFixed(1)
+	limit := limiter.NewFixed(2)
 
 	return s.walkShards(shards, func(sh *Shard) error {
 		// Determine list of measurements from sources.
