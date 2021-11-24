@@ -2,6 +2,8 @@ module github.com/influxdata/influxdb/v2
 
 go 1.17
 
+replace github.com/influxdata/influx-cli/v2 => /Users/wbaker/influx-cli
+
 require (
 	github.com/BurntSushi/toml v0.3.1
 	github.com/Masterminds/squirrel v1.5.0
