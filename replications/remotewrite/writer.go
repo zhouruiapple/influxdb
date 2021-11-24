@@ -183,7 +183,8 @@ func PostWrite(ctx context.Context, config *influxdb.ReplicationHTTPConfig, data
 	req := client.PostWrite(ctx).
 		Org(config.RemoteOrgID.String()).
 		Bucket(config.RemoteBucketID.String()).
-		Body(data)
+		Body(data).
+		ContentEncoding("gzip")
 
 	res, err := req.ExecuteWithHttpInfo()
 	if res == nil {
